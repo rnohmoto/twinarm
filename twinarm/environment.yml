@@ -1,0 +1,14 @@
+# conda environment for the twinarm package.
+#
+# This file declares only the interpreter and pip. All package dependencies
+# live in pyproject.toml, which is the single source of truth.
+#
+#   conda env create -f environment.yml
+#   conda activate twinarm
+#   pip install -e ".[dev]"
+name: twinarm
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip

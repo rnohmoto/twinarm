@@ -1,0 +1,39 @@
+[project]
+name = "twinarm"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+
+# Code Formatting Configuration
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+extend-select = [
+    "F",
+    "D", #pydocstyle
+    "I001", #isort
+]
+extend-ignore = [
+    "D100",
+    "D401",
+]
+
+[tool.lint.isort]
+known-first-party = ["twinarm"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["D104"]
+"tests/**" = ["D"]
+"test_*.py" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.format]
+quote-style = "double"

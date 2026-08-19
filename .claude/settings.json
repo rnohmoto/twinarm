@@ -1,4 +1,9 @@
 {
+  "env": {
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-fable-5[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-opus-5[1m]",
+    "ANTHROPIC_MODEL": "opusplan"
+  },
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true,
     "playwright@claude-plugins-official": true,

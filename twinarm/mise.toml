@@ -1,0 +1,25 @@
+[tasks.format]
+description = "Auto-fix lint violations, then format; pass --check to verify only"
+usage = 'flag "-c --check" help="Report violations without writing files"'
+run = '''
+set -e
+if [ -n "${usage_check:-}" ]; then
+  uv run ruff check .
+  uv run ruff format --check .
+else
+  uv run ruff check --fix-only .
+  uv run ruff format .
+fi
+'''
+
+[tasks.type]
+description = "Type check; pass --fix to apply fixes"
+usage = '''
+flag "-f --fix" help="Apply fixes to resolve errors"
+arg "[paths]" var=#true help="Paths to check (default: whole project)"
+'''
+run = "uv run ty check ${usage_fix:+--fix} ${usage_paths:-}"
+
+[tasks.check]
+description = "Verify formatting and types without writing files"
+depends = ["format --check", "type"]

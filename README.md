@@ -30,6 +30,7 @@ shared tool configuration.
 - macOS
 - Python 3.13 (pinned in `.python-version`)
 - [uv](https://docs.astral.sh/uv/)
+- [mise](https://mise.jdx.dev/) — task runner (used by `twinarm/`)
 - Koch v1.1 leader and follower arms connected over USB. Serial ports appear as `/dev/tty.usbmodem*`.
 
 ## Setup
@@ -50,7 +51,9 @@ with.
 
 ## Development
 
-Run these inside the subproject you are changing (`twinarm/` or `descovery/`):
+`twinarm/` runs its checks as mise tasks — see [`twinarm/README.md`](twinarm/README.md).
+
+`descovery/` has no tasks; run its tools directly from that directory:
 
 ```bash
 uv run ruff check .    # lint

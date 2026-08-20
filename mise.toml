@@ -1,0 +1,4 @@
+monorepo_root = true
+
+[monorepo]
+config_roots = ["twinarm", "twinarm-web-ui"]

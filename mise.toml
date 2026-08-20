@@ -1,4 +1,7 @@
 monorepo_root = true
 
+[tools]
+uv = "0.12.5"
+
 [monorepo]
 config_roots = ["twinarm", "twinarm-web-ui"]

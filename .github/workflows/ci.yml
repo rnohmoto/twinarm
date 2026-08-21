@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MISE_VERSION: 2026.8.9
+
+jobs:
+  # Runs exactly what `mise run check` runs locally. descovery/ is absent on
+  # purpose: its scripts need real arms attached.
+  check:
+    name: check (twinarm, twinarm-web-ui)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install root tools (uv)
+        uses: jdx/mise-action@v4
+        with:
+          version: ${{ env.MISE_VERSION }}
+
+      - name: Install web UI tools (node)
+        uses: jdx/mise-action@v4
+        with:
+          version: ${{ env.MISE_VERSION }}
+          working_directory: twinarm-web-ui
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('twinarm/uv.lock') }}
+          restore-keys: uv-${{ runner.os }}-
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('twinarm-web-ui/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      - name: Install twinarm dependencies
+        run: mise exec -- uv sync
+        working-directory: twinarm
+
+      - name: Install web UI dependencies
+        run: mise run install
+        working-directory: twinarm-web-ui
+
+      - name: Check
+        run: mise run check
+
+  e2e:
+    name: e2e (twinarm-web-ui)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install web UI tools (node)
+        uses: jdx/mise-action@v4
+        with:
+          version: ${{ env.MISE_VERSION }}
+          working_directory: twinarm-web-ui
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('twinarm-web-ui/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      - name: Install web UI dependencies
+        run: mise run install
+        working-directory: twinarm-web-ui
+
+      - uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('twinarm-web-ui/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        run: mise exec -- npx playwright install --with-deps chromium
+        working-directory: twinarm-web-ui
+
+      - name: End-to-end tests
+        run: mise run e2e
+        working-directory: twinarm-web-ui
+
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: twinarm-web-ui/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore

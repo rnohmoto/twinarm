@@ -16,8 +16,6 @@ Read @README.md for what this package is, its current state, and its layout.
   finish; report its real output. If it reports formatting violations, run `mise run format` and
   re-run it. The tasks are listed in [README.md](README.md) — use them rather than bare
   `uv run ruff` / `uv run ty` in this directory.
-- `mise run check` does not come back clean today: `ty` reports one `unresolved-import` for `pytest`
-  in `tests/test_package.py`, because pytest is not a declared dependency. That single diagnostic is
-  the baseline — do not add pytest to silence it — and your change must introduce no others.
-  `mise run type src` checks the package on its own. Check the testing status in
-  [`../AGENTS.md`](../AGENTS.md) before running or claiming tests.
+- `mise run check` comes back clean, and must stay that way: it is `format --check`, `type`, and
+  `test` (pytest). Introduce no new diagnostics and no failing tests. `mise run type src` checks the
+  package on its own when you want to exclude the tests.

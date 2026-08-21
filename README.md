@@ -57,7 +57,8 @@ with.
 ## Development
 
 `twinarm/` and `twinarm-web-ui/` run their checks as mise tasks. Both use the same task names, so
-one vocabulary covers both: `format`, `type`, `test`, `check` (and `fsd` and `e2e` in the web UI).
+one vocabulary covers both: `format`, `type`, `test`, `check` (plus `build`, `fsd` and `e2e` in
+the web UI).
 See [`twinarm/README.md`](twinarm/README.md) and
 [`twinarm-web-ui/README.md`](twinarm-web-ui/README.md) for the details.
 

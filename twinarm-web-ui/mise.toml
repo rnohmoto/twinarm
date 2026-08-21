@@ -27,6 +27,10 @@ run = "npx tsc -b"
 description = "Run unit and component tests once (Vitest)"
 run = "npx vitest run"
 
+[tasks.build]
+description = "Build for production; `type` already covers the tsc half"
+run = "npx vite build"
+
 [tasks.fsd]
 description = "Verify Feature-Sliced Design layer and public-API rules (steiger)"
 run = "npx steiger ./src"
@@ -36,5 +40,5 @@ description = "Run end-to-end tests (Playwright); needs: npx playwright install 
 run = "npx playwright test"
 
 [tasks.check]
-description = "Verify formatting, types, FSD rules, and tests without writing files"
-depends = ["format --check", "type", "fsd", "test"]
+description = "Verify formatting, types, FSD rules, tests, and the production build"
+depends = ["format --check", "type", "fsd", "test", "build"]

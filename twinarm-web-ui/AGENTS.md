@@ -9,7 +9,8 @@ Read @README.md for the stack, the layout, and every command.
 - Run `npm` here, never at the repository root, and prefer the mise tasks over bare `npx`.
 - After changing anything here you must run `mise run check` and make it pass before you finish;
   report its real output. If it reports formatting violations, run `mise run format` and re-run it.
-- `mise run check` does **not** run the end-to-end tests. Run `mise run e2e` separately when you
+- `mise run check` covers formatting, types, the FSD rules, the unit tests, and the production
+  build. It does **not** run the end-to-end tests. Run `mise run e2e` separately when you
   change routing, the page shell, or the mock backend. It needs browsers once:
   `npx playwright install chromium`.
 - Do not add dependencies without an explicit request.

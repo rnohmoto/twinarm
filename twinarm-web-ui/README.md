@@ -40,7 +40,8 @@ mise run format   # eslint --fix, then prettier --write (-c/--check to verify on
 mise run type     # tsc --build
 mise run test     # vitest run
 mise run fsd      # steiger: layer and public-API rules
-mise run check    # format --check + type + fsd + test; writes nothing
+mise run build    # vite build (type covers the tsc half)
+mise run check    # format --check + type + fsd + test + build
 mise run e2e      # playwright test (not part of check)
 ```
 

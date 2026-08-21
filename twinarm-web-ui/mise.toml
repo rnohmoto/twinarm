@@ -1,2 +1,45 @@
 [tools]
 node = "24.19.0"
+
+[tasks.install]
+description = "Install npm dependencies exactly as locked"
+run = "npm ci"
+
+[tasks.format]
+description = "Auto-fix lint violations, then format; pass --check to verify only"
+usage = 'flag "-c --check" help="Report violations without writing files"'
+run = '''
+set -e
+if [ -n "${usage_check:-}" ]; then
+  npx eslint .
+  npx prettier --check .
+else
+  npx eslint --fix .
+  npx prettier --write .
+fi
+'''
+
+[tasks.type]
+description = "Type check (tsc --build); writes nothing"
+run = "npx tsc -b"
+
+[tasks.test]
+description = "Run unit and component tests once (Vitest); pass --coverage for a line-coverage report"
+usage = 'flag "-c --coverage" help="Report line coverage, including the files no test reaches"'
+run = "npx vitest run ${usage_coverage:+--coverage}"
+
+[tasks.build]
+description = "Build for production; `type` already covers the tsc half"
+run = "npx vite build"
+
+[tasks.fsd]
+description = "Verify Feature-Sliced Design layer and public-API rules (steiger)"
+run = "npx steiger ./src"
+
+[tasks.e2e]
+description = "Run end-to-end tests (Playwright); needs: npx playwright install chromium"
+run = "npx playwright test"
+
+[tasks.check]
+description = "Verify formatting, types, FSD rules, tests, and the production build"
+depends = ["format --check", "type", "fsd", "test", "build"]

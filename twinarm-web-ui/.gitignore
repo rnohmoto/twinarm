@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Test output
+coverage
+test-results
+playwright-report
+blob-report
+
+# The root .gitignore carries Python build patterns (build/, dist/, lib/) that
+# would otherwise swallow source directories here — src/shared/lib/ among them.
+!/src/**

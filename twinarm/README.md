@@ -18,7 +18,8 @@ Checks run as [mise](https://mise.jdx.dev/) tasks, defined in `mise.toml`:
 ```bash
 mise run format   # ruff check --fix-only, then ruff format (-c/--check to verify only)
 mise run type     # ty check (-f/--fix to apply fixes)
-mise run check    # format --check + type; writes nothing
+mise run test     # pytest (-c/--coverage for a line-coverage report)
+mise run check    # format --check + type + test; writes nothing
 ```
 
 Run them from this directory. From the repository root, use the monorepo path instead:
@@ -28,5 +29,6 @@ Run them from this directory. From the repository root, use the monorepo path in
 
 - `src/twinarm/` — package source (src layout)
 - `tests/` — tests
-- `pyproject.toml` — dependencies (`lerobot[dynamixel]`), dev tools (ruff, ty), and the uv_build backend
-- `mise.toml` — the `format` / `type` / `check` tasks
+- `pyproject.toml` — dependencies (`lerobot[dynamixel]`), dev tools (ruff, ty, pytest), the pytest
+  configuration, and the uv_build backend
+- `mise.toml` — the `format` / `type` / `test` / `check` tasks

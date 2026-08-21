@@ -9,10 +9,13 @@ development commands.
 
 ## Working in this repo
 
-- Run `uv` commands inside the subproject you are changing (`twinarm/` or `descovery/`). The root
-  project is configuration only — never run `uv sync` at the root.
-- After changing Python code, run the lint, format, and type-check commands from the affected
-  subproject before you finish.
+- Run `uv` commands inside the subproject you are changing (`twinarm/` or `descovery/`), and `npm`
+  commands inside `twinarm-web-ui/`. The root project is configuration only — never run `uv sync` or
+  `npm install` at the root.
+- After changing code, run the affected subproject's checks before you finish and make them pass:
+  `mise run check` in `twinarm/` and `twinarm-web-ui/`, or the ruff and ty commands directly in
+  `descovery/`, which has no tasks. If it reports formatting violations, run `mise run format` and
+  re-run it. From the root, `mise run check` runs both task-based subprojects at once.
 - Do not add dependencies, entry points, or top-level directories without an explicit request.
 
 ## Hardware safety
@@ -26,11 +29,17 @@ The scripts in `descovery/` drive real robot arms.
 - Never state that hardware behaves a certain way unless the user ran it and reported the result — you
   cannot observe the arms from here.
 
-## Testing status
+## Testing and CI
 
-pytest is not a declared dependency in any subproject, so `uv run pytest` fails today.
-`twinarm/tests/` holds one smoke test that nothing currently runs. Do not claim tests were run, and do
-not add pytest without an explicit request. There is no CI; all verification is local.
+Both task-based subprojects run their tests as part of `mise run check`. Inside either one,
+`mise run test --coverage` reports line coverage. Playwright is deliberately **not** part of
+`check`; run `mise run e2e` in `twinarm-web-ui/` when it matters. `descovery/` has no tests and no
+tasks: its scripts need arms attached.
+
+CI is GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), running the same mise
+tasks a developer runs locally. `descovery/` is excluded because it needs real hardware.
+
+Report what actually ran. Never claim tests passed on output you did not see.
 
 ## Rules auto-loading
 
@@ -38,10 +47,8 @@ Claude Code loads `.claude/rules/common/` in every session, and `.claude/rules/p
 files are involved. Do not import those files and do not restate their content here or in any other
 AGENTS.md — they would then be loaded twice. Other agents should read
 [`.claude/rules/common/`](.claude/rules/common/) and [`.claude/rules/python/`](.claude/rules/python/)
-directly.
-
-The same applies to this file. Imports in this repository are one per directory, pointing from that
-directory's AGENTS.md to its README.md; everything else is a plain link. Keep it that way when editing.
+directly. Imports in this repository are one per directory, pointing from that directory's AGENTS.md
+to its README.md; everything else is a plain link. Keep it that way when editing.
 
 ## Subprojects
 

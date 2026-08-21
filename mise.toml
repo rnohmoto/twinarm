@@ -5,3 +5,11 @@ uv = "0.12.5"
 
 [monorepo]
 config_roots = ["twinarm", "twinarm-web-ui"]
+
+[tasks.format]
+description = "Run format in every subproject"
+depends = ["//twinarm:format", "//twinarm-web-ui:format"]
+
+[tasks.check]
+description = "Run check in every subproject (descovery is excluded: it needs real hardware)"
+depends = ["//twinarm:check", "//twinarm-web-ui:check"]

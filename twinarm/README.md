@@ -18,7 +18,7 @@ Checks run as [mise](https://mise.jdx.dev/) tasks, defined in `mise.toml`:
 ```bash
 mise run format   # ruff check --fix-only, then ruff format (-c/--check to verify only)
 mise run type     # ty check (-f/--fix to apply fixes)
-mise run test     # pytest
+mise run test     # pytest (-c/--coverage for a line-coverage report)
 mise run check    # format --check + type + test; writes nothing
 ```
 

@@ -20,5 +20,10 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     // e2e/ belongs to Playwright, not Vitest.
     include: ['src/**/*.test.{ts,tsx}'],
+    coverage: {
+      // Count every source file, not just the ones a test happens to import.
+      include: ['src/**'],
+      reporter: ['text'],
+    },
   },
 })

@@ -21,8 +21,9 @@ arg "[paths]" var=#true help="Paths to check (default: whole project)"
 run = "uv run ty check ${usage_fix:+--fix} ${usage_paths:-}"
 
 [tasks.test]
-description = "Run the test suite"
-run = "uv run pytest"
+description = "Run the test suite; pass --coverage for a line-coverage report"
+usage = 'flag "-c --coverage" help="Report line coverage, including the lines no test reaches"'
+run = "uv run pytest ${usage_coverage:+--cov=twinarm --cov-report=term-missing}"
 
 [tasks.check]
 description = "Verify formatting, types, and tests without writing files"

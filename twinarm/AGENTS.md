@@ -12,10 +12,6 @@ Read @README.md for what this package is, its current state, and its layout.
   sync.
 - This is the only directory that builds (uv_build backend, src layout). Code that only makes sense
   with arms attached belongs in [`../descovery/`](../descovery/AGENTS.md) instead.
-- After changing any Python code here you must run `mise run check` and make it pass before you
-  finish; report its real output. If it reports formatting violations, run `mise run format` and
-  re-run it. The tasks are listed in [README.md](README.md) — use them rather than bare
-  `uv run ruff` / `uv run ty` in this directory.
-- `mise run check` comes back clean, and must stay that way: it is `format --check`, `type`, and
-  `test` (pytest). Introduce no new diagnostics and no failing tests. `mise run type src` checks the
-  package on its own when you want to exclude the tests.
+- Use the mise tasks listed in [README.md](README.md) rather than bare `uv run ruff` / `uv run ty`
+  in this directory. `mise run type src` checks the package on its own when you want to exclude the
+  tests.

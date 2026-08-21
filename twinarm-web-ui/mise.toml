@@ -24,8 +24,9 @@ description = "Type check (tsc --build); writes nothing"
 run = "npx tsc -b"
 
 [tasks.test]
-description = "Run unit and component tests once (Vitest)"
-run = "npx vitest run"
+description = "Run unit and component tests once (Vitest); pass --coverage for a line-coverage report"
+usage = 'flag "-c --coverage" help="Report line coverage, including the files no test reaches"'
+run = "npx vitest run ${usage_coverage:+--coverage}"
 
 [tasks.build]
 description = "Build for production; `type` already covers the tsc half"

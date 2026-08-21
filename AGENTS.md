@@ -12,9 +12,10 @@ development commands.
 - Run `uv` commands inside the subproject you are changing (`twinarm/` or `descovery/`), and `npm`
   commands inside `twinarm-web-ui/`. The root project is configuration only — never run `uv sync` or
   `npm install` at the root.
-- After changing code, run the affected subproject's checks before you finish: `mise run check` in
-  `twinarm/` and `twinarm-web-ui/`, or the ruff and ty commands directly in `descovery/`, which has
-  no tasks. From the root, `mise run check` runs both task-based subprojects at once.
+- After changing code, run the affected subproject's checks before you finish and make them pass:
+  `mise run check` in `twinarm/` and `twinarm-web-ui/`, or the ruff and ty commands directly in
+  `descovery/`, which has no tasks. If it reports formatting violations, run `mise run format` and
+  re-run it. From the root, `mise run check` runs both task-based subprojects at once.
 - Do not add dependencies, entry points, or top-level directories without an explicit request.
 
 ## Hardware safety
@@ -30,17 +31,13 @@ The scripts in `descovery/` drive real robot arms.
 
 ## Testing and CI
 
-Both task-based subprojects run their tests as part of `mise run check`:
-
-- `twinarm/` — pytest, declared in its dev dependencies. `tests/` holds one smoke test.
-- `twinarm-web-ui/` — Vitest for units and components. Playwright covers end to end and is
-  deliberately **not** part of `check`; run `mise run e2e` in that directory when it matters.
-
-`descovery/` has no tests and no tasks: its scripts need arms attached.
+Both task-based subprojects run their tests as part of `mise run check`. Inside either one,
+`mise run test --coverage` reports line coverage. Playwright is deliberately **not** part of
+`check`; run `mise run e2e` in `twinarm-web-ui/` when it matters. `descovery/` has no tests and no
+tasks: its scripts need arms attached.
 
 CI is GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), running the same mise
-tasks a developer runs locally, so there is one definition of green. It covers `twinarm` and
-`twinarm-web-ui`; `descovery/` is excluded because it needs real hardware.
+tasks a developer runs locally. `descovery/` is excluded because it needs real hardware.
 
 Report what actually ran. Never claim tests passed on output you did not see.
 
@@ -50,10 +47,8 @@ Claude Code loads `.claude/rules/common/` in every session, and `.claude/rules/p
 files are involved. Do not import those files and do not restate their content here or in any other
 AGENTS.md — they would then be loaded twice. Other agents should read
 [`.claude/rules/common/`](.claude/rules/common/) and [`.claude/rules/python/`](.claude/rules/python/)
-directly.
-
-The same applies to this file. Imports in this repository are one per directory, pointing from that
-directory's AGENTS.md to its README.md; everything else is a plain link. Keep it that way when editing.
+directly. Imports in this repository are one per directory, pointing from that directory's AGENTS.md
+to its README.md; everything else is a plain link. Keep it that way when editing.
 
 ## Subprojects
 

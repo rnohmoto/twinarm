@@ -15,7 +15,7 @@ example slice; it has no backend and runs against mocks.
 
 | Path | What it is |
 | ---- | ---------- |
-| [`twinarm/`](twinarm/README.md) | The installable Python library (src layout). A skeleton for now. |
+| [`twinarm/`](twinarm/README.md) | The installable Python library (src layout). |
 | [`descovery/`](descovery/README.md) | Hardware experiment sandbox: standalone Koch-arm scripts. |
 | [`twinarm-web-ui/`](twinarm-web-ui/README.md) | The web teleoperation UI: React and Vite, mock-backed. |
 | `docs/` | Reserved for documentation. Empty. |
@@ -56,10 +56,9 @@ with.
 
 ## Development
 
-`twinarm/` and `twinarm-web-ui/` run their checks as mise tasks. Both use the same task names, so
-one vocabulary covers both: `format`, `type`, `test`, `check` (plus `build`, `fsd` and `e2e` in
-the web UI).
-See [`twinarm/README.md`](twinarm/README.md) and
+`twinarm/` and `twinarm-web-ui/` run their checks as mise tasks under the same names: `format`,
+`type`, `test`, `check` (plus `build`, `fsd` and `e2e` in the web UI). See
+[`twinarm/README.md`](twinarm/README.md) and
 [`twinarm-web-ui/README.md`](twinarm-web-ui/README.md) for the details.
 
 From the repository root, aggregate tasks fan out to both:
@@ -85,8 +84,8 @@ each subproject inherits it through `extend = "../pyproject.toml"`. Change share
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and every pull
 request. It runs the same mise tasks as a developer does — `mise run check` at the root, plus the web
-UI's Playwright suite as a separate job — so "green" means the same thing locally and in CI.
-`descovery/` is excluded because its scripts need arms attached.
+UI's Playwright suite as a separate job. `descovery/` is excluded because its scripts need arms
+attached.
 
 ## Documentation for AI coding agents
 

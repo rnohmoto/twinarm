@@ -38,7 +38,7 @@ Checks run as mise tasks, defined in `mise.toml`:
 ```bash
 mise run format   # eslint --fix, then prettier --write (-c/--check to verify only)
 mise run type     # tsc --build
-mise run test     # vitest run
+mise run test     # vitest run (-c/--coverage for a line-coverage report)
 mise run fsd      # steiger: layer and public-API rules
 mise run build    # vite build (type covers the tsc half)
 mise run check    # format --check + type + fsd + test + build
@@ -70,8 +70,8 @@ Each layer has a README explaining what belongs in it; the rules themselves are 
 
 ## The backend contract
 
-There is no backend. [`src/shared/api`](src/shared/api/README.md) defines the telemetry and command
-contract as zod schemas, derived from the working prototype
+[`src/shared/api`](src/shared/api/README.md) defines the telemetry and command contract as zod
+schemas, derived from the working prototype
 [`../descovery/koch_web_panel.py`](../descovery/koch_web_panel.py) — Server-Sent Events on
 `GET /stream`, commands on `GET /ctl?c=<url-encoded JSON>`. Treat it as **provisional**: when a real
 backend appears, reconcile it there first.

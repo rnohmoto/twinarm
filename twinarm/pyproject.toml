@@ -9,7 +9,8 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [    
+dev = [
+    "pytest>=8.4",
     "ruff>=0.16.3",
     "ty>=0.0.72",
 ]
@@ -17,6 +18,11 @@ dev = [
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+markers = ["unit: fast tests that need no hardware or I/O"]
 
 [tool.ruff]
 extend = "../pyproject.toml"

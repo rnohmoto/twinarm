@@ -20,6 +20,10 @@ arg "[paths]" var=#true help="Paths to check (default: whole project)"
 '''
 run = "uv run ty check ${usage_fix:+--fix} ${usage_paths:-}"
 
+[tasks.test]
+description = "Run the test suite"
+run = "uv run pytest"
+
 [tasks.check]
-description = "Verify formatting and types without writing files"
-depends = ["format --check", "type"]
+description = "Verify formatting, types, and tests without writing files"
+depends = ["format --check", "type", "test"]

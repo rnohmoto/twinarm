@@ -18,7 +18,8 @@ has a separate top-level test tree.
   `src/features/ff-mode/ui/__tests__/FfModeSwitch.test.tsx` covers `ui/FfModeSwitch.tsx`.
 
 Adding a test folder needs no config change: pytest collects from `src`, and the Vitest include
-glob already reaches into `__tests__/`. Both tool defaults keep test files out of coverage.
+glob already reaches into `__tests__/`. Vitest's defaults keep test files out of coverage; on the
+Python side, `[tool.coverage.run] omit` in `twinarm/pyproject.toml` does that job.
 
 Playwright end-to-end specs are the one exception — they cover user flows rather than a folder, and
 stay in `twinarm-web-ui/e2e/`.

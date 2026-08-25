@@ -28,3 +28,8 @@ run = "uv run pytest ${usage_coverage:+--cov=twinarm --cov-report=term-missing}"
 [tasks.check]
 description = "Verify formatting, types, and tests without writing files"
 depends = ["format --check", "type", "test"]
+
+[tasks.serve]
+description = "Run the API dev server with uvicorn --reload; pass --port to override 8780"
+usage = 'flag "-p --port <port>" help="Port to listen on (default: 8780)"'
+run = "uv run uvicorn twinarm.api:create_app --factory --reload --reload-dir src --port ${usage_port:-8780}"

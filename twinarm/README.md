@@ -7,9 +7,12 @@ Part of the TwinArm monorepo; see [`../README.md`](../README.md) for requirement
 
 ## Status
 
-An early skeleton. `src/twinarm/__init__.py` currently holds only the package docstring and
-`__version__`, and the public API is not defined yet. The working hardware code still lives in
-[`../descovery/`](../descovery/README.md).
+An early skeleton. `src/twinarm/__init__.py` holds the package docstring and `__version__`, and the
+library's public API is not defined yet. `src/twinarm/api/` holds a FastAPI app skeleton whose only
+live endpoint is `GET /health`; the `telemetry` and `control` slices are README-only placeholders
+waiting on the provisional contract in
+[`../twinarm-web-ui/src/shared/api/`](../twinarm-web-ui/src/shared/api/README.md). Nothing here
+talks to an arm — the working hardware code still lives in [`../descovery/`](../descovery/README.md).
 
 ## Development
 
@@ -20,15 +23,21 @@ mise run format   # ruff check --fix-only, then ruff format (-c/--check to verif
 mise run type     # ty check (-f/--fix to apply fixes)
 mise run test     # pytest (-c/--coverage for a line-coverage report)
 mise run check    # format --check + type + test; writes nothing
+mise run serve    # uvicorn dev server on 127.0.0.1:8780 (-p/--port to override)
 ```
 
 Run them from this directory. From the repository root, use the monorepo path instead:
-`mise run //twinarm:check`.
+`mise run //twinarm:check`. `serve` is not part of `check`: it runs until you stop it, and it
+defaults to the same port as [`../descovery/koch_web_panel.py`](../descovery/README.md), so pass
+`--port` when that panel is already running.
 
 ## Structure
 
 - `src/twinarm/` — package source (src layout)
-- `tests/` — tests
-- `pyproject.toml` — dependencies (`lerobot[dynamixel]`), dev tools (ruff, ty, pytest), the pytest
-  configuration, and the uv_build backend
-- `mise.toml` — the `format` / `type` / `test` / `check` tasks
+- `src/twinarm/api/` — the FastAPI app: `app.py` assembles the vertical slices under
+  `api/features/`, one folder per slice owning its router and schemas. `health` is the worked
+  example; `telemetry` and `control` are placeholders.
+- `tests/` — tests; `tests/api/` mirrors the api package
+- `pyproject.toml` — dependencies (`lerobot[dynamixel]`, `fastapi`, `uvicorn`), dev tools (ruff, ty,
+  pytest, httpx), the pytest configuration, and the uv_build backend
+- `mise.toml` — the `format` / `type` / `test` / `check` / `serve` tasks

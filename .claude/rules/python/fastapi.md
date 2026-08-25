@@ -1,6 +1,7 @@
 ---
 paths:
   - "**/app/**/*.py"
+  - "**/api/**/*.py"
   - "**/fastapi/**/*.py"
   - "**/*_api.py"
 ---

@@ -7,6 +7,23 @@ Test Types (ALL required):
 2. **Integration Tests** - API endpoints, database operations
 3. **E2E Tests** - Critical user flows (framework chosen per language)
 
+## Test File Placement
+
+Tests live in a test folder **inside the folder that owns the code under test**. Neither subproject
+has a separate top-level test tree.
+
+- **Python** (`twinarm/`) — a `tests/` package, with `__init__.py`, beside the code it covers:
+  `src/twinarm/api/features/health/tests/test_health.py` covers the `health` slice.
+- **TypeScript / React** (`twinarm-web-ui/`) — a `__tests__/` folder inside the segment:
+  `src/features/ff-mode/ui/__tests__/FfModeSwitch.test.tsx` covers `ui/FfModeSwitch.tsx`.
+
+Adding a test folder needs no config change: pytest collects from `src`, and the Vitest include
+glob already reaches into `__tests__/`. Vitest's defaults keep test files out of coverage; on the
+Python side, `[tool.coverage.run] omit` in `twinarm/pyproject.toml` does that job.
+
+Playwright end-to-end specs are the one exception — they cover user flows rather than a folder, and
+stay in `twinarm-web-ui/e2e/`.
+
 ## Test-Driven Development
 
 MANDATORY workflow:

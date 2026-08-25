@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CommandSchema } from './commands'
-import { TelemetryFrameSchema } from './telemetry'
-import { parseFrame } from './transport'
+import { CommandSchema } from '../commands'
+import { TelemetryFrameSchema } from '../telemetry'
+import { parseFrame } from '../transport'
 
 const frame = {
   t: 12.5,

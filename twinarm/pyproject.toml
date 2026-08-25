@@ -5,11 +5,14 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "fastapi>=0.141.1",
     "lerobot[dynamixel]>=0.6.1",
+    "uvicorn>=0.52.4",
 ]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest>=8.4",
     "pytest-cov>=7.0",
     "ruff>=0.16.3",
@@ -20,10 +23,18 @@ dev = [
 requires = ["uv_build>=0.12.5,<0.13.0"]
 build-backend = "uv_build"
 
+[tool.uv.build-backend]
+# Co-located test packages stay out of the wheel; they import dev-only deps.
+wheel-exclude = ["tests"]
+
 [tool.pytest.ini_options]
 addopts = "-q"
-testpaths = ["tests"]
+testpaths = ["src"]
 markers = ["unit: fast tests that need no hardware or I/O"]
+
+[tool.coverage.run]
+# Tests live inside the package; they are not part of the measured surface.
+omit = ["*/tests/*"]
 
 [tool.ruff]
 extend = "../pyproject.toml"

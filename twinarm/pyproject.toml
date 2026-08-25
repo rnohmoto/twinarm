@@ -25,8 +25,12 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 addopts = "-q"
-testpaths = ["tests"]
+testpaths = ["src"]
 markers = ["unit: fast tests that need no hardware or I/O"]
+
+[tool.coverage.run]
+# Tests live inside the package; they are not part of the measured surface.
+omit = ["*/tests/*"]
 
 [tool.ruff]
 extend = "../pyproject.toml"

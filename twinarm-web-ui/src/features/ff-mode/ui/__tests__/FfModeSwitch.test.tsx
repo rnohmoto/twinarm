@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { FfModeSwitch } from './FfModeSwitch'
+import { FfModeSwitch } from '../FfModeSwitch'
 
 describe('FfModeSwitch', () => {
   it('sends a mode command when a mode is picked', async () => {

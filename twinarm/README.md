@@ -37,7 +37,9 @@ defaults to the same port as [`../descovery/koch_web_panel.py`](../descovery/REA
 - `src/twinarm/api/` — the FastAPI app: `app.py` assembles the vertical slices under
   `api/features/`, one folder per slice owning its router and schemas. `health` is the worked
   example; `telemetry` and `control` are placeholders.
-- `tests/` — tests; `tests/api/` mirrors the api package
+- tests sit in a `tests/` package inside the folder holding the code they cover:
+  `src/twinarm/tests/` for the package itself, `src/twinarm/api/features/health/tests/` for the
+  health slice. There is no separate top-level test tree.
 - `pyproject.toml` — dependencies (`lerobot[dynamixel]`, `fastapi`, `uvicorn`), dev tools (ruff, ty,
   pytest, httpx), the pytest configuration, and the uv_build backend
 - `mise.toml` — the `format` / `type` / `test` / `check` / `serve` tasks

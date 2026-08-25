@@ -17,8 +17,8 @@ Read @README.md for what this package is, its current state, and its layout.
   [`../twinarm-web-ui/src/shared/api/`](../twinarm-web-ui/src/shared/api/README.md), derived from
   [`../descovery/koch_web_panel.py`](../descovery/koch_web_panel.py). Reconcile there first before
   implementing the `telemetry` or `control` placeholder slices.
-- The version lives in `src/twinarm/__init__.py` and nowhere else — there is no second copy to keep in
-  sync.
+- The version lives in `pyproject.toml` and nowhere else — `src/twinarm/__init__.py` re-exports it
+  from the installed package metadata, so there is no second copy to keep in sync.
 - This is the only directory that builds (uv_build backend, src layout). Code that only makes sense
   with arms attached belongs in [`../descovery/`](../descovery/AGENTS.md) instead.
 - Use the mise tasks listed in [README.md](README.md) rather than bare `uv run ruff` / `uv run ty`

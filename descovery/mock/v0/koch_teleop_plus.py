@@ -25,7 +25,7 @@ koch_teleop_robust.py の後継。lerobot 0.5.x のクラスを直接使った�
 
 使い方(61_ログの運用レシピと同じ引数体系):
   conda activate twinarm
-  python koch_teleop_plus.py \
+  python mock/v0/koch_teleop_plus.py \
       --follower-port /dev/tty.usbmodem5B141156401 --follower-id koch_follower_arm \
       --leader-port   /dev/tty.usbmodem5B141156061 --leader-id   koch_leader_arm \
       --plot --csv [--ff gripper]
@@ -199,7 +199,7 @@ def main():
     writer = None
     if args.csv:
         path = os.path.abspath(os.path.join(
-            os.path.dirname(__file__) or ".", "..", "..", "TacitCapture", "logs",
+            os.path.dirname(__file__) or ".", "..", "..", "..", "..", "TacitCapture", "logs",
             f"teleop_{datetime.now():%Y%m%d_%H%M%S}.csv"))
         os.makedirs(os.path.dirname(path), exist_ok=True)
         fcsv = open(path, "w", newline="")

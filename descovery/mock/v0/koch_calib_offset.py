@@ -18,7 +18,7 @@
 
 使い方:
   conda activate twinarm
-  python koch_calib_offset.py --leader-port /dev/tty.usbmodem5B141156061 \
+  python mock/v0/koch_calib_offset.py --leader-port /dev/tty.usbmodem5B141156061 \
                               --follower-port /dev/tty.usbmodem5B141156401
   # 5秒間サンプリングして比較表を表示。--watch で連続表示(姿勢を変えながら確認可)
 """

@@ -5,6 +5,6 @@ telemetry frame per event (~15 Hz in the prototype).
 
 The wire format is owned by the zod schemas in
 [`twinarm-web-ui/src/shared/api/`](../../../../../../twinarm-web-ui/src/shared/api/README.md),
-derived from [`descovery/koch_web_panel.py`](../../../../../../descovery/koch_web_panel.py).
+derived from [`descovery/mock/v0/koch_web_panel.py`](../../../../../../descovery/mock/v0/koch_web_panel.py).
 Per the web UI's rules, a real implementation must be reconciled there first — do not invent
 frame shapes here.

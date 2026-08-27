@@ -1,8 +1,9 @@
 # Descovery
 
 Hardware experiment sandbox for the Koch v1.1 arms. (The directory name is spelled "descovery" on
-purpose.) The scripts here are flat and standalone — no package structure, no shared modules, and some
-deliberate duplication between them.
+purpose.) The scripts live in [`mock/v0/`](mock/v0/) and are flat and standalone — no package
+structure, no shared modules, and some deliberate duplication between them. Run them from this
+directory so `uv run` picks up the environment here.
 
 Part of the TwinArm monorepo; see [`../README.md`](../README.md) for requirements and setup.
 
@@ -10,7 +11,7 @@ Part of the TwinArm monorepo; see [`../README.md`](../README.md) for requirement
 
 ```bash
 uv sync
-uv run python koch_scan.py /dev/tty.usbmodem<XXXX>
+uv run python mock/v0/koch_scan.py /dev/tty.usbmodem<XXXX>
 ```
 
 `koch_scan.py` is the safe place to start: it only broadcast-pings the bus and prints the motors it
@@ -18,7 +19,7 @@ finds. Everything else needs more care — check the risk column below first.
 
 ## Script inventory
 
-Risk classes:
+All scripts below live in [`mock/v0/`](mock/v0/). Risk classes:
 
 - **read-only** — reads registers only.
 - **torque off** — releases the motors; an arm held up by torque will drop when it runs.

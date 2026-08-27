@@ -35,7 +35,7 @@ Speak teleoperation, never HTTP or lerobot: leader arm and follower arm; joint (
 `shoulder_lift`, `elbow_flex`, `wrist_flex`, `wrist_roll`, `gripper`); normalized position;
 current in milliamps, with the two shoulder joints reporting load percent; force-feedback mode
 (`off`, `gripper`, `arm`); telemetry frame; tunable parameter. The vocabulary comes from the
-working prototype [`descovery/koch_web_panel.py`](../../../../descovery/koch_web_panel.py) and the
+working prototype [`descovery/mock/v0/koch_web_panel.py`](../../../../descovery/mock/v0/koch_web_panel.py) and the
 contract derived from it — grow it from there rather than inventing terms ahead of working code.
 
 ## Imports

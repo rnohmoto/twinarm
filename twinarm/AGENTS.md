@@ -24,7 +24,7 @@ Read @README.md for what this package is, its current state, and its layout.
   imports are relative, everything else absolute.
 - The `/stream` and `/ctl` wire contract is owned by the zod schemas in
   [`../twinarm-web-ui/src/shared/api/`](../twinarm-web-ui/src/shared/api/README.md), derived from
-  [`../descovery/koch_web_panel.py`](../descovery/koch_web_panel.py). Reconcile there first before
+  [`../descovery/mock/v0/koch_web_panel.py`](../descovery/mock/v0/koch_web_panel.py). Reconcile there first before
   implementing the `telemetry` or `control` placeholder slices. Slice pydantic schemas translate
   between that wire format and the domain model — wire shapes must not leak into `domain/`.
 - The version lives in `pyproject.toml` and nowhere else — `src/twinarm/__init__.py` re-exports it

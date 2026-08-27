@@ -8,7 +8,7 @@
          (--no-current で4段目を消して3段にできる)
 
 使い方（通常は koch_teleop_plus.py --plot が自動起動するので手動起動は不要）:
-  python koch_live_plot.py --port 8765 --window 20
+  python mock/v0/koch_live_plot.py --port 8765 --window 20
 終了: ウィンドウを閉じる / Ctrl+C / 無データ300秒で自動終了。
 """
 import argparse, json, socket, time

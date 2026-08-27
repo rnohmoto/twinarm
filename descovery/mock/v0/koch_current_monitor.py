@@ -12,11 +12,11 @@ v2の変更: (1) --port2 で2台目(リーダー等)を同じウィンドウに�
 使い方:
   conda activate twinarm
   # フォロワーのみ(従来どおり)
-  python koch_current_monitor.py <フォロワーのポート>
+  python mock/v0/koch_current_monitor.py <フォロワーのポート>
   # 1窓で両アーム(フォロワー実線・リーダー破線。リーダーは全軸XL330なので--xl430-2は既定の空でよい)
-  python koch_current_monitor.py <フォロワーのポート> --port2 <リーダーのポート>
+  python mock/v0/koch_current_monitor.py <フォロワーのポート> --port2 <リーダーのポート>
   # トルクON(保持電流を観察=実験1-1)
-  python koch_current_monitor.py <ポート> --torque on --duration 60 --csv noise_on.csv
+  python mock/v0/koch_current_monitor.py <ポート> --torque on --duration 60 --csv noise_on.csv
 終了: Ctrl+C または --duration 秒経過。終了時に軸ごとの統計(平均/標準偏差/p-p)を表示。
 """
 import argparse, csv, os, sys, time
@@ -76,7 +76,7 @@ def main():
                              ids, {int(x) for x in getattr(args, "xl430_2").split(",") if x}, torque_on))
 
     csv_path = args.csv or os.path.join(
-        os.path.dirname(__file__) or ".", "..", "..", "TacitCapture", "logs",
+        os.path.dirname(__file__) or ".", "..", "..", "..", "..", "TacitCapture", "logs",
         f"currents_{datetime.now():%Y%m%d_%H%M%S}.csv")
     csv_path = os.path.abspath(csv_path)
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)

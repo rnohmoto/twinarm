@@ -1,4 +1,4 @@
-"""koch_set_id.py — 使い方: python koch_set_id.py <ポート> <現在ID> <新ID>"""
+"""koch_set_id.py — 使い方: python mock/v0/koch_set_id.py <ポート> <現在ID> <新ID>"""
 import sys
 from dynamixel_sdk import PortHandler, PacketHandler
 

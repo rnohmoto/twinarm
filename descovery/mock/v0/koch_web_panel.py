@@ -4,7 +4,7 @@ Mac/Windows共通。teleop_plusのUDPテレメトリを受けてブラウザに�
 スライダ/ボタン操作をUDP制御チャネルでteleop_plusへ返す。グラフはCanvas直描き(軽量)。
 
 使い方: 通常は koch_teleop_plus.py --panel で自動起動される。単体起動:
-  python koch_web_panel.py            # http://127.0.0.1:8780 が自動で開く
+  python mock/v0/koch_web_panel.py            # http://127.0.0.1:8780 が自動で開く
 ポート: HTTP 8780 / テレメトリ受信 UDP 8765 / 制御送信 UDP 8766
 """
 import argparse, json, socket, threading, time, webbrowser

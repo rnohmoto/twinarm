@@ -4,7 +4,7 @@
 built and tested with no arms attached. Treat every shape here as provisional.
 
 The contract is derived from the working prototype
-[`../../../../descovery/koch_web_panel.py`](../../../../descovery/koch_web_panel.py), a stdlib-only
+[`../../../../descovery/mock/v0/koch_web_panel.py`](../../../../descovery/mock/v0/koch_web_panel.py), a stdlib-only
 panel that the teleop loop launches:
 
 |           |                                                                               |

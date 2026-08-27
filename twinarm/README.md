@@ -29,7 +29,7 @@ mise run serve    # uvicorn dev server on 127.0.0.1:8780 (-p/--port to override)
 
 Run them from this directory. From the repository root, use the monorepo path instead:
 `mise run //twinarm:check`. `serve` is not part of `check`: it runs until you stop it, and it
-defaults to the same port as [`../descovery/koch_web_panel.py`](../descovery/README.md), so pass
+defaults to the same port as [`../descovery/mock/v0/koch_web_panel.py`](../descovery/README.md), so pass
 `--port` when that panel is already running.
 
 ## Structure

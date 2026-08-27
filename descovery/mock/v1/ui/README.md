@@ -2,7 +2,7 @@
 
 A static HTML mock of a next-generation teleoperation cockpit for TwinArm: two Koch v1.1
 leader/follower pairs monitored and operated from one screen. It is the design successor to the
-embedded panel in [`../../koch_web_panel.py`](../../koch_web_panel.py) — same data contract, "cockpit"
+embedded panel in [`../../v0/koch_web_panel.py`](../../v0/koch_web_panel.py) — same data contract, "cockpit"
 levels of functional coverage. Nothing here talks to hardware or to a backend; every value on screen
 comes from a built-in fake telemetry engine, and the page permanently wears a
 **MOCK · SIMULATED DATA** badge so screenshots cannot pass as real telemetry.

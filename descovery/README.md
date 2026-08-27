@@ -42,7 +42,7 @@ Risk classes:
 
 ## UI mocks
 
-[`ui_mocks/v1/`](ui_mocks/v1/README.md) is a static HTML mock of a next-generation dual-arm
+[`mock/v1/ui/`](mock/v1/ui/README.md) is a static HTML mock of a next-generation dual-arm
 teleoperation cockpit — the design successor to `koch_web_panel.py`. It runs on simulated data only
 (open `index.html` in a browser; no hardware, no risk) and its README documents the scenarios it can
 play back.

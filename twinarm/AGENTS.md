@@ -33,3 +33,5 @@ Read @README.md for what this package is, its current state, and its layout.
   with arms attached belongs in [`../descovery/`](../descovery/AGENTS.md) instead.
 - Use the mise tasks listed in [README.md](README.md) rather than bare `uv run ruff` / `uv run ty`
   in this directory.
+- Implement changes test-first (TDD) — the workflow is defined in
+  [`../.claude/rules/common/testing.md`](../.claude/rules/common/testing.md).

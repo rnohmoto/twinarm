@@ -9,6 +9,8 @@ Read @README.md for the stack, the layout, and every command.
 - Run `npm` here, never at the repository root, and prefer the mise tasks over bare `npx`.
 - `mise run check` leaves out the end-to-end tests. Run `mise run e2e` separately when you change
   routing, the page shell, or the mock backend.
+- Implement changes test-first (TDD) — the workflow is defined in
+  [`../.claude/rules/common/testing.md`](../.claude/rules/common/testing.md).
 
 ## Feature-Sliced Design
 

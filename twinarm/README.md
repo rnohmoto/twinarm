@@ -8,9 +8,10 @@ Part of the TwinArm monorepo; see [`../README.md`](../README.md) for requirement
 ## Status
 
 An early skeleton. `src/twinarm/__init__.py` holds the package docstring and `__version__`, and the
-library's public API is not defined yet. `src/twinarm/api/` holds a FastAPI app skeleton whose only
-live endpoint is `GET /health`; the `telemetry` and `control` slices are README-only placeholders
-waiting on the provisional contract in
+library's public API is not defined yet. `src/twinarm/domain/` and `src/twinarm/infrastructure/` are
+importable but empty — each holds only the docstring and README stating its layer's rules.
+`src/twinarm/api/` holds a FastAPI app skeleton whose only live endpoint is `GET /health`; the
+`telemetry` and `control` slices are README-only placeholders waiting on the provisional contract in
 [`../twinarm-web-ui/src/shared/api/`](../twinarm-web-ui/src/shared/api/README.md). Nothing here
 talks to an arm — the working hardware code still lives in [`../descovery/`](../descovery/README.md).
 
@@ -34,9 +35,14 @@ defaults to the same port as [`../descovery/koch_web_panel.py`](../descovery/REA
 ## Structure
 
 - `src/twinarm/` — package source (src layout)
+- `src/twinarm/domain/` — the teleoperation domain model and its ports (`typing.Protocol`),
+  stdlib-only by rule; its [README](src/twinarm/domain/README.md) defines the layer
+- `src/twinarm/infrastructure/` — adapters implementing the domain ports over real drivers
+  (lerobot, serial); its [README](src/twinarm/infrastructure/README.md) defines the layer
 - `src/twinarm/api/` — the FastAPI app: `app.py` assembles the vertical slices under
-  `api/features/`, one folder per slice owning its router and schemas. `health` is the worked
-  example; `telemetry` and `control` are placeholders.
+  `api/features/` and will bind adapters to domain ports; one folder per slice owning its router,
+  schemas, and use cases. `health` is the worked example; `telemetry` and `control` are
+  placeholders.
 - tests sit in a `tests/` package inside the folder holding the code they cover:
   `src/twinarm/tests/` for the package itself, `src/twinarm/api/features/health/tests/` for the
   health slice. There is no separate top-level test tree.

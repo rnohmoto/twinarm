@@ -40,6 +40,13 @@ Risk classes:
 | `koch_live_plot.py` | matplotlib viewer for teleop telemetry: leader command, follower position, the L−F error, and currents. | network only | UDP in :8765 |
 | `koch_web_panel.py` | Stdlib-only browser control panel with Canvas graphs. Switches force-feedback mode, resyncs, or stops a running teleop session. | network only, but it commands a live teleop session | HTTP :8780 (SSE), UDP in :8765, control out :8766 |
 
+## UI mocks
+
+[`ui_mocks/v1/`](ui_mocks/v1/README.md) is a static HTML mock of a next-generation dual-arm
+teleoperation cockpit — the design successor to `koch_web_panel.py`. It runs on simulated data only
+(open `index.html` in a browser; no hardware, no risk) and its README documents the scenarios it can
+play back.
+
 ## Notes
 
 - Some docstrings still say `conda activate twinarm`. That is stale — this project uses uv.

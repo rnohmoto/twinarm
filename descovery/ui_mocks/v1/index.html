@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TwinArm Cockpit — UI Mock v1</title>
+  <link
+    rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2314161a'/%3E%3Cpath d='M4 12V7l2-3M12 12V7l-2-3' stroke='%237cc4ff' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"
+  />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/cockpit.css" />
+  <link rel="stylesheet" href="css/wing.css" />
+  <script defer src="js/sim.js"></script>
+  <script defer src="js/charts.js"></script>
+  <script defer src="js/posture.js"></script>
+  <script defer src="js/wing.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <p class="mock-badge">MOCK · SIMULATED DATA</p>
+
+  <header class="masthead">
+    <div class="masthead-id">
+      <h1 class="wordmark">TWINARM <span class="wordmark-sub">TELEOP COCKPIT</span></h1>
+      <p class="session-meta">
+        SESSION <b id="session-clock" class="num">T+00:00</b>
+        <span class="session-caption">LOOP 30 fps · TLM 15 Hz</span>
+      </p>
+    </div>
+
+    <ul class="annunciator" aria-label="Annunciator panel">
+      <li class="lamp" data-lamp="l-comm" data-state="off">L·COMM<span class="visually-hidden" data-role="state">: off</span></li>
+      <li class="lamp" data-lamp="l-heat" data-state="off">L·HEAT<span class="visually-hidden" data-role="state">: off</span></li>
+      <li class="lamp" data-lamp="l-track" data-state="off">L·TRACK<span class="visually-hidden" data-role="state">: off</span></li>
+      <li class="lamp" data-lamp="r-comm" data-state="off">R·COMM<span class="visually-hidden" data-role="state">: off</span></li>
+      <li class="lamp" data-lamp="r-heat" data-state="off">R·HEAT<span class="visually-hidden" data-role="state">: off</span></li>
+      <li class="lamp" data-lamp="r-track" data-state="off">R·TRACK<span class="visually-hidden" data-role="state">: off</span></li>
+      <li class="lamp lamp-hw" data-lamp="volt" data-state="off">VOLT<span class="visually-hidden" data-role="state">: off</span></li>
+      <li class="lamp lamp-hw" data-lamp="enc" data-state="off">ENC<span class="visually-hidden" data-role="state">: off</span></li>
+      <li class="lamp lamp-hw" data-lamp="shock" data-state="off">SHOCK<span class="visually-hidden" data-role="state">: off</span></li>
+      <li class="lamp lamp-hw" data-lamp="load" data-state="off">LOAD<span class="visually-hidden" data-role="state">: off</span></li>
+    </ul>
+
+    <p class="rec-block" id="rec-block" data-on="false">
+      <span class="rec-dot" aria-hidden="true"></span>
+      <span class="rec-word">REC</span>
+      <b class="num" data-role="rec-elapsed">OFF</b>
+      <span class="rec-file num" data-role="rec-file" title="teleop_20260827_141500.csv">teleop_20260827_141500.csv · 30 Hz</span>
+    </p>
+
+    <div class="master-stop" id="master-stop" data-armed="true">
+      <button type="button" class="stop-fire" id="stop-fire" disabled aria-label="Confirm master stop — stops both arms and recording">
+        CONFIRM<br />STOP
+      </button>
+      <button type="button" class="stop-cover" id="stop-cover" aria-expanded="false" aria-label="Master stop — lift the guard cover">
+        MASTER<br />STOP
+      </button>
+    </div>
+  </header>
+
+  <main class="cockpit">
+    <section class="wing" id="wing-left" data-arm="left" aria-label="Arm L station"></section>
+
+    <div class="center-col">
+      <section class="bay cameras" aria-label="Gripper cameras">
+        <h2 class="bay-label">GRIPPER CAMS</h2>
+        <div class="cam-grid">
+          <figure class="cam" data-arm="left" data-live="false">
+            <div class="cam-viewport">
+              <svg class="cam-reticle" viewBox="0 0 120 90" aria-hidden="true">
+                <path d="M60 34v14M53 41h14" />
+                <circle cx="60" cy="41" r="16" />
+                <path d="M6 6h14M6 6v10M114 6h-14M114 6v10M6 84h14M6 84v-10M114 84h-14M114 84v-10" />
+              </svg>
+              <p class="cam-hud cam-hud-tl">CAM L · GRIPPER</p>
+              <p class="cam-hud cam-hud-br" data-role="cam-tag">—</p>
+              <p class="cam-nosignal">NO SIGNAL</p>
+            </div>
+            <figcaption class="visually-hidden">Left gripper camera</figcaption>
+          </figure>
+          <figure class="cam" data-arm="right" data-live="false">
+            <div class="cam-viewport">
+              <svg class="cam-reticle" viewBox="0 0 120 90" aria-hidden="true">
+                <path d="M60 34v14M53 41h14" />
+                <circle cx="60" cy="41" r="16" />
+                <path d="M6 6h14M6 6v10M114 6h-14M114 6v10M6 84h14M6 84v-10M114 84h-14M114 84v-10" />
+              </svg>
+              <p class="cam-hud cam-hud-tl">CAM R · GRIPPER</p>
+              <p class="cam-hud cam-hud-br" data-role="cam-tag">—</p>
+              <p class="cam-nosignal">NO SIGNAL</p>
+            </div>
+            <figcaption class="visually-hidden">Right gripper camera</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="bay checklist-panel" aria-label="Startup sequence">
+        <h2 class="bay-label">STARTUP SEQUENCE</h2>
+        <div class="checklist-cols">
+          <div class="checklist-col">
+            <h3 class="checklist-arm">ARM L</h3>
+            <ol class="checklist" data-arm="left"></ol>
+          </div>
+          <div class="checklist-col">
+            <h3 class="checklist-arm">ARM R</h3>
+            <ol class="checklist" data-arm="right"></ol>
+          </div>
+        </div>
+      </section>
+
+      <section class="bay log-panel" aria-label="Event log">
+        <h2 class="bay-label">EVENT LOG <span class="bay-label-note">latest first · caps at 200</span></h2>
+        <ol class="event-log" id="event-log"></ol>
+      </section>
+
+      <details class="sim-panel" id="sim-panel">
+        <summary>SIM · MOCK-ONLY CONTROLS</summary>
+        <p class="sim-note">
+          Drives the fake telemetry behind this mock — none of these controls exist on the real
+          panel. Recover from E-STOP by picking another scenario.
+        </p>
+        <fieldset class="sim-scenarios">
+          <legend>Scenario</legend>
+          <label><input type="radio" name="scenario" value="r-only" checked /> R only <span class="sim-hint">left pair absent (today's hardware)</span></label>
+          <label><input type="radio" name="scenario" value="dual" /> Dual nominal <span class="sim-hint">left pair joins and engages</span></label>
+          <label><input type="radio" name="scenario" value="heat" /> Heat caution <span class="sim-hint">gripper climbs past 60 / 65 °C guards</span></label>
+          <label><input type="radio" name="scenario" value="storm" /> Reconnect storm <span class="sim-hint">R link drops and recovers repeatedly</span></label>
+          <label><input type="radio" name="scenario" value="estop" /> E-stop <span class="sim-hint">frozen end state after a master stop</span></label>
+        </fieldset>
+        <div class="sim-actions">
+          <button type="button" data-role="sim-pause" aria-pressed="false">PAUSE SIM</button>
+          <button type="button" data-role="sim-rec" aria-pressed="true">RECORDING</button>
+        </div>
+      </details>
+    </div>
+
+    <section class="wing" id="wing-right" data-arm="right" aria-label="Arm R station"></section>
+  </main>
+
+  <template id="wing-template">
+    <header class="wing-head">
+      <h2 class="wing-title" data-role="wing-title">ARM —</h2>
+      <span class="link-chip" data-role="link-chip" data-state="none">NO LINK</span>
+      <code class="port-path num" data-role="port">—</code>
+    </header>
+
+    <ul class="chip-row">
+      <li class="chip">MODE <b class="num" data-role="chip-mode">—</b></li>
+      <li class="chip">TEMP <b class="num" data-role="chip-temp">—</b></li>
+      <li class="chip">FF <b class="num" data-role="chip-ff">—</b></li>
+      <li class="chip">FRAMES <b class="num" data-role="chip-frames">—</b></li>
+      <li class="chip">RECON <b class="num" data-role="chip-recon">—</b></li>
+    </ul>
+
+    <section class="bay bay-posture" aria-label="Posture">
+      <h3 class="bay-label">POSTURE <span class="bay-label-note">ghost = leader cmd · solid = follower</span></h3>
+      <div class="posture-mount" data-role="posture"></div>
+    </section>
+
+    <section class="bay bay-gauges" aria-label="Joint gauges">
+      <h3 class="bay-label">JOINTS · POS [norm] <span class="bay-label-note">▲ bug = leader cmd</span></h3>
+      <div class="gauge-rows" data-role="gauges"></div>
+    </section>
+
+    <section class="bay bay-charts" aria-label="Telemetry charts">
+      <h3 class="bay-label">TELEMETRY <span class="bay-label-note">15 s window</span></h3>
+      <ul class="legend" data-role="legend"></ul>
+      <figure class="chart">
+        <figcaption>LEADER CMD [norm]</figcaption>
+        <canvas data-role="chart-pos"></canvas>
+      </figure>
+      <figure class="chart">
+        <figcaption>FOLLOWER POS [norm]</figcaption>
+        <canvas data-role="chart-fpos"></canvas>
+      </figure>
+      <figure class="chart">
+        <figcaption>DELTA L−F [norm]</figcaption>
+        <canvas data-role="chart-delta"></canvas>
+      </figure>
+      <figure class="chart">
+        <figcaption>CURRENT [mA] · shoulders = load% ×10 · dashed = FF cmd</figcaption>
+        <canvas data-role="chart-cur"></canvas>
+      </figure>
+    </section>
+
+    <section class="bay bay-console" aria-label="Force feedback console">
+      <h3 class="bay-label">FORCE FEEDBACK</h3>
+      <div class="mode-segment" role="group" aria-label="Force feedback mode" data-role="mode-segment">
+        <button type="button" data-mode="off" aria-pressed="false">OFF</button>
+        <button type="button" data-mode="gripper" aria-pressed="false">GRIPPER</button>
+        <button type="button" data-mode="arm" aria-pressed="false">ARM</button>
+      </div>
+      <div class="param-grid" data-role="params"></div>
+      <div class="wing-actions">
+        <button type="button" class="btn-resync" data-role="resync">RESYNC</button>
+        <button type="button" class="btn-stop" data-role="stop">STOP ARM</button>
+      </div>
+    </section>
+  </template>
+
+  <div class="visually-hidden" aria-live="polite" id="live-region"></div>
+  <noscript><p class="noscript-note">This mock needs JavaScript for its simulated telemetry.</p></noscript>
+</body>
+</html>

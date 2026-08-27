@@ -1,0 +1,94 @@
+/* tokens.css — design tokens for the TwinArm cockpit mock.
+ *
+ * Single source of truth for color, type, spacing, and motion. JS reads the
+ * chart colors from here via getComputedStyle at init — never duplicate hex
+ * values outside this file.
+ *
+ * Colors are kept as the exact hex values that passed the dataviz palette
+ * validator (categorical set checked against --color-chart-surface: adjacent
+ * CVD dE 8.4, normal-vision dE 19.3, contrast >= 3:1). Converting them to
+ * another notation would break traceability to that validation run.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces — one committed dark look (camera feeds + continuous telemetry
+   * + long monitoring sessions; lineage of koch_web_panel.py). */
+  --color-ground: #14161a;
+  --color-panel: #1d2026;
+  --color-panel-raised: #262a32;
+  --color-chart-surface: #101216;
+  --color-well: #0c0e11; /* deepest inset: camera viewports, lamp strip */
+
+  /* Ink. --color-ink-faint is NOT for running text (3.0–4.0:1); hairline
+   * glyphs, disabled labels, and etched captions only. */
+  --color-ink: #e9ecf1;
+  --color-ink-muted: #9aa3b2;
+  --color-ink-faint: #6b7484;
+
+  /* Hairlines and grid */
+  --color-line: rgba(233, 236, 241, 0.09);
+  --color-line-strong: rgba(233, 236, 241, 0.18);
+  --color-grid: #232830;
+
+  /* Status — reserved semantics, never used as series colors.
+   * Fill variants light lamps and fills; -ink variants are the text-safe
+   * steps (>= 4.5:1 on panel). */
+  --color-nominal: #0ca30c;
+  --color-nominal-ink: #3ecf5e;
+  --color-caution: #fab219; /* text-safe as-is on dark */
+  --color-serious: #ec835a;
+  --color-alert: #d03b3b;
+  --color-alert-ink: #ff7a6e;
+
+  /* Command accent — interactive/operable elements only, never data marks. */
+  --color-command: #7cc4ff;
+  --color-command-dim: rgba(124, 196, 255, 0.16);
+
+  /* Joint series — fixed order, color follows the joint everywhere
+   * (charts, gauges, posture, legends). Validated as a set; do not reorder. */
+  --color-j1: #3987e5; /* shoulder_pan  */
+  --color-j2: #d95926; /* shoulder_lift */
+  --color-j3: #199e70; /* elbow_flex    */
+  --color-j4: #c98500; /* wrist_flex    */
+  --color-j5: #d55181; /* wrist_roll    */
+  --color-j6: #008300; /* gripper       */
+
+  /* Type — two families only, offline system stacks. All numerics wear
+   * the mono stack with tabular figures. */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas,
+    monospace;
+
+  --text-micro: 0.625rem; /* 10px — etched panel captions, all-caps + tracked */
+  --text-small: 0.75rem; /* 12px — chips, log, checklist detail */
+  --text-base: 0.8125rem; /* 13px — controls, labels */
+  --text-value: 0.9375rem; /* 15px — primary numeric readouts */
+  --text-title: clamp(1rem, 0.9rem + 0.5vw, 1.25rem); /* masthead wordmark */
+
+  --tracking-caps: 0.08em;
+  --tracking-wide: 0.14em;
+
+  /* Space — dense instrument rhythm: hairline seams between bays,
+   * breathing room only inside instrument groups. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-seam: 1px;
+
+  /* Shape — outer bays soften, instruments stay square. */
+  --radius-bay: 6px;
+  --radius-inner: 2px;
+  --radius-pill: 999px;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-lamp: 240ms;
+  --duration-cover: 260ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Fixed instrument dimensions */
+  --chart-h: 96px;
+  --lamp-w: 3.6rem;
+}

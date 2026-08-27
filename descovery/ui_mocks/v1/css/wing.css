@@ -1,0 +1,454 @@
+/* wing.css — everything inside an arm station ("wing"): chassis, head,
+ * chips, posture view, joint gauges, strip-chart figures, force-feedback
+ * console, and the dead-wing (no link) treatment. Shell/masthead/center
+ * styles live in cockpit.css; values come from tokens.css. */
+
+.wing {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-bay);
+}
+
+.wing > .bay {
+  border: 0;
+  border-top: var(--space-seam) solid var(--color-line);
+  border-radius: 0;
+}
+
+.wing > .bay:last-child {
+  border-radius: 0 0 var(--radius-bay) var(--radius-bay);
+}
+
+.wing-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+.wing-title {
+  flex: none;
+  white-space: nowrap;
+  font-size: var(--text-small);
+  color: var(--color-ink);
+}
+
+.link-chip {
+  flex: none;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: var(--radius-inner);
+  border: 1px solid var(--color-line);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  background: var(--color-well);
+  color: var(--color-ink-faint);
+}
+
+.link-chip[data-state='live'] {
+  background: var(--color-nominal);
+  border-color: var(--color-nominal);
+  color: var(--color-ground);
+}
+
+.link-chip[data-state='drop'] {
+  background: var(--color-alert);
+  border-color: var(--color-alert);
+  color: #ffffff;
+  animation: lamp-blink 1s step-end infinite;
+}
+
+.link-chip[data-state='stopped'] {
+  background: var(--color-caution);
+  border-color: var(--color-caution);
+  color: var(--color-ground);
+}
+
+.port-path {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-micro);
+  color: var(--color-ink-muted);
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-well);
+  color: var(--color-ink-muted);
+}
+
+.chip .num {
+  font-size: var(--text-small);
+  text-transform: none;
+  color: var(--color-ink);
+}
+
+.chip .num[data-heat='caution'] {
+  color: var(--color-caution);
+}
+
+.chip .num[data-heat='alert'] {
+  color: var(--color-alert-ink);
+}
+
+/* Posture */
+.posture-mount {
+  position: relative;
+  height: 180px;
+  background: var(--color-chart-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-inner);
+}
+
+.posture-mount svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.posture-ground {
+  stroke: var(--color-line-strong);
+}
+
+.posture-base {
+  fill: var(--color-panel-raised);
+  stroke: var(--color-line-strong);
+}
+
+.posture-ghost {
+  fill: none;
+  stroke: var(--color-ink-faint);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.posture-seg {
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.posture-jaw {
+  fill: none;
+  stroke: var(--color-j6);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.posture-dial {
+  fill: var(--color-well);
+  stroke: var(--color-line-strong);
+}
+
+.posture-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: var(--tracking-caps);
+  fill: var(--color-ink-muted);
+}
+
+.posture-grip {
+  font-size: 13px;
+  font-weight: 600;
+  fill: var(--color-ink);
+}
+
+/* Joint gauges */
+.gauge-rows {
+  display: grid;
+  gap: 3px;
+}
+
+.gauge-row,
+.gauge-head {
+  display: grid;
+  grid-template-columns: 8px 6.2rem 3.2rem 3.2rem minmax(2.5rem, 1fr) 3.4rem;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.gauge-head {
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.gauge-head span:nth-child(3),
+.gauge-head span:nth-child(4),
+.gauge-head span:nth-child(6) {
+  text-align: right;
+}
+
+.gauge-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-inner);
+  background: var(--j, var(--color-ink-faint));
+}
+
+.gauge-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-small);
+  color: var(--color-ink-muted);
+}
+
+.gauge-l,
+.gauge-f,
+.gauge-cur {
+  font-size: var(--text-small);
+  text-align: right;
+  color: var(--color-ink);
+}
+
+.gauge-l {
+  color: var(--color-ink-muted);
+}
+
+.gauge-cur[data-hot='true'] {
+  color: var(--color-caution);
+  font-weight: 700;
+}
+
+.gauge-track {
+  position: relative;
+  height: 8px;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-well);
+  border-radius: var(--radius-inner);
+}
+
+.gauge-track::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-line-strong);
+}
+
+.gauge-track[data-span='full']::before {
+  left: 0;
+}
+
+.gauge-fill {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 50%;
+  width: 50%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: var(--j, var(--color-ink-muted));
+  will-change: transform;
+}
+
+.gauge-track[data-span='full'] .gauge-fill {
+  left: 0;
+  width: 100%;
+}
+
+.gauge-bug {
+  position: absolute;
+  inset: 0;
+  transform: translateX(0);
+  will-change: transform;
+}
+
+.gauge-bug::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 5px solid var(--color-ink);
+}
+
+/* Charts */
+.bay-charts .legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--color-ink-muted);
+}
+
+.legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-inner);
+  background: var(--j, var(--color-ink-faint));
+}
+
+.chart {
+  margin-top: var(--space-2);
+}
+
+.chart figcaption {
+  margin-bottom: 3px;
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.chart canvas {
+  display: block;
+  width: 100%;
+  height: var(--chart-h);
+  background: var(--color-chart-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-inner);
+}
+
+/* Force-feedback console */
+.mode-segment {
+  display: inline-flex;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-inner);
+  overflow: hidden;
+}
+
+.mode-segment button {
+  padding: 5px 14px;
+  border: 0;
+  border-left: 1px solid var(--color-line);
+  background: var(--color-panel-raised);
+  color: var(--color-ink-muted);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: var(--tracking-caps);
+  transition: background-color var(--duration-fast), color var(--duration-fast);
+}
+
+.mode-segment button:first-child {
+  border-left: 0;
+}
+
+.mode-segment button:hover:enabled {
+  color: var(--color-ink);
+}
+
+.mode-segment button[aria-pressed='true'] {
+  background: var(--color-command-dim);
+  color: var(--color-command);
+  box-shadow: inset 0 -2px 0 var(--color-command);
+}
+
+.param-grid {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.param-row {
+  display: grid;
+  grid-template-columns: 8.4rem minmax(0, 1fr) 3.2rem;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.param-row label {
+  font-size: var(--text-small);
+  color: var(--color-ink-muted);
+}
+
+.param-row input[type='range'] {
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--color-command);
+}
+
+.param-value {
+  font-size: var(--text-small);
+  text-align: right;
+}
+
+.wing-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.btn-resync {
+  border: 1px solid var(--color-command);
+  background: transparent;
+  color: var(--color-command);
+}
+
+.btn-resync:hover:enabled {
+  background: var(--color-command-dim);
+}
+
+.btn-stop {
+  margin-left: auto;
+  border: 1px solid var(--color-alert);
+  background: transparent;
+  color: var(--color-alert-ink);
+}
+
+.btn-stop:hover:enabled {
+  background: var(--color-alert);
+  color: #ffffff;
+}
+
+/* Dead wing (no link): controls are disabled by JS; instruments dim. */
+.wing[data-live='false'] .bay-posture,
+.wing[data-live='false'] .bay-gauges,
+.wing[data-live='false'] .bay-charts,
+.wing[data-live='false'] .bay-console {
+  opacity: 0.45;
+}
+
+.wing button:disabled,
+.wing input:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+@media (max-width: 560px) {
+  .gauge-row,
+  .gauge-head {
+    grid-template-columns: 8px 5rem 2.8rem 2.8rem minmax(1.5rem, 1fr) 3rem;
+    gap: var(--space-1);
+  }
+
+  .param-row {
+    grid-template-columns: 6.8rem minmax(0, 1fr) 2.8rem;
+  }
+}

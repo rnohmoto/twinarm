@@ -1095,7 +1095,7 @@ wheels = [
 [[package]]
 name = "twinarm"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "lerobot", extra = ["dynamixel"] },
 ]

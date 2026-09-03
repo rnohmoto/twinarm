@@ -62,25 +62,57 @@ except Exception:
 
 XL430_JOINTS = {"shoulder_pan", "shoulder_lift"}  # フォロワーのXL430(電流でなく負荷0.1%/unit)
 
+# 位置ループ剛性。既定200では偏差158ticksで~124mAしか要求せず、Goal_Currentを
+# 450まで上げても実電流が124mAで頭打ちになる(実測)。Operating_Modeを書くと200へ
+# リセットされるため、必ずモード設定の"後"に書くこと。
+FF_GRIPPER_P_GAIN = 800
+
 
 def to_signed16(v):
     return v - 65536 if v > 32767 else v
 
 
-def setup_gripper_ff(leader, cap_ma):
-    """リーダーのグリッパーを電流ベース位置制御にして、開位置を保持させる"""
+def gripper_open_tick(bus):
+    """全開端の生カウント値をキャリブレーションから取る(保持目標として使う).
+
+    実測(較正値2036-2773に対し、握り込み時の生値=2106): 握ると raw position は
+    range_min 方向へ減る。したがって range_max が全開端。
+    ここを閉じ端(range_min)にすると、モーターが常に閉じる向きへ引き、握るほど
+    強く閉じてしまう。反力は「握りに逆らう=開く向き」でなければならない。
+    """
+    cal = getattr(bus, "calibration", None) or {}
+    g = cal.get("gripper")
+    return None if g is None else int(g.range_max)
+
+
+def setup_gripper_ff(leader, cap_ma, anchor=None):
+    """リーダーのグリッパーを電流ベース位置制御にして、開位置を保持させる
+
+    anchor を渡すとその位置を保持目標にする。再接続時に現在位置を読み直すと、
+    通信断の瞬間に握っていた位置が新しい保持目標になり、手を離すとそこへ
+    引き戻されてしまうため、再接続では初回の基準位置を引き継ぐこと。
+    """
     bus = leader.bus
     bus.write("Torque_Enable", "gripper", 0, normalize=False)
     bus.write("Operating_Mode", "gripper", 5, normalize=False)  # current-based position
+    # ↓モード書き込みでリセットされるので、この順序は動かさないこと
+    bus.write("Position_P_Gain", "gripper", FF_GRIPPER_P_GAIN, normalize=False)
     bus.write("Torque_Enable", "gripper", 1, normalize=False)
-    open_pos = bus.read("Present_Position", "gripper", normalize=False)
+    open_pos, src = anchor, "再接続で引き継ぎ"
+    if open_pos is None:
+        open_pos, src = gripper_open_tick(bus), "キャリブレーション全開端"
+    if open_pos is None:
+        open_pos, src = bus.read("Present_Position", "gripper", normalize=False), "起動時位置(較正なし)"
     bus.write("Goal_Position", "gripper", int(open_pos), normalize=False)
     bus.write("Goal_Current", "gripper", 60, normalize=False)  # 戻りバネの床値から開始
-    print(f"[ff] リーダーgripper: current-based position mode / 開位置={int(open_pos)} / 上限{cap_ma}mA")
+    print(f"[ff] リーダーgripper: current-based position mode / "
+          f"開位置={int(open_pos)}({src}) / 上限{cap_ma}mA")
     mode = int(bus.read("Operating_Mode", "gripper", normalize=False))
     trq = int(bus.read("Torque_Enable", "gripper", normalize=False))
-    print(f"[ff] 設定確認: Operating_Mode={mode}(期待5) / Torque_Enable={trq}(期待1)")
-    if mode != 5 or trq != 1:
+    pgain = int(bus.read("Position_P_Gain", "gripper", normalize=False))
+    print(f"[ff] 設定確認: Operating_Mode={mode}(期待5) / Torque_Enable={trq}(期待1) "
+          f"/ Position_P_Gain={pgain}(期待{FF_GRIPPER_P_GAIN})")
+    if mode != 5 or trq != 1 or pgain != FF_GRIPPER_P_GAIN:
         print("[ff] ⚠ モード/トルクが反映されていません — この状態では握り返しは効きません(この行をClaudeへ)")
     return int(open_pos)
 
@@ -213,8 +245,9 @@ def main():
 
     ff_on = args.ff in ("gripper", "arm")
     ff_arm = args.ff == "arm"
+    ff_anchor = [None]  # 初回の保持目標。再接続で引き継ぐ
     if ff_on:
-        setup_gripper_ff(teleop, args.ff_cap)
+        ff_anchor[0] = setup_gripper_ff(teleop, args.ff_cap)
     if ff_arm:
         setup_arm_ff(teleop, ARM_FF_JOINTS)
         print("[ff-arm] ⚠ 腕反力中はリーダーから手を離さない(反力で勝手に動き得る)。"
@@ -233,7 +266,7 @@ def main():
         if new not in ("off", "gripper", "arm"):
             return
         if new in ("gripper", "arm") and not ff_on:
-            setup_gripper_ff(teleop, args.ff_cap)
+            ff_anchor[0] = setup_gripper_ff(teleop, args.ff_cap)
             ff_on = True
         if new == "off" and ff_on:
             teleop.bus.write("Goal_Current", "gripper", 0, normalize=False)
@@ -400,7 +433,7 @@ def main():
                         teleop.connect()
                     check_hw_errors(robot)
                     if args.ff in ("gripper", "arm"):
-                        setup_gripper_ff(teleop, args.ff_cap)
+                        setup_gripper_ff(teleop, args.ff_cap, anchor=ff_anchor[0])
                         ff_on = True
                     if args.ff == "arm":
                         setup_arm_ff(teleop, ARM_FF_JOINTS)

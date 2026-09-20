@@ -26,6 +26,14 @@ pipeline against a synthetic frame and serves the browser panel. Real-arm and re
 
 ```bash
 cd dobot
+./start.sh            # Mac/Linux: wizard if not configured yet, otherwise the demo panel (start.bat on Windows)
+./start.sh dry        # no hardware: synthetic camera + recording robot, panel at http://127.0.0.1:8790
+./start.sh check      # read-only: cameras, candidate ports, offline tests
+```
+
+Or step by step:
+
+```bash
 uv sync                                   # first time; creates .venv with Python 3.13
 uv run pytest                             # offline tests — must pass before touching hardware
 uv run python demo.py --dry-run --no-llm  # synthetic camera + recording robot, panel at http://127.0.0.1:8790

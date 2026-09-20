@@ -103,6 +103,18 @@ class ThermalGuard:
         self.budget_s, self.window_s, self.cooldown_s = budget_s, window_s, cooldown_s
         self.intervals: list[tuple[float, float]] = []
         self.rest_until = 0.0
+        self.temp_c: float | None = None
+        self.temp_hot = False
+
+    def set_temperature(self, temp_c: float | None, stop_c: float, resume_c: float) -> None:
+        """温度センサがあるときの二段しきい値（stop_c 以上で休止・resume_c 未満で再開）。"""
+        self.temp_c = temp_c
+        if temp_c is None:
+            return
+        if temp_c >= stop_c:
+            self.temp_hot = True
+        elif temp_c < resume_c:
+            self.temp_hot = False
 
     def _trim(self, now: float) -> None:
         cutoff = now - self.window_s
@@ -126,7 +138,7 @@ class ThermalGuard:
         return max(0.0, self.rest_until - now)
 
     def can_run(self, now: float) -> bool:
-        return now >= self.rest_until and self.motion_s(now) < self.budget_s
+        return (not self.temp_hot) and now >= self.rest_until and self.motion_s(now) < self.budget_s
 
 
 class DemoRunner:
@@ -172,7 +184,35 @@ class DemoRunner:
         return {"on": self.attract_on, "idle_s": self.cfg.demo.idle_s, "pause_s": self.cfg.demo.pause_s,
                 "zone": self.cfg.demo.attract_zone, "count": self.cfg.demo.attract_count,
                 "cycles_last_hour": len(self._recent_cycles()), "max_per_hour": self.cfg.demo.max_cycles_per_hour,
-                "duty_pct": round(self.guard.duty(now) * 100), "rest_s": round(self.guard.resting_s(now))}
+                "duty_pct": round(self.guard.duty(now) * 100), "rest_s": round(self.guard.resting_s(now)),
+                "temp_c": (round(self.guard.temp_c, 1) if self.guard.temp_c is not None else None),
+                "temp_hot": self.guard.temp_hot}
+
+    def read_temperature(self) -> float | None:
+        """温度センサ（demo.temp_eio）を 1 回読んで熱の予算に渡す。無効・失敗なら None。"""
+        d = self.cfg.demo
+        if not d.temp_eio or not hasattr(self.robot, "read_adc"):
+            return None
+        from robot_dobot import thermistor_c
+        try:
+            if not getattr(self, "_temp_mux_done", False):
+                self.robot.set_io_multiplexing(d.temp_eio, "adc")
+                self._temp_mux_done = True
+            adc = self.robot.read_adc(d.temp_eio)
+        except Exception as e:  # noqa: BLE001 — センサ不調で実演を止めない
+            self.state.update(error=f"temp: {e!r}")
+            return None
+        t = thermistor_c(adc, d.temp_r_pullup, d.temp_r25, d.temp_beta, 3.3, d.temp_adc_fullscale_v)
+        was_hot = self.guard.temp_hot
+        self.guard.set_temperature(t, d.temp_stop_c, d.temp_resume_c)
+        robot_info = dict(self.state.snapshot().get("robot") or {})
+        robot_info["温度"] = f"{t:.1f} ℃ (adc {adc})" if t is not None else f"範囲外 (adc {adc})"
+        self.state.update(robot=robot_info, attract=self._attract_info())
+        if self.guard.temp_hot and not was_hot:
+            self.state.push_event(f"温度 {t:.1f} ℃ ≥ {d.temp_stop_c} ℃ → 自動動作を休止")
+        elif was_hot and not self.guard.temp_hot:
+            self.state.push_event(f"温度 {t:.1f} ℃ < {d.temp_resume_c} ℃ → 自動動作を再開")
+        return t
 
     def _record_motion(self, t0: float, picks_before: int) -> None:
         """腕が実際に動いた時間だけを熱の予算に積む（拾った数が増えたときだけ）。"""
@@ -404,6 +444,7 @@ class DemoRunner:
         t_start = time.time()
         frame_period = 1.0 / max(1, d.stream_fps)
         last_frame = 0.0
+        last_temp = 0.0
         n_frames = 0
         fps_t0 = time.time()
         try:
@@ -425,6 +466,9 @@ class DemoRunner:
                     self.state.push_event(f"コマンド失敗: {e!r}")
                 continue
             now = time.time()
+            if d.temp_eio and now - last_temp >= d.temp_period_s:
+                self.read_temperature()
+                last_temp = now
             if now - last_frame >= frame_period:
                 status = {"idle": "ready: talk / tidy / attract", "estop": "E-STOP (resume to continue)"}.get(
                     self.state.snapshot().get("state", "idle"), "")

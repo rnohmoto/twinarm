@@ -97,6 +97,15 @@ class DemoConfig:
     motion_budget_s: float = 240.0   # 直近 budget_window_s 秒のうち腕を動かしてよい秒数（≈40%・ステッパの発熱の目安）
     budget_window_s: float = 600.0
     cooldown_s: float = 120.0        # 予算を使い切ったら最低この秒数は自動動作を止める（対話は説明員の判断で可）
+    # 温度センサ（任意）: Temp ピン（EIO1・内蔵 4.7kΩ→3.3V プルアップ）に貼ったサーミスタを読む
+    temp_eio: int = 0                # 0＝無し。1＝EIO1（Temp）
+    temp_period_s: float = 10.0
+    temp_r_pullup: float = 4700.0
+    temp_r25: float = 100000.0       # サーミスタの 25℃ 抵抗（3D プリンタ用 NTC 100kΩ）
+    temp_beta: float = 3950.0
+    temp_adc_fullscale_v: float = 3.3  # ADC のフルスケール電圧（3.3 か 5.0。check_robot.py --adc で確認）
+    temp_stop_c: float = 60.0        # これ以上で自動動作を休止
+    temp_resume_c: float = 50.0      # これ未満で再開
     panel_port: int = 8790           # ブラウザ UI（http://127.0.0.1:8790）
     stream_fps: int = 8
     jpeg_quality: int = 70

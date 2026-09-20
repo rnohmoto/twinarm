@@ -16,11 +16,37 @@
 from __future__ import annotations
 
 import math
+import struct
 import threading
 import time
 from dataclasses import dataclass
 
 from config import RobotConfig
+
+# Dobot Communication Protocol V1.1.5（公式）: I/O 関連のコマンド ID と多重化の機能番号
+ID_SET_IO_MULTIPLEXING = 130   # params: address(uint8), multiplex(uint8)
+ID_GET_IO_ADC = 134            # params: address(uint8) → response: address(uint8), value(uint16, 0..4095)
+IO_FUNCTION = {"dummy": 0, "pwm": 1, "do": 2, "di": 3, "adc": 4}
+ADC_MAX = 4095
+
+
+def thermistor_c(adc: int, r_pullup: float = 4700.0, r25: float = 100000.0, beta: float = 3950.0,
+                 v_pullup: float = 3.3, adc_fullscale_v: float = 3.3) -> float | None:
+    """Temp ピン（内蔵プルアップ r_pullup → v_pullup・サーミスタは GND 側）の ADC 値を ℃ にする。
+
+    V = adc / 4095 × adc_fullscale_v、R = r_pullup × V / (v_pullup − V)、β 式で温度。範囲外なら None。
+    adc_fullscale_v は 3.3 か 5.0（何も繋がずに読んだ値で決める: 4095 付近なら 3.3、2700 付近なら 5.0）。
+    """
+    if adc <= 0 or adc >= ADC_MAX:
+        return None
+    v = adc_fullscale_v * adc / ADC_MAX
+    if v >= v_pullup - 1e-6:
+        return None
+    r = r_pullup * v / (v_pullup - v)
+    if r <= 0:
+        return None
+    inv_t = 1.0 / 298.15 + math.log(r / r25) / beta
+    return 1.0 / inv_t - 273.15
 
 
 class OutOfWorkspace(Exception):
@@ -127,6 +153,15 @@ class DryRunRobot(RobotBase):
     def _ee(self, on):
         self.ee_state = on
 
+    # 温度センサの模擬（3900 ≈ 25℃・100kΩ サーミスタ・3.3V フルスケール）
+    sim_adc: int = 3900
+
+    def set_io_multiplexing(self, eio: int, function: str = "adc") -> None:
+        self.log.append(f"io_mux({eio},{function})")
+
+    def read_adc(self, eio: int) -> int:
+        return int(self.sim_adc)
+
 
 class PydobotRobot(RobotBase):
     def __init__(self, cfg: RobotConfig):
@@ -186,6 +221,29 @@ class PydobotRobot(RobotBase):
             self.dev.grip(on)
         else:
             self.dev.suck(on)
+
+    # --- I/O（温度センサ等・読み取り系。pydobot 1.3.2 に無いので公式プロトコルの ID を直接送る） ---
+    def _io_command(self, cmd_id: int, params: bytes, write: bool):
+        from pydobot.message import Message  # type: ignore
+        msg = Message()
+        msg.id = cmd_id
+        msg.ctrl = 1 if write else 0            # bit0 = rw（1=書き込み）、bit1 = isQueued（0=即時）
+        msg.params = bytes(params)
+        return self.dev._send_command(msg)
+
+    def set_io_multiplexing(self, eio: int, function: str = "adc") -> None:
+        """EIO ピンの機能を切り替える（adc/di/do/pwm/dummy）。SetIOMultiplexing（ID 130）。"""
+        self._io_command(ID_SET_IO_MULTIPLEXING, bytes([int(eio), IO_FUNCTION[function]]), write=True)
+        self.log.append(f"io_mux({eio},{function})")
+
+    def read_adc(self, eio: int) -> int:
+        """EIO ピンの ADC 値（0〜4095）。GetIOADC（ID 134）。事前に set_io_multiplexing(eio, "adc")。"""
+        resp = self._io_command(ID_GET_IO_ADC, bytes([int(eio)]), write=False)
+        params = bytes(getattr(resp, "params", b"") or b"")
+        if len(params) < 3:
+            raise RuntimeError(f"GetIOADC({eio}): 応答が短い ({len(params)} bytes)")
+        _addr, value = struct.unpack_from("<BH", params, 0)
+        return int(value)
 
     # pydobot 1.3.2 は home（SetHOMECmd ID=31）とアラーム解除を公開していない（★ソース確認 2026-09-11）。
     # 電源投入ごとのホーミングは本体キー長押し 2 秒 or DobotStudio で行う（初代はインクリメンタルエンコーダ）。

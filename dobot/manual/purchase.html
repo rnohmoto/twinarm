@@ -23,14 +23,15 @@
 </head>
 <body>
 <nav class="nav-top">
-  <a href="index.html">← 初期設定マニュアル</a><a href="connection.html">接続マニュアル</a><a href="#s1">必須</a><a href="#s2">推奨</a><a href="#s3">任意・拡張</a><a href="#s4">温度とトルク</a><a href="#s5">購買経路</a>
+  <a href="index.html">初期設定マニュアル</a><a href="connection.html">接続マニュアル</a><span style="color:#7f8c8d">｜</span>
+  <a href="#s1">必須</a><a href="#s2">推奨</a><a href="#s3">任意・拡張</a><a href="#s4">温度とトルク</a><a href="#s5">購買経路</a>
 </nav>
 <div class="container py-4">
 
 <header class="mb-3">
-  <h1 class="h2">Dobot Magician 画像認識ピック＆プレース — 購入リスト（v1・2026-09-20）</h1>
-  <p class="text-muted mb-1">価格は 2026-09-20 に販売ページで確認したもの（★）、または概算（☆）。税込表示は店の表示に従う。数量はフェス 1 ブース分。</p>
-  <p class="mb-0">優先度 <span class="badge badge-A">A</span> 本番に必須　<span class="badge badge-B">B</span> 推奨（確実性・記録のため）　<span class="badge badge-C">C</span> 任意・拡張（吸着の成否・電流の目安・予備）。設計の根拠は robotics の 93_（カメラ・対象物）と 91_（構成）。</p>
+  <h1 class="h2">Dobot Magician 画像認識ピック＆プレース — 購入リスト</h1>
+  <p class="text-muted mb-1">価格は 2026年9月20日に各販売ページで確認した表示額。「約」を付けた額は概算。数量はブース 1 組分。</p>
+  <p class="mb-0">優先度 <span class="badge badge-A">A</span> 本番に必須　<span class="badge badge-B">B</span> 推奨（確実性と記録のため）　<span class="badge badge-C">C</span> 任意・拡張（吸着の成否・電流の目安・予備）</p>
 </header>
 
 <div class="row g-3 mb-4">
@@ -39,35 +40,35 @@
   <div class="col-md-4"><div class="metric-card"><div class="metric-value">約 1.0〜2.5 万円</div><div>C 任意の合計目安（負圧センサ・電流計・予備）</div></div></div>
 </div>
 
-<h2 id="s1">1. 必須（A）— これが無いと動かない</h2>
+<h2 id="s1">1. 必須（A）</h2>
 <table class="table table-striped table-hover">
   <thead><tr><th>#</th><th>品名</th><th>型番・仕様</th><th>数</th><th>価格</th><th>買う場所</th><th>用途・備考</th></tr></thead>
   <tbody>
-    <tr class="pri-A"><td>A1</td><td>俯瞰カメラ</td><td><strong>Logicool C920n</strong>（1080p30・AF は設定で止める・対角 78°）</td><td>1</td><td>★¥6,148（Amazon）／★MonotaRO は C920e ¥9,788・C920s ¥9,898 税込</td><td>Amazon.co.jp／MonotaRO（当日出荷）</td><td>Koch 俯瞰と共用。三脚付きがよければ C922n ★¥11,400（MonotaRO ¥13,178）</td></tr>
-    <tr class="pri-A"><td>A2</td><td>俯瞰スタンド</td><td>マジックアーム＋スーパークランプ（SMALLRIG 系）、またはコピースタンド／スマホ俯瞰スタンド（1/4-20 ネジ）</td><td>1</td><td>☆¥3,000〜8,000</td><td>Amazon</td><td>高さ 45cm で「動かない」ことが最重要。机にクランプ固定</td></tr>
-    <tr class="pri-A"><td>A3</td><td>背景マット</td><td>黒のデスクマット 60×90cm（艶消し）</td><td>1</td><td>☆¥1,000〜2,000</td><td>Amazon／MonotaRO</td><td>背景を色検出から外す。白い机は不可</td></tr>
-    <tr class="pri-A"><td>A4</td><td>対象物: 立方体</td><td>木製ブロック 立方体 2.5cm カラーミックス 30 個</td><td>1 袋</td><td>★¥1,498（Amazon）</td><td>Amazon</td><td>主役（赤・緑・青・黄）。3cm 版は ★¥2,380</td></tr>
-    <tr class="pri-A"><td>A5</td><td>対象物: ボール</td><td>卓球ボール 40mm カラー 50 個（プラスチック・無地）</td><td>1 袋</td><td>★¥899（Amazon）</td><td>Amazon</td><td>吸盤で確実側。橙を既定の「ボール」にしている</td></tr>
-    <tr class="pri-A"><td>A6</td><td>対象物: 消しゴム</td><td>MONO 消しゴム PE-04（55×23×11mm）</td><td>3</td><td>☆¥100〜150／個</td><td>文具店／ASKUL／Amazon</td><td>青帯で検出。吸盤は上面幅 23mm で可（PE-01 は不可）</td></tr>
-    <tr class="pri-A"><td>A7</td><td>置き場</td><td>浅いトレイ（無彩色・A5 程度）×3、ボール用に窪み付き（製氷皿・卵パック代替可）×1</td><td>4</td><td>☆¥1,000</td><td>100 円ショップ／Amazon</td><td>ボールは転がるので窪みへ</td></tr>
-    <tr class="pri-A"><td>A8</td><td>キャリブレーション用</td><td>ArUco 4×4_50 ID0〜3（`calibrate.py --make-markers` で印刷）＋厚紙 or 発泡ボード＋のり</td><td>4</td><td>¥0〜300</td><td>手元</td><td>反らないように貼る</td></tr>
-    <tr class="pri-A"><td>A9</td><td>USB ケーブル・ハブ</td><td>Magician 付属 USB ケーブルの予備 1、PC の USB 口が 2 つ無ければセルフパワー USB ハブ</td><td>1</td><td>☆¥1,000〜3,000</td><td>Amazon／MonotaRO</td><td>カメラと Magician で 2 口</td></tr>
-    <tr class="pri-A"><td>A10</td><td>養生・固定</td><td>養生テープ、結束バンド、メジャー、ノギス</td><td>—</td><td>☆¥1,000</td><td>手元／MonotaRO</td><td>カメラ高さ・物の寸法の実測に使う</td></tr>
-    <tr class="pri-A"><td>A11</td><td>（手元にある物の確認）</td><td>Magician 本体・AC アダプタ（12V・公式仕様 6.5A。銘板で確認）・付属 USB ケーブル・吸盤キット（エアポンプボックス＋チューブ＋吸盤）</td><td>—</td><td>—</td><td>手元</td><td>欠品なら TechShare へ。ポンプボックスは吸盤・グリッパ共用（★）</td></tr>
+    <tr class="pri-A"><td>A1</td><td>俯瞰カメラ</td><td><strong>Logicool C920n</strong>（1080p30・対角 78°・AF は設定で止める）</td><td>1</td><td>¥6,148（Amazon）。MonotaRO は C920e ¥9,788、C920s ¥9,898（税込）</td><td>Amazon.co.jp／MonotaRO（当日出荷）</td><td>Koch の俯瞰と共用できる。三脚付きがよければ C922n ¥11,400（MonotaRO ¥13,178）</td></tr>
+    <tr class="pri-A"><td>A2</td><td>俯瞰スタンド</td><td>マジックアーム＋スーパークランプ、またはコピースタンド／スマホ俯瞰スタンド（1/4-20 ネジ）</td><td>1</td><td>約 ¥3,000〜8,000</td><td>Amazon</td><td>高さ 45cm で動かないことが最重要。机にクランプ固定</td></tr>
+    <tr class="pri-A"><td>A3</td><td>背景マット</td><td>黒のデスクマット 60×90cm（艶消し）</td><td>1</td><td>約 ¥1,000〜2,000</td><td>Amazon／MonotaRO</td><td>背景を色検出から外す。白い机は不可</td></tr>
+    <tr class="pri-A"><td>A4</td><td>対象物: 立方体</td><td>木製ブロック 立方体 2.5cm カラーミックス 30 個</td><td>1 袋</td><td>¥1,498（Amazon）</td><td>Amazon</td><td>主役（赤・緑・青・黄）。3cm 版は ¥2,380</td></tr>
+    <tr class="pri-A"><td>A5</td><td>対象物: ボール</td><td>卓球ボール 40mm カラー 50 個（プラスチック・無地）</td><td>1 袋</td><td>¥899（Amazon）</td><td>Amazon</td><td>吸盤で確実側。橙を既定の「ボール」にしている</td></tr>
+    <tr class="pri-A"><td>A6</td><td>対象物: 消しゴム</td><td>MONO 消しゴム PE-04（55×23×11mm）</td><td>3</td><td>約 ¥100〜150／個</td><td>文具店／ASKUL／Amazon</td><td>青帯で検出。吸盤は上面幅 23mm で可（PE-01 は幅 17mm で不可）</td></tr>
+    <tr class="pri-A"><td>A7</td><td>置き場</td><td>浅いトレイ（無彩色・A5 程度）3 枚、ボール用に窪み付き 1 枚</td><td>4</td><td>約 ¥1,000</td><td>100 円ショップ／Amazon</td><td>ボールは転がるので窪みへ</td></tr>
+    <tr class="pri-A"><td>A8</td><td>キャリブレーション用</td><td>ArUco マーカー 4 枚（ウィザードが印刷用画像を出す）、厚紙か発泡ボード、のり</td><td>4</td><td>¥0〜300</td><td>手元</td><td>反らないように貼る</td></tr>
+    <tr class="pri-A"><td>A9</td><td>USB ケーブル・ハブ</td><td>Magician 付属 USB ケーブルの予備 1 本。PC の USB 口が 2 つ無ければセルフパワー USB ハブ</td><td>1</td><td>約 ¥1,000〜3,000</td><td>Amazon／MonotaRO</td><td>カメラと Magician で 2 口</td></tr>
+    <tr class="pri-A"><td>A10</td><td>養生・固定・計測</td><td>養生テープ、結束バンド、メジャー、ノギス</td><td>—</td><td>約 ¥1,000</td><td>手元／MonotaRO</td><td>カメラ高さと物の寸法の実測に使う</td></tr>
+    <tr class="pri-A"><td>A11</td><td>手元にある物の確認</td><td>Magician 本体、AC アダプタ（12V・公式仕様 6.5A。銘板で確認）、付属 USB ケーブル、吸盤キット（エアポンプボックス・チューブ・吸盤）</td><td>—</td><td>—</td><td>手元</td><td>欠品なら TechShare へ。ポンプボックスは吸盤とグリッパで共用</td></tr>
   </tbody>
 </table>
 
-<h2 id="s2">2. 推奨（B）— 確実性と記録のため</h2>
+<h2 id="s2">2. 推奨（B）</h2>
 <table class="table table-striped table-hover">
   <thead><tr><th>#</th><th>品名</th><th>型番・仕様</th><th>数</th><th>価格</th><th>買う場所</th><th>用途・備考</th></tr></thead>
   <tbody>
-    <tr class="pri-B"><td>B1</td><td>照明</td><td>LED 面光源かリングライト（調光・CRI 90 以上・USB 給電）</td><td>1</td><td>☆¥3,000〜6,000</td><td>Amazon</td><td>会場の照明変化から色検出を守る</td></tr>
-    <tr class="pri-B"><td>B2</td><td><strong>放射温度計（赤外線）</strong></td><td>シンワ測定 放射温度計 B レーザーポイント付 73010、または汎用品（−50〜+600℃）</td><td>1</td><td>★¥6,628（シンワ・Amazon）／★¥2,699（汎用・Amazon）</td><td>Amazon／MonotaRO（計測器）</td><td><strong>熱の測定 その1</strong>: 30 分ごとに J1（土台）・J2・J3 のモーター筐体を測って記録。最初の長時間運転はこれで</td></tr>
-    <tr class="pri-B"><td>B3</td><td><strong>サーミスタ（外付け温度センサ）</strong></td><td>3D プリンタ用 NTC 100kΩ・B 3950・ケーブル付き（ARCELI 5 個 1m 配線）、または素子のみ（Hailege 10 個）</td><td>1 袋</td><td>★¥599（ARCELI 5 個）／★¥680（Hailege 10 個）</td><td>Amazon</td><td><strong>熱の測定 その2</strong>: モーター筐体に貼り、Magician 背面 EIO1（Temp・4.7kΩ→3.3V プルアップ）に繋いで GetIOADC で読む（接続マニュアル §5）。実機で換算を確認</td></tr>
-    <tr class="pri-B"><td>B4</td><td>カプトンテープ</td><td>ポリイミド耐熱テープ 15〜20mm×33m</td><td>1</td><td>★¥645〜699（Amazon）</td><td>Amazon</td><td>サーミスタをモーター筐体に密着固定</td></tr>
-    <tr class="pri-B"><td>B5</td><td>配線材</td><td>デュポンワイヤ（メス–メス／メス–オス 2.54mm）・熱収縮チューブ</td><td>1 袋</td><td>☆¥500〜1,000</td><td>Amazon／秋月</td><td>EIO ピンヘッダへの接続用（コネクタ形状は接続マニュアル §5 で確認）</td></tr>
-    <tr class="pri-B"><td>B6</td><td>予備部品</td><td>吸盤ゴム（Magician 純正吸盤キット用）、シリコンチューブ</td><td>1</td><td>☆¥1,000〜2,000</td><td>TechShare／Amazon</td><td>吸盤の劣化は吸着失敗の主因</td></tr>
-    <tr class="pri-B"><td>B7</td><td>音声（使う場合）</td><td>USB 単一指向マイク（or ヘッドセット）＋小型スピーカー、PTT 用フットスイッチ</td><td>各 1</td><td>☆¥5,000〜10,000</td><td>Amazon／MonotaRO</td><td>音声入力を使わずキーボード入力で始めるなら不要</td></tr>
+    <tr class="pri-B"><td>B1</td><td>照明</td><td>LED 面光源かリングライト（調光・演色性 Ra90 以上・USB 給電）</td><td>1</td><td>約 ¥3,000〜6,000</td><td>Amazon</td><td>会場の照明変化から色検出を守る</td></tr>
+    <tr class="pri-B"><td>B2</td><td><strong>放射温度計（赤外線）</strong></td><td>シンワ測定 放射温度計 B レーザーポイント付 73010、または汎用品（−50〜+600℃）</td><td>1</td><td>¥6,628（シンワ・Amazon）／¥2,699（汎用・Amazon）</td><td>Amazon／MonotaRO（計測器）</td><td><strong>温度の測定 1</strong>: 30 分ごとに J1（土台）・J2・J3 のモーター筐体を測って記録する。最初の長時間運転はこれで</td></tr>
+    <tr class="pri-B"><td>B3</td><td><strong>サーミスタ（外付け温度センサ）</strong></td><td>3D プリンタ用 NTC 100kΩ・B 3950・ケーブル付き 5 個（ARCELI）、または素子のみ 10 個（Hailege）</td><td>1 袋</td><td>¥599（ARCELI）／¥680（Hailege）</td><td>Amazon</td><td><strong>温度の測定 2</strong>: モーター筐体に貼り、本体の Temp ピン（EIO1）に繋ぐと実演画面に温度が出て、60℃ で自動動作が休止する（接続マニュアル §5）</td></tr>
+    <tr class="pri-B"><td>B4</td><td>カプトンテープ</td><td>ポリイミド耐熱テープ 15〜20mm×33m</td><td>1</td><td>¥645〜699（Amazon）</td><td>Amazon</td><td>サーミスタをモーター筐体に密着固定</td></tr>
+    <tr class="pri-B"><td>B5</td><td>配線材</td><td>デュポンワイヤ（メス–メス／メス–オス 2.54mm）、熱収縮チューブ</td><td>1 袋</td><td>約 ¥500〜1,000</td><td>Amazon／秋月電子</td><td>Temp ピンと GP ピンへの接続用（コネクタ形状は現物で確認）</td></tr>
+    <tr class="pri-B"><td>B6</td><td>予備部品</td><td>吸盤ゴム（Magician 純正吸盤キット用）、シリコンチューブ</td><td>1</td><td>約 ¥1,000〜2,000</td><td>TechShare／Amazon</td><td>吸盤の劣化は吸着失敗の主因</td></tr>
+    <tr class="pri-B"><td>B7</td><td>音声（使う場合）</td><td>USB 単一指向マイクかヘッドセット、小型スピーカー、押して話す用フットスイッチ</td><td>各 1</td><td>約 ¥5,000〜10,000</td><td>Amazon／MonotaRO</td><td>キーボード入力で始めるなら不要</td></tr>
   </tbody>
 </table>
 
@@ -75,38 +76,36 @@
 <table class="table table-striped table-hover">
   <thead><tr><th>#</th><th>品名</th><th>型番・仕様</th><th>数</th><th>価格</th><th>買う場所</th><th>用途・備考</th></tr></thead>
   <tbody>
-    <tr class="pri-C"><td>C1</td><td><strong>負圧センサ（吸着の成否）</strong></td><td>アナログ出力 0.5〜4.5V・測定範囲 −100〜0kPa・5V 電源のゲージ圧センサモジュール（例: XGZP6847 系）。※Amazon 上位の MPXV7002（±2kPa）は範囲不足、秋月の MPX5700DP（¥1,650）は正圧用で不可</td><td>1</td><td>☆¥1,500〜4,000</td><td>Amazon（国内取扱は要確認・Amazon.com には掲載）／秋月／Switch Science</td><td>吸盤の配管に T 継手で割り込ませ、空き GP（ADC・最大 5V）で読む→「吸えた／吸えていない」を判定。純正吸盤キットに真空センサは無い（★接続マニュアル §6）</td></tr>
-    <tr class="pri-C"><td>C2</td><td>T 継手・チューブ</td><td>φ4〜6mm エアチューブ用 T 継手、シリコンチューブ 1m</td><td>1</td><td>☆¥500〜1,000</td><td>Amazon／MonotaRO</td><td>C1 用</td></tr>
-    <tr class="pri-C"><td>C3</td><td><strong>電流の目安（トルクの代替）</strong></td><td>DC 電力計（12V バレルジャック割り込み型・電流表示）、または ACS712 電流センサモジュール（アナログ 0〜5V・EIO ADC で読む）</td><td>1</td><td>☆¥1,000〜2,000</td><td>Amazon／秋月</td><td>初代 Magician はモーターの電流・トルクを返さない。12V 供給線の総電流を見るのが現実的な代替（接続マニュアル §6）</td></tr>
-    <tr class="pri-C"><td>C4</td><td>固定焦点カメラ（代替）</td><td>Elgato Facecam MK.2（固定焦点 30〜120cm・設定を本体に保存）</td><td>1</td><td>★¥17,980（Amazon セール）</td><td>Amazon</td><td>AF の迷いを構造的に消したい場合の C920n の代わり</td></tr>
-    <tr class="pri-C"><td>C5</td><td>予備・手首カメラ</td><td>InnoMaker U20CAM-720P（32×32mm・UVC）</td><td>1〜2</td><td>★¥2,200（Amazon）</td><td>Amazon</td><td>Koch 手首と共通。Magician 俯瞰には広角すぎる</td></tr>
-    <tr class="pri-C"><td>C6</td><td>Windows PC（Magician 専用）</td><td>ミニ PC or ノート（USB 2 口以上）</td><td>1</td><td>☆¥50,000〜</td><td>社内手配</td><td>露出固定が OpenCV から効き、Koch の Mac と分離できる（91_ P1）</td></tr>
-    <tr class="pri-C"><td>C7</td><td>深度カメラ</td><td>Orbbec Gemini 335 ★¥50,160（Switch Science・在庫 0）／OAK-D Lite ★¥30,910</td><td>—</td><td>—</td><td>Switch Science</td><td>今回は不要。積み重ね・高さ違いに広げるとき</td></tr>
+    <tr class="pri-C"><td>C1</td><td><strong>負圧センサ（吸着の成否）</strong></td><td>アナログ出力 0.5〜4.5V・測定範囲 −100〜0kPa・5V 電源のゲージ圧センサモジュール（XGZP6847 系）。Amazon 上位の MPXV7002（±2kPa）は範囲不足、秋月の MPX5700DP（¥1,650）は正圧用で不可</td><td>1</td><td>約 ¥1,500〜4,000</td><td>Amazon（国内取扱は要確認。Amazon.com には掲載）／秋月電子／Switch Science</td><td>吸盤の配管に T 継手で割り込ませ、空き GP（ADC・最大 5V）で読む。純正吸盤キットに真空センサは無い（接続マニュアル §6）</td></tr>
+    <tr class="pri-C"><td>C2</td><td>T 継手・チューブ</td><td>φ4〜6mm エアチューブ用 T 継手、シリコンチューブ 1m</td><td>1</td><td>約 ¥500〜1,000</td><td>Amazon／MonotaRO</td><td>C1 用</td></tr>
+    <tr class="pri-C"><td>C3</td><td><strong>電流の目安（トルクの代替）</strong></td><td>DC 電力計（12V バレルジャック割り込み型・電流表示）、または ACS712 電流センサモジュール（アナログ 0〜5V・GP の ADC で読む）</td><td>1</td><td>約 ¥1,000〜2,000</td><td>Amazon／秋月電子</td><td>初代 Magician はモーターの電流・トルクを返さない。12V 供給線の総電流を見るのが現実的な代替（接続マニュアル §6）</td></tr>
+    <tr class="pri-C"><td>C4</td><td>固定焦点カメラ（代替）</td><td>Elgato Facecam MK.2（固定焦点 30〜120cm・設定を本体に保存）</td><td>1</td><td>¥17,980（Amazon・セール時）</td><td>Amazon</td><td>AF の迷いを構造的に消したい場合の C920n の代わり</td></tr>
+    <tr class="pri-C"><td>C5</td><td>予備・手首カメラ</td><td>InnoMaker U20CAM-720P（32×32mm・UVC）</td><td>1〜2</td><td>¥2,200（Amazon）</td><td>Amazon</td><td>Koch の手首と共通。Magician の俯瞰には広角すぎる</td></tr>
+    <tr class="pri-C"><td>C6</td><td>Windows PC（Magician 専用）</td><td>ミニ PC かノート（USB 2 口以上）</td><td>1</td><td>約 ¥50,000〜</td><td>社内手配</td><td>露出固定が OpenCV から効き、Koch の Mac と分離できる</td></tr>
+    <tr class="pri-C"><td>C7</td><td>深度カメラ</td><td>Orbbec Gemini 335 ¥50,160（Switch Science・在庫切れ）／OAK-D Lite ¥30,910</td><td>—</td><td>—</td><td>Switch Science</td><td>今回は不要。積み重ねや高さ違いに広げるとき</td></tr>
   </tbody>
 </table>
 
-<h2 id="s4">4. 温度とトルクは何で見るか（購入品との対応）</h2>
+<h2 id="s4">4. 温度とトルクは何で見るか</h2>
 <div class="note">
-  <p class="mb-1"><strong>温度</strong>: 初代 Magician は自分の温度を返しません（通信プロトコルに温度コマンド無し・アラームに過熱系無し）。測る口は 2 つ。①<strong>B2 放射温度計</strong>で J1／J2／J3 のモーター筐体を定期的に測る（まずこれで実測値を得る）。②<strong>B3 サーミスタ＋B4 テープ＋B5 配線</strong>をモーター筐体に貼り、背面 EIO1（Temp ピン・4.7kΩ で 3.3V にプルアップ済み・3D プリント用サーミスタ入力）へ繋いで <code>GetIOADC</code>（12bit）で読み、画面に温度を出して熱の予算を温度でも止める（ソフトは要追加・実機で換算確認）。</p>
-  <p class="mb-0"><strong>トルク</strong>: 初代 Magician は開ループのステッピングモーターで、<strong>モーター電流・トルク・負荷を返すコマンドはありません</strong>（脱調検知のアラームだけ）。代替は、<strong>C3 電流計</strong>で 12V 供給線の総電流を見る（腕全体の負荷の目安）、<strong>C1 負圧センサ</strong>で「吸えたか」を見る（ピックの成否＝実演で一番効く指標）、の 2 つです。関節ごとのトルク／温度がフィードバックで取れるのはサーボ機（MG400・M1 Pro・CR 系。E6 も同系列）です。</p>
+  <p class="mb-1"><strong>温度</strong>: 初代 Magician は自分の温度を返しません（通信プロトコルに温度コマンドが無く、アラームにも過熱系がありません）。測る口は 2 つ。①<strong>B2 放射温度計</strong>で J1・J2・J3 のモーター筐体を定期的に測る（まずこれで実測値を得る）。②<strong>B3 サーミスタ＋B4 テープ＋B5 配線</strong>をモーター筐体に貼り、Temp ピン（EIO1・4.7kΩ で 3.3V にプルアップ済み）に繋ぐ。実演画面に温度が出て、60℃ 以上で自動動作が休止し 50℃ 未満で再開します（接続マニュアル §5）。</p>
+  <p class="mb-0"><strong>トルク</strong>: 初代 Magician は開ループのステッピングモーターで、<strong>モーター電流・トルク・負荷を返すコマンドがありません</strong>（脱調検知のアラームだけ）。代替は、<strong>C3 電流計</strong>で 12V 供給線の総電流を見る（腕全体の負荷の目安）、<strong>C1 負圧センサ</strong>で吸えたかを見る（ピックの成否＝実演で最も効く指標）、の 2 つです。関節ごとのトルクや温度が取れるのはサーボ機（MG400・M1 Pro・CR 系。E6 も同系列）です。</p>
 </div>
 
 <h2 id="s5">5. 購買経路の整理</h2>
 <table class="table table-bordered">
-  <thead><tr><th>経路</th><th>買えるもの</th><th>備考（2026-09-20）</th></tr></thead>
+  <thead><tr><th>経路</th><th>買えるもの</th><th>備考</th></tr></thead>
   <tbody>
-    <tr><td><strong>MonotaRO（MRO）</strong></td><td>Logicool C920e／C920s／C922n／C270、テープ・結束バンド・計測器（放射温度計）</td><td>★当日出荷。「ロジクール ウェブカメラ」で検索（C920n の型番では出ない）</td></tr>
-    <tr><td><strong>ASKUL（MRO）</strong></td><td>Logicool C270n ★¥2,926、文具（消しゴム・厚紙）</td><td>社内口座で型番検索</td></tr>
-    <tr><td>Amazon.co.jp（ビジネス）</td><td>上記全部＋対象物・サーミスタ・カプトン・センサモジュール・InnoMaker・Elgato</td><td>★在庫あり。法人請求書払いの社内可否を要確認</td></tr>
-    <tr><td>秋月電子／Switch Science</td><td>センサモジュール（負圧・電流）・配線材／深度カメラ</td><td>個人向け通販。法人は Switch Science の請求書払いを確認</td></tr>
-    <tr><td>TechShare（Dobot 正規代理店）</td><td>Magician 純正の吸盤キット部品・グリッパキット・ケーブル</td><td>見積依頼（Store は会員価格）</td></tr>
+    <tr><td><strong>MonotaRO（MRO）</strong></td><td>Logicool C920e／C920s／C922n／C270、テープ・結束バンド・計測器（放射温度計）</td><td>当日出荷。「ロジクール ウェブカメラ」で検索する（C920n の型番では出ない）</td></tr>
+    <tr><td><strong>ASKUL（MRO）</strong></td><td>Logicool C270n ¥2,926、文具（消しゴム・厚紙）</td><td>社内口座で型番検索</td></tr>
+    <tr><td>Amazon.co.jp（ビジネス）</td><td>上記全部と対象物・サーミスタ・カプトン・センサモジュール・InnoMaker・Elgato</td><td>在庫あり。法人請求書払いの社内可否を確認する</td></tr>
+    <tr><td>秋月電子／Switch Science</td><td>センサモジュール（負圧・電流）・配線材／深度カメラ</td><td>個人向け通販。法人は Switch Science の請求書払いを確認する</td></tr>
+    <tr><td>TechShare（Dobot 正規代理店）</td><td>Magician 純正の吸盤キット部品・グリッパキット・ケーブル</td><td>見積依頼</td></tr>
   </tbody>
 </table>
-<div class="warn">買わないもの: 純正 Vision Kit（産業カメラ＋Windows 専用ソフト・☆¥328,000 税別・UVC 非対応）、深度カメラ（今回は不要）、ゴルフボール（手元の物で吸着テストをしてから採否）。</div>
+<div class="warn">買わないもの: 純正 Vision Kit（産業カメラと Windows 専用ソフトの構成で約 33 万円。UVC の Web カメラは接続対象外）、深度カメラ（今回は不要）、ゴルフボール（手元の物で吸着テストをしてから採否を決める）。</div>
 
-<footer>
-  生成: 2026-09-20（TwinArm <code>dobot/manual/purchase.html</code> v1・正本）。価格の出典: Amazon.co.jp・MonotaRO・Switch Science の各ページ（robotics <code>web_research/camera_pnp_2609/H0_</code>・本日追加分は放射温度計・サーミスタ・カプトンテープ・負圧センサの検索結果）。温度・トルクの根拠: robotics <code>web_research/magician_temperature_260920.md</code>（Dobot 通信プロトコル V1.1.5・ALARM Description・Interface Description）。
-</footer>
+<footer>作成 2026年9月20日。TwinArm <code>dobot/manual/purchase.html</code>。価格は Amazon.co.jp・MonotaRO・Switch Science の各ページの当日表示。</footer>
 </div>
 </body>
 </html>

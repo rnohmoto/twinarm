@@ -40,6 +40,9 @@ def main(argv=None) -> int:
     ap.add_argument("--dry", action="store_true", help="実機なし（DryRunRobot）")
     ap.add_argument("--home", action="store_true", help="ホーム姿勢へ動く")
     ap.add_argument("--round-trip", action="store_true", help="作業域内を 1 往復して戻る（動く）")
+    ap.add_argument("--adc", type=int, default=None, metavar="EIO", help="EIO ピンの ADC 生値を読む（読み取りのみ）")
+    ap.add_argument("--temp", type=int, default=None, metavar="EIO",
+                    help="EIO ピンのサーミスタを ℃ で読む（config の demo.temp_* で換算・読み取りのみ）")
     args = ap.parse_args(argv)
 
     if args.list:
@@ -57,6 +60,20 @@ def main(argv=None) -> int:
         else:
             x, y, z, r = rb.pose()
             print(f"connected {cfg.port}  pose x={x:.1f} y={y:.1f} z={z:.1f} r={r:.1f}")
+        eio = args.temp if args.temp is not None else args.adc
+        if eio is not None:
+            from robot_dobot import thermistor_c
+            app = AppConfig.load(Path(args.config)) if Path(args.config).exists() else AppConfig.default()
+            d = app.demo
+            rb.set_io_multiplexing(eio, "adc")
+            vals = [rb.read_adc(eio) for _ in range(5)]
+            adc = sorted(vals)[len(vals) // 2]
+            volts = d.temp_adc_fullscale_v * adc / 4095
+            print(f"EIO{eio}: adc={adc} (5 回の中央値・生値 {vals})  ≈ {volts:.2f} V @ フルスケール {d.temp_adc_fullscale_v} V")
+            print("  何も繋いでいなければ 3.3 V 相当（4095 付近＝3.3V フルスケール／2700 付近＝5V フルスケール）")
+            if args.temp is not None:
+                t = thermistor_c(adc, d.temp_r_pullup, d.temp_r25, d.temp_beta, 3.3, d.temp_adc_fullscale_v)
+                print(f"  温度 ≈ {t:.1f} ℃" if t is not None else "  温度: 範囲外（センサ未接続か短絡）")
         if args.home:
             rb.home()
             print("home:", cfg.home_xyzr)

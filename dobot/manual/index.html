@@ -39,7 +39,7 @@
 
 <header class="mb-4">
   <h1 class="h2">Dobot Magician 画像認識ピック＆プレース — 初期設定マニュアル</h1>
-  <p class="text-muted mb-1">TwinArm リポジトリ <code>dobot/</code> の手引き（v1・2026-09-20）。設計の正本は robotics の 91_（構成）と 93_（カメラ・対象物）。</p>
+  <p class="text-muted mb-1">TwinArm の <code>dobot</code> フォルダで動かすための手引き。配線は接続マニュアル、買う物は購入リストにまとめてあります。</p>
   <p class="mb-0">このページは <strong>箱から出した Magician を、カメラ付きで「赤いブロックを右のトレイに置いて」が動くところまで</strong>を、順番どおりに進めるためのものです。各節の「関門」を越えてから次へ進みます。写真は設定しながら撮って <code>manual/img/</code> に入れると、この場所に表示されます（§10 の撮影リスト）。</p>
 </header>
 
@@ -92,7 +92,7 @@
 <!-- ===================================================== -->
 <h2 id="s1">1. 用意する物</h2>
 <table class="table table-striped table-hover">
-  <thead><tr><th>#</th><th>物</th><th>要否</th><th>入手（2026-09-20 時点・robotics 93_）</th><th>備考</th></tr></thead>
+  <thead><tr><th>#</th><th>物</th><th>要否</th><th>入手先（2026年9月20日の価格。詳細は購入リスト）</th><th>備考</th></tr></thead>
   <tbody>
     <tr><td>1</td><td>Dobot Magician 本体＋AC アダプタ＋USB ケーブル＋吸盤キット（エアポンプ）</td><td>必須</td><td>手元の機体</td><td>初代（4 軸・USB）が前提。Lite／E6 は §2 の見分け方</td></tr>
     <tr><td>2</td><td>俯瞰カメラ <strong>Logicool C920n</strong>（または C922n）</td><td>必須</td><td>Amazon ¥6,148／MonotaRO C920e ¥9,788・C920s ¥9,898（当日出荷）</td><td>コミュニティ実績（ALOHA・LeRobot）が最も厚い UVC。AF は設定で止める</td></tr>
@@ -114,7 +114,7 @@
   <thead><tr><th>見た目</th><th>機種</th><th>このマニュアルでの扱い</th></tr></thead>
   <tbody>
     <tr><td>4 軸・制御器が本体に内蔵・USB 端子が本体にある</td><td><strong>Magician（初代）</strong></td><td>そのまま進める（pydobot）</td></tr>
-    <tr><td>白基調・別筐体の「Magic Box」が付く</td><td>Magician Lite</td><td>おおむね同じ手順で動く報告あり。動かなければ robotics 91_ §1.3 へ</td></tr>
+    <tr><td>白基調・別筐体の「Magic Box」が付く</td><td>Magician Lite</td><td>同じ手順で動く報告が複数ある。動かなければ制御ライブラリの差し替えが要る（先に連絡）</td></tr>
     <tr><td>6 軸・ベースにリング状の表示灯・Ethernet 端子</td><td>Magician E6</td><td>別の通信方式（TCP/IP）。このコードでは動かない → 先に連絡</td></tr>
   </tbody>
 </table>
@@ -194,11 +194,12 @@
 <h2 id="s4">4. ソフトの準備（uv・テスト・疎通チェック）</h2>
 <h3>4.0 いちばん早い道: 設定ウィザード</h3>
 <div class="step">
-  <p class="mb-1">Magician とカメラを繋いだら、次の 1 本で §4.2〜§6 と初回のピックまでを順に通せます（各ステップの結果は <code>config.json</code> に保存され、<code>--from N</code> で途中から再開できます。腕が動くのは <code>y</code> と答えたときだけ）。</p>
+  <p class="mb-1"><strong>Magician とカメラを繋いだら（接続マニュアル §2）、次の 1 本で §4.2〜§6 と初回のピックまでを順に通せます。</strong>設定が済んでいなければウィザード、済んでいれば実演画面が起動します。各ステップの結果は <code>config.json</code> に保存され、途中から再開できます。腕が動くのは <code>y</code> と答えたときだけです。</p>
 <pre>cd twinarm/dobot
-uv sync &amp;&amp; uv run pytest
-uv run python setup_wizard.py      # 1 カメラ → 2 ロボット → 3 マーカー → 4 較正 → 5 置き場 → 6 高さ → 7 検出 → 8 試運転</pre>
-  <p class="mb-0">終わったら <code>uv run python demo.py --config config.json --robot pydobot --port &lt;ポート&gt; --camera-index &lt;番号&gt; --no-llm</code> で実演画面（§7）が立ち上がります。以下 4.1〜6 は、ウィザードが中で何をしているかの説明と、個別にやり直すときの手順です。</p>
+./start.sh              # Mac / Linux（初回は uv が Python 環境を作る）
+start.bat               # Windows
+./start.sh wizard       # 設定をやり直す（1 カメラ → 2 ロボット → 3 マーカー → 4 較正 → 5 置き場 → 6 高さ → 7 検出 → 8 試運転）</pre>
+  <p class="mb-0">ウィザードが終わると、次回から <code>./start.sh</code> だけで実演画面（§7）が開きます。以下 4.1〜6 は、ウィザードが中で何をしているかの説明と、個別にやり直すときの手順です。</p>
 </div>
 <h3>4.1 環境を作る（初回のみ・ハード不要）</h3>
 <pre>cd twinarm/dobot
@@ -320,7 +321,7 @@ uv run python calibrate.py --config config.json            # カメラで 4 枚�
   <div class="col-md-6"><figure class="photo"><img src="img/08_first_pick.jpg" alt="最初のピック" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 08 未撮影: 最初のピック成功の瞬間</div><figcaption>写真 7-1: 吸着中。</figcaption></figure></div>
   <div class="col-md-6"><figure class="photo"><img src="img/09_pc_setup.jpg" alt="PC 画面" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 09 未撮影: main.py --tune の検出枠（スクリーンショット可）</div><figcaption>写真 7-2: 検出枠の画面。</figcaption></figure></div>
 </div>
-<div class="gate"><strong>関門 7</strong>: 20 回連続成功。ここまで来たら robotics 側の M4（音声）・M5（LLM）・M6（連続稼働）へ。</div>
+<div class="gate"><strong>関門 7</strong>: 20 回連続成功。ここまで来たら音声入力、LLM の接続、連続稼働のリハーサルへ進む。</div>
 
 <!-- ===================================================== -->
 <h2 id="s8">8. 困ったとき</h2>
@@ -368,9 +369,18 @@ uv run python calibrate.py --config config.json            # カメラで 4 枚�
   </tbody>
 </table>
 
-<footer>
-  生成: 2026-09-20（TwinArm <code>dobot/manual/index.html</code> v1）。出典: robotics <code>TacitCapture/91_</code>（構成・テスト M0〜M7・安全）・<code>93_</code>（カメラ互換 4 条件・買えるリスト・対象物サイズ）・<code>web_research/camera_pnp_2609/</code>（一次情報）。価格・在庫は 2026-09-20 時点。
-</footer>
+<h2 id="s11">11. 参考資料</h2>
+<table class="table table-bordered">
+  <thead><tr><th>資料</th><th>使った箇所</th></tr></thead>
+  <tbody>
+    <tr><td><a href="https://www.generationrobots.com/media/Dobot-Magician-User-Manual-V1.2.4.pdf">Dobot Magician User Manual V1.2.4</a></td><td>§2 ホーミング・LED・電源の切り方、§9 安全</td></tr>
+    <tr><td><a href="https://download.dobot.cc/product-manual/dobot-magician/pdf/en/Dobot-Magician-Interface-Description-V2.pdf">Dobot Magician Interface Description V2</a></td><td>接続マニュアルの端子表</td></tr>
+    <tr><td><a href="https://www.dobot-robots.com/products/education/magician.html">Dobot Magician 製品ページ</a></td><td>吸盤 φ20mm・−35kPa、グリッパ 27.5mm・8N、可搬 500g、リーチ 320mm</td></tr>
+    <tr><td><a href="https://huggingface.co/docs/lerobot/en/cameras">LeRobot Cameras（Hugging Face）</a></td><td>§3 同じカメラを Koch に使う</td></tr>
+    <tr><td><a href="https://github.com/luismesas/pydobot">pydobot</a></td><td>§4 Magician の制御ライブラリ</td></tr>
+  </tbody>
+</table>
+<footer>作成 2026年9月20日。TwinArm <code>dobot/manual/index.html</code>。価格は購入リストの当日表示。</footer>
 </div>
 </body>
 </html>

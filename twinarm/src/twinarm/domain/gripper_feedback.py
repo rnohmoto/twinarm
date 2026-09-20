@@ -22,6 +22,7 @@ Three laws exist, one per force-feedback style of the working prototype:
   force cap), so the host loop only decides whether the wall is engaged.
 """
 
+import math
 from dataclasses import dataclass
 
 STALL_FRAMES_MAX = 10
@@ -220,3 +221,101 @@ def thermal_derate(guard: ThermalGuard, temp_c: int, gain: float) -> tuple[float
     if temp_c >= guard.derate_c:
         return max(gain * 0.5, guard.min_gain), False
     return gain, False
+
+
+# ---------------------------------------------------------- virtual weight
+
+JOINT_SPAN_DEG = {
+    "shoulder_pan": 180.0,
+    "shoulder_lift": 100.0,
+    "elbow_flex": 100.0,
+    "wrist_flex": 100.0,
+    "wrist_roll": 180.0,
+}
+LINK_M = (0.11, 0.108, 0.115)  # upper arm, forearm, wrist + gripper to the tip (twin)
+G_MPS2 = 9.81
+KT_NM_PER_A = 0.146  # XL330-M077 stall data at 5 V (0.215 N*m at 1.47 A)
+
+
+@dataclass(frozen=True)
+class JointMap:
+    """How a normalized joint value (+-100) becomes a display/model angle."""
+
+    span_deg: float
+    offset_deg: float = 0.0
+    sign: int = 1
+
+
+def norm_to_rad(value: float, joint_map: JointMap) -> float:
+    """Map a normalized joint value to radians with the joint's span, offset and sign."""
+    degrees = value / 100.0 * joint_map.span_deg / 2.0 + joint_map.offset_deg
+    return joint_map.sign * math.radians(degrees)
+
+
+def tip_levers(
+    lift_rad: float,
+    elbow_rad: float,
+    wrist_rad: float,
+    links: tuple[float, float, float] = LINK_M,
+) -> tuple[float, float]:
+    """Horizontal lever arms [m] of the gripper tip about the shoulder_lift and elbow.
+
+    Planar chain in the sagittal plane; 0 rad means the link points straight up,
+    positive angles tilt it forward. The levers are what a payload at the tip
+    multiplies by ``m * g`` to load each joint.
+    """
+    a1 = lift_rad
+    a2 = a1 + elbow_rad
+    a3 = a2 + wrist_rad
+    x1 = links[0] * math.sin(a1)
+    x2 = x1 + links[1] * math.sin(a2)
+    x3 = x2 + links[2] * math.sin(a3)
+    return x3, x3 - x1
+
+
+@dataclass(frozen=True)
+class VirtualWeightLaw:
+    """Render a grasped object's weight as current on the leader's lift and elbow."""
+
+    scale: float = 0.12
+    cap_ma: int = 120
+    alpha: float = 0.2
+    release: float = 0.5
+    invert_shoulder: bool = False
+    invert_elbow: bool = False
+
+
+@dataclass(frozen=True)
+class VirtualWeightState:
+    """Smoothed currents [mA] for shoulder_lift and elbow_flex."""
+
+    shoulder_ma: float = 0.0
+    elbow_ma: float = 0.0
+
+
+def _weight_target_ma(law: VirtualWeightLaw, torque_nm: float, invert: bool) -> float:
+    physical_ma = torque_nm / KT_NM_PER_A * 1000.0
+    target = max(min(physical_ma * law.scale, law.cap_ma), -law.cap_ma)
+    return -target if invert else target
+
+
+def virtual_weight_step(
+    law: VirtualWeightLaw,
+    state: VirtualWeightState,
+    engaged: bool,
+    mass_g: float,
+    levers_m: tuple[float, float],
+) -> VirtualWeightState:
+    """Advance the weight law by one frame; releases decay faster than they rise."""
+    if engaged and mass_g > 0.0:
+        force_n = mass_g / 1000.0 * G_MPS2
+        target_s = _weight_target_ma(law, force_n * levers_m[0], law.invert_shoulder)
+        target_e = _weight_target_ma(law, force_n * levers_m[1], law.invert_elbow)
+        alpha = law.alpha
+    else:
+        target_s = target_e = 0.0
+        alpha = law.release
+    return VirtualWeightState(
+        shoulder_ma=(1.0 - alpha) * state.shoulder_ma + alpha * target_s,
+        elbow_ma=(1.0 - alpha) * state.elbow_ma + alpha * target_e,
+    )

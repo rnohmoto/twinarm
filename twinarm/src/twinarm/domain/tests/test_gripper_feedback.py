@@ -1,5 +1,7 @@
 """Tests for the gripper force-feedback laws (stdlib-only domain logic)."""
 
+import math
+
 import pytest
 
 from twinarm.domain.gripper_feedback import (
@@ -197,3 +199,121 @@ def test_thermal_guard_stops_at_stop_temperature() -> None:
 
     assert stop is True
     assert gain == 1.5
+
+
+# ----------------------------------------------------------- virtual weight
+
+
+@pytest.mark.unit
+def test_norm_to_rad_maps_full_scale_to_half_span_plus_offset() -> None:
+    from twinarm.domain.gripper_feedback import JointMap, norm_to_rad
+
+    m = JointMap(span_deg=100.0, offset_deg=10.0, sign=1)
+
+    assert norm_to_rad(0.0, m) == pytest.approx(math.radians(10.0))
+    assert norm_to_rad(100.0, m) == pytest.approx(math.radians(60.0))
+    assert norm_to_rad(100.0, JointMap(100.0, 0.0, -1)) == pytest.approx(
+        -math.radians(50.0)
+    )
+
+
+@pytest.mark.unit
+def test_tip_levers_are_zero_when_the_arm_points_straight_up() -> None:
+    from twinarm.domain.gripper_feedback import tip_levers
+
+    shoulder, elbow = tip_levers(0.0, 0.0, 0.0)
+
+    assert shoulder == pytest.approx(0.0)
+    assert elbow == pytest.approx(0.0)
+
+
+@pytest.mark.unit
+def test_tip_levers_equal_link_sums_when_the_arm_is_horizontal() -> None:
+    from twinarm.domain.gripper_feedback import LINK_M, tip_levers
+
+    shoulder, elbow = tip_levers(math.pi / 2, 0.0, 0.0)
+
+    assert shoulder == pytest.approx(sum(LINK_M))
+    assert elbow == pytest.approx(LINK_M[1] + LINK_M[2])
+
+
+@pytest.mark.unit
+def test_virtual_weight_is_zero_when_nothing_is_grasped() -> None:
+    from twinarm.domain.gripper_feedback import (
+        VirtualWeightLaw,
+        VirtualWeightState,
+        virtual_weight_step,
+    )
+
+    state = virtual_weight_step(
+        VirtualWeightLaw(),
+        VirtualWeightState(),
+        engaged=False,
+        mass_g=100.0,
+        levers_m=(0.2, 0.1),
+    )
+
+    assert state.shoulder_ma == 0.0
+    assert state.elbow_ma == 0.0
+
+
+@pytest.mark.unit
+def test_virtual_weight_rises_with_ema_and_saturates_at_cap() -> None:
+    from twinarm.domain.gripper_feedback import (
+        VirtualWeightLaw,
+        VirtualWeightState,
+        virtual_weight_step,
+    )
+
+    law = VirtualWeightLaw(scale=0.12, cap_ma=120, alpha=0.2)
+    first = virtual_weight_step(
+        law, VirtualWeightState(), engaged=True, mass_g=100.0, levers_m=(0.2, 0.1)
+    )
+    state = first
+    for _ in range(80):
+        state = virtual_weight_step(
+            law, state, engaged=True, mass_g=100.0, levers_m=(0.2, 0.1)
+        )
+
+    # 0.1 kg * 9.81 * 0.2 m = 0.1962 Nm -> 1344 mA physical -> *0.12 = 161 mA -> cap 120
+    assert first.shoulder_ma == pytest.approx(0.2 * 120.0)
+    assert state.shoulder_ma == pytest.approx(120.0, abs=0.5)
+    # elbow: 0.0981 Nm -> 672 mA -> *0.12 = 80.6 mA, below the cap
+    assert state.elbow_ma == pytest.approx(80.6, abs=0.5)
+
+
+@pytest.mark.unit
+def test_virtual_weight_invert_flips_the_sign_per_joint() -> None:
+    from twinarm.domain.gripper_feedback import (
+        VirtualWeightLaw,
+        VirtualWeightState,
+        virtual_weight_step,
+    )
+
+    law = VirtualWeightLaw(scale=0.12, cap_ma=120, alpha=1.0, invert_elbow=True)
+
+    state = virtual_weight_step(
+        law, VirtualWeightState(), engaged=True, mass_g=100.0, levers_m=(0.2, 0.1)
+    )
+
+    assert state.shoulder_ma > 0
+    assert state.elbow_ma < 0
+
+
+@pytest.mark.unit
+def test_virtual_weight_releases_quickly() -> None:
+    from twinarm.domain.gripper_feedback import (
+        VirtualWeightLaw,
+        VirtualWeightState,
+        virtual_weight_step,
+    )
+
+    law = VirtualWeightLaw(alpha=0.2)
+    state = VirtualWeightState(shoulder_ma=100.0, elbow_ma=50.0)
+
+    state = virtual_weight_step(
+        law, state, engaged=False, mass_g=100.0, levers_m=(0.2, 0.1)
+    )
+
+    assert state.shoulder_ma == pytest.approx(50.0)
+    assert state.elbow_ma == pytest.approx(25.0)

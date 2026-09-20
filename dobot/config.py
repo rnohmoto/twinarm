@@ -85,13 +85,18 @@ class ObjectSpec:
 
 @dataclass
 class DemoConfig:
-    """実演の運転（demo.py）。"""
-    attract: bool = False            # 誰も話さない間、自動で「運ぶ→片付ける」を繰り返す
-    idle_s: float = 90.0             # 最後の操作からこの秒数で自動ループを始める
-    pause_s: float = 20.0            # 自動ループ 1 サイクル後の休み（モーター発熱の抑制）
+    """実演の運転（demo.py）。既定は「自動では回さない・回すなら短く・熱の予算内」。"""
+    attract: bool = False            # 誰も話さない間、自動で「運ぶ→片付ける」を繰り返す（既定 OFF）
+    idle_s: float = 120.0            # 最後の操作からこの秒数で自動ループを始める
+    pause_s: float = 45.0            # 自動ループ 1 サイクル後の休み（モーター発熱の抑制）
     attract_zone: str = "tray_right" # 自動ループで運ぶ先
     start_zone: str = "start"        # 片付け先（スタート台）
-    max_cycles_per_hour: int = 40    # 自動ループの上限（発熱・摩耗）
+    attract_count: int = 1           # 自動ループ 1 サイクルで運ぶ個数（1 個運んで戻す＝約 20 秒で終わる）
+    loop_cycles: int = 3             # 「ループして」の既定回数（回数が終わったら止まる）
+    max_cycles_per_hour: int = 20    # 自動ループ・「ループして」の合計上限（発熱・摩耗）
+    motion_budget_s: float = 240.0   # 直近 budget_window_s 秒のうち腕を動かしてよい秒数（≈40%・ステッパの発熱の目安）
+    budget_window_s: float = 600.0
+    cooldown_s: float = 120.0        # 予算を使い切ったら最低この秒数は自動動作を止める（対話は説明員の判断で可）
     panel_port: int = 8790           # ブラウザ UI（http://127.0.0.1:8790）
     stream_fps: int = 8
     jpeg_quality: int = 70

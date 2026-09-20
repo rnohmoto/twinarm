@@ -185,7 +185,9 @@ def test_llm_tools_schema():
     cfg = AppConfig.default()
     tools = build_tools(cfg)
     names = {t["name"] for t in tools}
-    assert names == {"list_objects", "pick_and_place", "tidy_up", "go_home", "stop"}
+    assert names == {"list_objects", "pick_and_place", "tidy_up", "run_loop", "go_home", "stop"}
+    rl = next(t for t in tools if t["name"] == "run_loop")
+    assert rl["input_schema"]["properties"]["cycles"]["enum"] == [1, 2, 3, 5]
     pp = next(t for t in tools if t["name"] == "pick_and_place")
     assert pp["strict"] is True
     assert pp["input_schema"]["properties"]["object"]["enum"] == cfg.object_names()

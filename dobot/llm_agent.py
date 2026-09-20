@@ -25,6 +25,7 @@ SYSTEM_PROMPT_JA = """あなたは展示ブースの小型ロボットアーム�
    対応づけられない物や場所を言われたら、動かさずに短く聞き返す。
 3. 置き場が言われていないときは動かさずに聞き返す（例:「右と左、どちらに置きますか？」）。
 4. 1回の発話で動かすのは原則1個。「全部」と言われたときだけ count=-1。「片付けて」「元に戻して」は tidy_up。
+   「ループして」「繰り返して」「デモして」は run_loop（回数が言われなければ 3）。
 5. 返答は話し言葉の日本語で1〜2文、丁寧で短く。ツールの結果（message）をそのまま伝えてよい。
 6. 危険な指示、ロボット以外の依頼、個人情報の要求には応じない。
 """
@@ -58,6 +59,17 @@ TOOLS_TEMPLATE: list[dict[str, Any]] = [
         "description": "見えている物を全部スタート台（元の場所）に戻す。「片付けて」「元に戻して」「リセット」のとき。",
         "strict": True,
         "input_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+    },
+    {
+        "name": "run_loop",
+        "description": "デモを cycles 回だけ繰り返す（1 個運んで戻す、を 1 回と数える）。「ループして」「3回繰り返して」「デモして」のとき。回数が終われば自動で止まる。",
+        "strict": True,
+        "input_schema": {
+            "type": "object",
+            "properties": {"cycles": {"type": "integer", "enum": [1, 2, 3, 5], "description": "繰り返す回数"}},
+            "required": ["cycles"],
+            "additionalProperties": False,
+        },
     },
     {
         "name": "go_home",
@@ -110,6 +122,8 @@ class ClaudeAgent:
             return ex.pick_and_place(inp.get("object"), inp.get("zone"), inp.get("hint", "any"), int(inp.get("count", 1)))
         if name == "tidy_up":
             return ex.tidy_up()
+        if name == "run_loop":
+            return ex.run_loop(int(inp.get("cycles", 3)))
         if name == "go_home":
             return ex.go_home()
         if name == "stop":
@@ -194,6 +208,8 @@ class RuleAgent:
             return ex.stop().message
         if it.action == "tidy":
             return ex.tidy_up().message
+        if it.action == "loop":
+            return ex.run_loop(it.count).message
         if it.action == "home":
             return ex.go_home().message
         if it.action == "list":

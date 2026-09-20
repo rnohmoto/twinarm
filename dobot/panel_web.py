@@ -87,6 +87,7 @@ PAGE_HTML = """<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
    <div style="margin-top:8px">
     <button class="ghost" onclick="cmd({type:'home'})">ホーム</button>
     <button class="warn" onclick="cmd({type:'tidy'})">片付け（元に戻す）</button>
+    <button class="ghost" onclick="cmd({type:'loop'})">ループ ×3</button>
     <button class="danger" onclick="cmd({type:'estop'})">非常停止</button>
     <button class="ghost" onclick="cmd({type:'resume'})">停止解除</button>
     <button class="ghost" id="attract" onclick="toggleAttract()">自動ループ: -</button>

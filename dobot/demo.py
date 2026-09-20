@@ -93,6 +93,42 @@ def attract_due(now: float, last_activity: float, idle_s: float, paused_until: f
     return (now - last_activity) >= idle_s
 
 
+class ThermalGuard:
+    """腕を動かした時間の予算: 直近 window_s 秒のうち budget_s 秒まで。超えたら cooldown_s 秒は自動動作を止める。
+
+    ステッピングモーターは動き続けると熱を持つ（Magician は連続稼働の発熱に注意）。数値は設定（DemoConfig）。
+    """
+
+    def __init__(self, budget_s: float, window_s: float, cooldown_s: float):
+        self.budget_s, self.window_s, self.cooldown_s = budget_s, window_s, cooldown_s
+        self.intervals: list[tuple[float, float]] = []
+        self.rest_until = 0.0
+
+    def _trim(self, now: float) -> None:
+        cutoff = now - self.window_s
+        self.intervals = [(a, b) for a, b in self.intervals if b > cutoff]
+
+    def record(self, t0: float, t1: float) -> None:
+        if t1 > t0:
+            self.intervals.append((t0, t1))
+        if self.motion_s(t1) >= self.budget_s:
+            self.rest_until = max(self.rest_until, t1 + self.cooldown_s)
+
+    def motion_s(self, now: float) -> float:
+        self._trim(now)
+        cutoff = now - self.window_s
+        return sum(b - max(a, cutoff) for a, b in self.intervals)
+
+    def duty(self, now: float) -> float:
+        return self.motion_s(now) / self.window_s if self.window_s > 0 else 0.0
+
+    def resting_s(self, now: float) -> float:
+        return max(0.0, self.rest_until - now)
+
+    def can_run(self, now: float) -> bool:
+        return now >= self.rest_until and self.motion_s(now) < self.budget_s
+
+
 class DemoRunner:
     def __init__(self, args):
         from main import build
@@ -109,6 +145,8 @@ class DemoRunner:
         self.last_activity = time.time()
         self.paused_until = 0.0
         self.cycle_times: list[float] = []
+        self.guard = ThermalGuard(cfg.demo.motion_budget_s, cfg.demo.budget_window_s, cfg.demo.cooldown_s)
+        executor.loop_handler = self.run_loop     # 「ループして」（ルール／LLM）→ ここ
         self.attract_on = bool(args.attract or cfg.demo.attract)
         self.asr = None
         self.tts = None
@@ -130,8 +168,16 @@ class DemoRunner:
 
     # ------------------------------------------------------------- helpers
     def _attract_info(self) -> dict:
+        now = time.time()
         return {"on": self.attract_on, "idle_s": self.cfg.demo.idle_s, "pause_s": self.cfg.demo.pause_s,
-                "zone": self.cfg.demo.attract_zone, "cycles_last_hour": len(self._recent_cycles())}
+                "zone": self.cfg.demo.attract_zone, "count": self.cfg.demo.attract_count,
+                "cycles_last_hour": len(self._recent_cycles()), "max_per_hour": self.cfg.demo.max_cycles_per_hour,
+                "duty_pct": round(self.guard.duty(now) * 100), "rest_s": round(self.guard.resting_s(now))}
+
+    def _record_motion(self, t0: float, picks_before: int) -> None:
+        """腕が実際に動いた時間だけを熱の予算に積む（拾った数が増えたときだけ）。"""
+        if self.executor.stats["picks_ok"] + self.executor.stats["picks_fail"] > picks_before:
+            self.guard.record(t0, time.time())
 
     def _recent_cycles(self) -> list[float]:
         now = time.time()
@@ -194,6 +240,7 @@ class DemoRunner:
         self.state.push_event(f"発話: {text}")
         self.logger({"ev": "utterance", "text": text})
         t0 = time.time()
+        picks0 = self.executor.stats["picks_ok"] + self.executor.stats["picks_fail"]
         self.busy.set()
         try:
             self.state.update(state="moving")
@@ -204,6 +251,7 @@ class DemoRunner:
             self.logger({"ev": "error", "type": type(e).__name__, "msg": str(e)})
         finally:
             self.busy.clear()
+            self._record_motion(t0, picks0)
         self.logger({"ev": "reply", "text": reply, "ms": int((time.time() - t0) * 1000)})
         self.state.update(state="estop" if self.robot.estop.is_set() else "idle", reply=reply)
         self.state.push_event(f"返事: {reply}")
@@ -239,14 +287,19 @@ class DemoRunner:
             self.state.update(reply=r.message, state="idle")
             self.state.push_event(r.message)
         elif t == "tidy":
+            t0, picks0 = time.time(), self.executor.stats["picks_ok"] + self.executor.stats["picks_fail"]
             self.busy.set()
             self.state.update(state="moving")
             try:
                 r = self.executor.tidy_up()
             finally:
                 self.busy.clear()
+                self._record_motion(t0, picks0)
             self.state.update(reply=r.message, state="idle")
             self.state.push_event(r.message)
+        elif t == "loop":
+            r = self.run_loop(int(cmd.get("cycles", self.cfg.demo.loop_cycles)))
+            self.state.update(reply=r.message, state="estop" if self.robot.estop.is_set() else "idle")
         elif t == "estop":
             r = self.executor.stop()
             self.attract_on = False
@@ -263,38 +316,72 @@ class DemoRunner:
         elif t == "quit":
             self.running.clear()
 
-    def attract_cycle(self) -> None:
-        """自動ループ 1 サイクル: スタート台の物を attract_zone へ全部運ぶ → 休む → 片付ける。"""
+    def attract_cycle(self, count: int | None = None, label: str = "自動ループ") -> bool:
+        """1 サイクル: スタート台の物を count 個 attract_zone へ運ぶ → 一休み → 片付ける。完走したら True。"""
         d = self.cfg.demo
-        self.state.update(mode="attract", state="moving", utterance="(自動ループ)")
-        self.state.push_event("自動ループ: 運ぶ")
+        count = count or d.attract_count
+        self.state.update(state="moving", utterance=f"({label})")
+        self.state.push_event(f"{label}: 運ぶ（{count} 個）")
+        t0, picks0 = time.time(), self.executor.stats["picks_ok"] + self.executor.stats["picks_fail"]
         self.busy.set()
         try:
-            r1 = self.executor.pick_and_place(None, d.attract_zone, "any", count=-1)
+            r1 = self.executor.pick_and_place(None, d.attract_zone, "any", count=count)
             self.state.update(reply=r1.message)
             if not r1.ok:
                 self.attract_on = False
-                self.state.push_event(f"自動ループ停止: {r1.message}")
-                return
+                self.state.push_event(f"{label}停止: {r1.message}")
+                return False
             self.busy.clear()
+            self._record_motion(t0, picks0)
             self.state.update(state="idle")
-            t_end = time.time() + min(d.pause_s, 8.0)   # 運んだ後の小休止（見せ場）。途中のコマンドは次のループで拾う
+            t_end = time.time() + min(d.pause_s, 8.0)   # 運んだ後の小休止（見せ場）。話しかけがあれば譲る
             while time.time() < t_end and self.running.is_set() and self.queue.empty():
-                self._tick_frame("自動ループ: 一休み")
+                self._tick_frame(f"{label}: 一休み")
                 time.sleep(0.1)
             if not self.queue.empty():
-                return
+                return False
+            t1, picks1 = time.time(), self.executor.stats["picks_ok"] + self.executor.stats["picks_fail"]
             self.busy.set()
             self.state.update(state="moving")
-            self.state.push_event("自動ループ: 片付け")
+            self.state.push_event(f"{label}: 片付け")
             r2 = self.executor.tidy_up()
             self.state.update(reply=r2.message)
+            self._record_motion(t1, picks1)
         finally:
             self.busy.clear()
-            self.state.update(state="estop" if self.robot.estop.is_set() else "idle")
+            self.state.update(state="estop" if self.robot.estop.is_set() else "idle", attract=self._attract_info())
         self.cycle_times.append(time.time())
         self.paused_until = time.time() + d.pause_s
         self.last_activity = time.time()
+        return True
+
+    def run_loop(self, cycles: int):
+        """「ループして」: 運ぶ→戻す を cycles 回。熱の予算・上限回数・話しかけ・非常停止で途中でも止まる。"""
+        from planner import Result
+        cycles = max(1, min(5, int(cycles)))
+        done = 0
+        self.state.update(mode="dialog")
+        self.state.push_event(f"ループ開始: {cycles} 回")
+        for i in range(cycles):
+            now = time.time()
+            if self.robot.estop.is_set():
+                break
+            if not self.guard.can_run(now):
+                msg = f"{done} 回で休憩に入ります（腕の熱の予算・あと {round(self.guard.resting_s(now))} 秒）。"
+                self.state.push_event(msg)
+                return Result(done > 0, msg, {"cycles": done})
+            if len(self._recent_cycles()) >= self.cfg.demo.max_cycles_per_hour:
+                msg = f"{done} 回で止めます（1 時間の上限 {self.cfg.demo.max_cycles_per_hour} 回）。"
+                self.state.push_event(msg)
+                return Result(done > 0, msg, {"cycles": done})
+            if not self.attract_cycle(count=self.cfg.demo.attract_count, label=f"ループ {i + 1}/{cycles}"):
+                break
+            done += 1
+            if not self.queue.empty():   # 話しかけ・ボタンがあれば譲る
+                break
+        msg = f"{done} 回繰り返しました。" if done else "繰り返せませんでした。"
+        self.state.push_event(msg)
+        return Result(done > 0, msg, {"cycles": done})
 
     def _tick_frame(self, status: str) -> None:
         try:
@@ -348,8 +435,9 @@ class DemoRunner:
                     self.state.update(fps=round(n_frames / (now - fps_t0), 1))
                     n_frames, fps_t0 = 0, now
             if attract_due(now, self.last_activity, d.idle_s, self.paused_until, len(self._recent_cycles()),
-                           d.max_cycles_per_hour, self.attract_on, self.robot.estop.is_set()):
+                           d.max_cycles_per_hour, self.attract_on, self.robot.estop.is_set()) and self.guard.can_run(now):
                 try:
+                    self.state.update(mode="attract")
                     self.attract_cycle()
                 except Exception as e:  # noqa: BLE001
                     self.attract_on = False

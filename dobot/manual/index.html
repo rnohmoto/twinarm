@@ -308,9 +308,11 @@ uv run python calibrate.py --config config.json            # カメラで 4 枚�
   <thead><tr><th>モード</th><th>動き</th><th>切り替わり</th></tr></thead>
   <tbody>
     <tr><td><strong>対話</strong>（既定）</td><td>来場者が「〜を右に置いて」→ 意図（LLM か、ネット無しならルール解析）→ 拾って置く → 返事。1 回 10〜20 秒。「片付けて」でスタート台に全部戻す（次の人のためのリセット）</td><td>—</td></tr>
-    <tr><td><strong>自動ループ</strong>（客寄せ）</td><td>90 秒だれも話さなければ、スタート台の物を右トレイへ運び、少し休んで片付ける。1 時間の上限回数と休みを設定で持つ（モーターの発熱）</td><td>話しかけ・ボタンで即座に対話へ。非常停止で OFF</td></tr>
+    <tr><td><strong>ループ</strong>（「ループして」「3回繰り返して」／ボタン）</td><td>「1 個運ぶ → 一休み → 戻す」（約 20 秒）を指定回数（既定 3）だけ繰り返して<strong>止まる</strong></td><td>回数が終わる／話しかけ／非常停止／1 時間の上限／熱の予算</td></tr>
+    <tr><td><strong>自動ループ</strong>（客寄せ・既定 OFF）</td><td>120 秒だれも話さなければ 1 サイクル動き、45 秒休んで、また 1 サイクル</td><td>話しかけ・ボタンで即座に対話へ。非常停止で OFF</td></tr>
   </tbody>
 </table>
+<div class="danger"><strong>発熱の予算</strong>: 腕が実際に動いた秒数を積算し、直近 10 分のうち 4 分（約 40%）を超えたら自動の動作（ループ・自動ループ）を最低 2 分止めます。対話の指示は説明員の判断で通せます。画面の「自動ループ」欄に duty（%）と残りの休み秒数が出ます。数値は <code>config.json</code> の <code>demo</code>（<code>motion_budget_s</code>／<code>budget_window_s</code>／<code>cooldown_s</code>／<code>max_cycles_per_hour</code>）で変えられます。Magician のモーターは連続で動かすと熱を持つので、長時間は「短いサイクル＋休み」で運転してください。</div>
 <p>「取って→戻す」までを 1 セットにするなら、来場者の指示で運ばせたあと、説明員が「片付けて」と言う（またはボタン）だけで元に戻ります。3 種に絞るなら、既定の対象物は 色つき立方体・ボール（卓球）・消しゴム で、LLM も ルール解析も この名前にしか対応づけません。</p>
 <p>音声（faster-whisper）と LLM（Claude）は後から足せます: <code>uv sync --extra voice --extra llm</code> → <code>ANTHROPIC_API_KEY</code> を設定 → <code>--no-llm</code> を外す。ネットが切れてもルール解析に自動で戻ります。物理の非常停止は本体の電源スイッチ、画面の「非常停止」は以後の動作を拒否します。</p>
 <div class="row g-3">

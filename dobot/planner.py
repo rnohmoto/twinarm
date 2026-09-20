@@ -155,7 +155,10 @@ class TaskExecutor:
             moved.append(target.to_public())
             if target.x_mm is not None:
                 picked_at.append((target.x_mm, target.y_mm))
-            if count != -1 or done >= 12:  # 「全部」でも 12 個で打ち切り（無限ループ防止）
+            if count == -1:
+                if done >= 12:  # 「全部」でも 12 個で打ち切り（無限ループ防止）
+                    break
+            elif done >= count:
                 break
         dt = time.time() - t0
         where = self.cfg.zone_label(zone.name)
@@ -173,6 +176,13 @@ class TaskExecutor:
             n = len(r.data.get("moved", []))
             r = Result(True, "片付けました。" if n else "もう片付いています。", r.data)
         return r
+
+    def run_loop(self, cycles: int) -> Result:
+        """「ループして」: 運ぶ→戻す を cycles 回。実体は demo.py（loop_handler）が持つ。"""
+        handler = getattr(self, "loop_handler", None)
+        if handler is None:
+            return Result(False, "この画面ではループは使えません（demo.py で起動してください）。")
+        return handler(int(cycles))
 
     def go_home(self) -> Result:
         try:

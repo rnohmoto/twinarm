@@ -53,8 +53,15 @@ uv run python check_robot.py --list  ; uv run python check_robot.py --port /dev/
 | Mode | What happens | Ends when |
 | ---- | ------------ | --------- |
 | Dialog (default) | Visitor says "〜を右に置いて" (text box, or the mic button = push-to-talk on the PC) → intent (Claude tool use, or the rule parser offline) → pick and place → spoken/printed reply. "片付けて" returns everything to the start pad (`start` zone slots) for the next visitor. | — |
-| Attract (`--attract` or the panel button) | After `demo.idle_s` seconds without input: move everything from the start pad to `demo.attract_zone`, pause, tidy back. Capped by `max_cycles_per_hour` and `pause_s` (motor heat). | Any command or utterance switches back to dialog; e-stop disables it. |
+| Loop on request ("ループして", "3回繰り返して", the panel button) | Runs a bounded number of short cycles (default 3; each = carry `attract_count` objects to `attract_zone`, pause, tidy back, ≈20 s) and then **stops**. | After the count, or earlier on any utterance/button, e-stop, the hourly cap, or the thermal budget. |
+| Attract (`--attract` or the panel button; default OFF) | After `demo.idle_s` (120 s) without input, runs one short cycle, rests `pause_s` (45 s), repeats. | Any command or utterance switches back to dialog; e-stop disables it. |
 | `--once "text"` | Handle one utterance and exit (smoke test). | immediately |
+
+**Thermal budget** (`DemoConfig.motion_budget_s` / `budget_window_s` / `cooldown_s`): the runner adds up the
+seconds the arm actually moved (utterances, tidy, loops); once motion exceeds 240 s in any 600 s window,
+automatic motion (attract / loop) pauses for at least 120 s. Dialog commands still run so the explainer can
+decide; the panel shows the duty (%) and the remaining rest. `max_cycles_per_hour` (20) caps loops as well.
+Magician steppers warm up under continuous motion — these defaults keep the duty near 40%; tune on site.
 
 Objects (`config.json` → `objects[]`): red/green/blue/yellow cubes (colour, aspect ≤ 1.6), `ball`
 (orange table-tennis ball: hue + circularity ≥ 0.82), `eraser` (MONO blue band: elongated), `golf_ball`

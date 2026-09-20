@@ -27,7 +27,19 @@ class Intent:
 
 
 _STOP = ("止まって", "とまって", "ストップ", "stop", "やめて", "中止")
+_LOOP = ("ループ", "るーぷ", "繰り返", "くりかえ", "回して", "まわして", "デモして", "自動で")
 _TIDY = ("片付け", "かたづけ", "戻して", "もどして", "リセット", "元に戻", "もとに戻", "元の場所", "もとの場所")
+_NUM = {"一": 1, "１": 1, "二": 2, "２": 2, "三": 3, "３": 3, "四": 4, "４": 4, "五": 5, "５": 5}
+
+
+def loop_count(t: str, default: int) -> int:
+    """「3回」「三回」「２回」→ 回数。無ければ default。1〜5 に丸める。"""
+    m = re.search(r"([0-9０-９]+|[一二三四五])回", t)
+    if not m:
+        return default
+    s = m.group(1)
+    n = _NUM.get(s, int(s) if s.isdigit() else default)   # int() は全角数字も読める
+    return max(1, min(5, n))
 _HOME = ("ホーム", "戻って", "もどって", "初期位置", "home")
 _LIST = ("何がある", "なにがある", "何が見える", "なにが見える", "見えてる", "リスト", "一覧", "何個", "なんこ")
 _PICK_VERBS = ("拾", "ひろ", "取", "とって", "つか", "掴", "持", "運", "移", "置", "おいて", "入れ", "いれ", "動か", "うごか")
@@ -51,6 +63,8 @@ def parse(text: str, cfg: AppConfig) -> Intent:
     t = normalize(text)
     if any(k in t for k in _STOP):
         return Intent("stop", raw=raw)
+    if any(k in t for k in _LOOP) and not any(k in t for k in _TIDY):
+        return Intent("loop", count=loop_count(t, cfg.demo.loop_cycles), raw=raw)
     if any(k in t for k in _TIDY):
         return Intent("tidy", raw=raw)
     if any(k in t for k in _HOME) and not any(v in t for v in ("置", "おいて", "入れ")):

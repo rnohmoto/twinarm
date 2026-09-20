@@ -65,6 +65,17 @@
     "voicevox_speaker": 3,
     "blocking": false
   },
+  "demo": {
+    "attract": false,
+    "idle_s": 90.0,
+    "pause_s": 20.0,
+    "attract_zone": "tray_right",
+    "start_zone": "start",
+    "max_cycles_per_hour": 40,
+    "panel_port": 8790,
+    "stream_fps": 8,
+    "jpeg_quality": 70
+  },
   "zones": [
     {
       "name": "tray_right",
@@ -78,7 +89,26 @@
       ],
       "x": 230.0,
       "y": -110.0,
-      "z_place": null
+      "z_place": null,
+      "radius_mm": 60.0,
+      "slots": [
+        [
+          215.0,
+          -125.0
+        ],
+        [
+          245.0,
+          -125.0
+        ],
+        [
+          215.0,
+          -95.0
+        ],
+        [
+          245.0,
+          -95.0
+        ]
+      ]
     },
     {
       "name": "tray_left",
@@ -92,7 +122,26 @@
       ],
       "x": 230.0,
       "y": 110.0,
-      "z_place": null
+      "z_place": null,
+      "radius_mm": 60.0,
+      "slots": [
+        [
+          215.0,
+          95.0
+        ],
+        [
+          245.0,
+          95.0
+        ],
+        [
+          215.0,
+          125.0
+        ],
+        [
+          245.0,
+          125.0
+        ]
+      ]
     },
     {
       "name": "box_front",
@@ -105,7 +154,9 @@
       ],
       "x": 170.0,
       "y": 0.0,
-      "z_place": null
+      "z_place": null,
+      "radius_mm": 60.0,
+      "slots": []
     },
     {
       "name": "box_back",
@@ -118,12 +169,55 @@
       ],
       "x": 280.0,
       "y": 0.0,
-      "z_place": null
+      "z_place": null,
+      "radius_mm": 60.0,
+      "slots": []
+    },
+    {
+      "name": "start",
+      "aliases": [
+        "スタート",
+        "元の場所",
+        "もとの場所",
+        "台",
+        "start"
+      ],
+      "x": 235.0,
+      "y": 0.0,
+      "z_place": null,
+      "radius_mm": 75.0,
+      "slots": [
+        [
+          210.0,
+          -40.0
+        ],
+        [
+          210.0,
+          0.0
+        ],
+        [
+          210.0,
+          40.0
+        ],
+        [
+          260.0,
+          -40.0
+        ],
+        [
+          260.0,
+          0.0
+        ],
+        [
+          260.0,
+          40.0
+        ]
+      ]
     }
   ],
-  "colors": [
+  "objects": [
     {
-      "name": "red",
+      "name": "red_cube",
+      "label": "赤いブロック",
       "aliases": [
         "赤",
         "あか",
@@ -156,10 +250,18 @@
             255
           ]
         ]
-      ]
+      ],
+      "min_area_px": null,
+      "max_area_px": null,
+      "min_circularity": 0.0,
+      "aspect_min": 1.0,
+      "aspect_max": 1.6,
+      "z_pick": null,
+      "ee": "suction"
     },
     {
-      "name": "green",
+      "name": "green_cube",
+      "label": "緑のブロック",
       "aliases": [
         "緑",
         "みどり",
@@ -181,10 +283,18 @@
             255
           ]
         ]
-      ]
+      ],
+      "min_area_px": null,
+      "max_area_px": null,
+      "min_circularity": 0.0,
+      "aspect_min": 1.0,
+      "aspect_max": 1.6,
+      "z_pick": null,
+      "ee": "suction"
     },
     {
-      "name": "blue",
+      "name": "blue_cube",
+      "label": "青いブロック",
       "aliases": [
         "青",
         "あお",
@@ -206,10 +316,18 @@
             255
           ]
         ]
-      ]
+      ],
+      "min_area_px": null,
+      "max_area_px": null,
+      "min_circularity": 0.0,
+      "aspect_min": 1.0,
+      "aspect_max": 1.6,
+      "z_pick": null,
+      "ee": "suction"
     },
     {
-      "name": "yellow",
+      "name": "yellow_cube",
+      "label": "黄色いブロック",
       "aliases": [
         "黄",
         "きいろ",
@@ -230,7 +348,112 @@
             255
           ]
         ]
-      ]
+      ],
+      "min_area_px": null,
+      "max_area_px": null,
+      "min_circularity": 0.0,
+      "aspect_min": 1.0,
+      "aspect_max": 1.6,
+      "z_pick": null,
+      "ee": "suction"
+    },
+    {
+      "name": "ball",
+      "label": "ボール",
+      "aliases": [
+        "ボール",
+        "ぼーる",
+        "たま",
+        "球",
+        "ピンポン",
+        "卓球",
+        "橙",
+        "オレンジ"
+      ],
+      "ranges": [
+        [
+          [
+            8,
+            120,
+            120
+          ],
+          [
+            22,
+            255,
+            255
+          ]
+        ]
+      ],
+      "min_area_px": null,
+      "max_area_px": null,
+      "min_circularity": 0.82,
+      "aspect_min": 1.0,
+      "aspect_max": 1.25,
+      "z_pick": null,
+      "ee": "suction"
+    },
+    {
+      "name": "eraser",
+      "label": "消しゴム",
+      "aliases": [
+        "消しゴム",
+        "けしごむ",
+        "ケシゴム",
+        "MONO",
+        "モノ"
+      ],
+      "ranges": [
+        [
+          [
+            95,
+            120,
+            60
+          ],
+          [
+            130,
+            255,
+            255
+          ]
+        ]
+      ],
+      "min_area_px": null,
+      "max_area_px": null,
+      "min_circularity": 0.0,
+      "aspect_min": 2.2,
+      "aspect_max": 8.0,
+      "z_pick": null,
+      "ee": "gripper"
+    },
+    {
+      "name": "golf_ball",
+      "label": "ゴルフボール",
+      "aliases": [
+        "ゴルフ",
+        "ごるふ",
+        "白いボール",
+        "白い球"
+      ],
+      "ranges": [
+        [
+          [
+            0,
+            0,
+            170
+          ],
+          [
+            179,
+            70,
+            255
+          ]
+        ]
+      ],
+      "min_area_px": null,
+      "max_area_px": null,
+      "min_circularity": 0.85,
+      "aspect_min": 1.0,
+      "aspect_max": 1.2,
+      "z_pick": null,
+      "ee": "suction"
     }
   ],
   "homography_path": "assets/homography.json",

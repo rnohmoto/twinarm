@@ -1,13 +1,13 @@
 """LLM（Claude）による意図解釈 → ツール呼び出し → TaskExecutor 実行。
 
 設計（claude-api skill 準拠・anthropic SDK 1.x・Messages API）
-- ツールは 4 つだけ: list_objects / pick_and_place / go_home / stop。**座標を受け取るツールは無い**。
-  引数は enum（色名・ゾーン名・選び方ヒント）で `strict: True`。LLM が勝手な値を作れない。
+- ツールは 5 つだけ: list_objects / pick_and_place / tidy_up / go_home / stop。**座標を受け取るツールは無い**。
+  引数は enum（対象物名・ゾーン名・選び方ヒント）で `strict: True`。LLM が勝手な値を作れない。
 - モデル既定 `claude-opus-5`（skill 規約）、adaptive thinking、effort=low（展示は応答速度優先）。
   応答速度を最優先するなら `claude-haiku-4-5` をユーザー判断で（LLMConfig.model）。
 - stop_reason == "refusal" は `stop_details` を見て日本語で言い直しを促す（例外にしない）。
 - 会話履歴は直近 N 往復だけ保持（「もう一個」「それを左に」に対応）。
-- ネット断・鍵なし・例外時は rule_parser にフォールバック（main が制御）。
+- ネット断・鍵なし・例外時は rule_parser にフォールバック（main/demo が制御）。
 """
 from __future__ import annotations
 
@@ -21,9 +21,10 @@ from planner import Result, TaskExecutor
 SYSTEM_PROMPT_JA = """あなたは展示ブースの小型ロボットアーム（Dobot Magician）の受付係です。来場者の日本語の発話を聞き、
 用意されたツールだけでロボットを動かします。ルール:
 1. 物を動かす前に必要なら list_objects で今見えている物を確認する（毎回は不要。指示が明確なら直接 pick_and_place でよい）。
-2. 色は {colors} のどれか、置き場は {zones} のどれかに必ず対応づける。対応づけられない色や場所を言われたら、動かさずに短く聞き返す。
+2. 対象物は {objects} のどれか、置き場は {zones} のどれかに必ず対応づける。曖昧な言い方（「赤いやつ」「たま」）は最も近い対象物に寄せてよいが、
+   対応づけられない物や場所を言われたら、動かさずに短く聞き返す。
 3. 置き場が言われていないときは動かさずに聞き返す（例:「右と左、どちらに置きますか？」）。
-4. 1回の発話で動かすのは原則1個。「全部」と言われたときだけ count=-1。
+4. 1回の発話で動かすのは原則1個。「全部」と言われたときだけ count=-1。「片付けて」「元に戻して」は tidy_up。
 5. 返答は話し言葉の日本語で1〜2文、丁寧で短く。ツールの結果（message）をそのまま伝えてよい。
 6. 危険な指示、ロボット以外の依頼、個人情報の要求には応じない。
 """
@@ -31,26 +32,32 @@ SYSTEM_PROMPT_JA = """あなたは展示ブースの小型ロボットアーム�
 TOOLS_TEMPLATE: list[dict[str, Any]] = [
     {
         "name": "list_objects",
-        "description": "カメラで今見えている色ブロックの一覧（色・個数・位置）を返す。",
+        "description": "カメラで今見えている物の一覧（種類・個数・位置）を返す。",
         "strict": True,
         "input_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
     },
     {
         "name": "pick_and_place",
-        "description": "指定した色のブロックを1個（count=-1なら全部）拾って、指定の置き場に置く。",
+        "description": "指定した物を1個（count=-1なら全部）拾って、指定の置き場に置く。",
         "strict": True,
         "input_schema": {
             "type": "object",
             "properties": {
-                "color": {"type": "string", "enum": ["__COLORS__"], "description": "拾う色"},
+                "object": {"type": "string", "enum": ["__OBJECTS__"], "description": "拾う物"},
                 "zone": {"type": "string", "enum": ["__ZONES__"], "description": "置き場"},
                 "hint": {"type": "string", "enum": ["any", "largest", "smallest", "nearest", "leftmost", "rightmost"],
-                         "description": "同じ色が複数あるときの選び方"},
+                         "description": "同じ物が複数あるときの選び方"},
                 "count": {"type": "integer", "enum": [1, -1], "description": "1=1個, -1=全部"},
             },
-            "required": ["color", "zone", "hint", "count"],
+            "required": ["object", "zone", "hint", "count"],
             "additionalProperties": False,
         },
+    },
+    {
+        "name": "tidy_up",
+        "description": "見えている物を全部スタート台（元の場所）に戻す。「片付けて」「元に戻して」「リセット」のとき。",
+        "strict": True,
+        "input_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
     },
     {
         "name": "go_home",
@@ -71,15 +78,15 @@ def build_tools(cfg: AppConfig) -> list[dict[str, Any]]:
     tools = json.loads(json.dumps(TOOLS_TEMPLATE))
     for t in tools:
         if t["name"] == "pick_and_place":
-            t["input_schema"]["properties"]["color"]["enum"] = cfg.color_names()
+            t["input_schema"]["properties"]["object"]["enum"] = cfg.object_names()
             t["input_schema"]["properties"]["zone"]["enum"] = cfg.zone_names()
     return tools
 
 
 def build_system(cfg: AppConfig) -> str:
-    colors = "、".join(f"{c.name}({c.aliases[0]})" for c in cfg.colors)
+    objects = "、".join(f"{o.name}({o.label})" for o in cfg.objects)
     zones = "、".join(f"{z.name}({z.aliases[0]})" for z in cfg.zones)
-    return SYSTEM_PROMPT_JA.format(colors=colors, zones=zones)
+    return SYSTEM_PROMPT_JA.format(objects=objects, zones=zones)
 
 
 class ClaudeAgent:
@@ -100,7 +107,9 @@ class ClaudeAgent:
         if name == "list_objects":
             return ex.list_objects()
         if name == "pick_and_place":
-            return ex.pick_and_place(inp.get("color"), inp.get("zone"), inp.get("hint", "any"), int(inp.get("count", 1)))
+            return ex.pick_and_place(inp.get("object"), inp.get("zone"), inp.get("hint", "any"), int(inp.get("count", 1)))
+        if name == "tidy_up":
+            return ex.tidy_up()
         if name == "go_home":
             return ex.go_home()
         if name == "stop":
@@ -130,7 +139,7 @@ class ClaudeAgent:
                          "ms": int((time.time() - t0) * 1000)})
             if resp.stop_reason == "refusal":
                 cat = getattr(getattr(resp, "stop_details", None), "category", None)
-                final_text = "その指示にはお応えできません。ブロックの色と置き場を言ってください。"
+                final_text = "その指示にはお応えできません。物の名前と置き場を言ってください。"
                 self.logger({"ev": "refusal", "category": cat})
                 messages.append({"role": "assistant", "content": final_text})
                 break
@@ -175,7 +184,7 @@ class RuleAgent:
         self.cfg = cfg
         self.executor = executor
         self.logger = logger or (lambda ev: None)
-        self.last_color: str | None = None
+        self.last_object: str | None = None
 
     def handle(self, utterance: str) -> str:
         it = self.parse(utterance, self.cfg)
@@ -183,20 +192,23 @@ class RuleAgent:
         ex = self.executor
         if it.action == "stop":
             return ex.stop().message
+        if it.action == "tidy":
+            return ex.tidy_up().message
         if it.action == "home":
             return ex.go_home().message
         if it.action == "list":
             return ex.list_objects().message
         if it.action == "pick_and_place":
-            color = it.color or self.last_color
-            if color is None:
-                return "どの色を動かしますか？"
+            obj = it.object or (None if it.count == -1 else self.last_object)
+            if obj is None and it.count != -1:
+                names = "・".join(o.label for o in self.cfg.objects[:4])
+                return f"どれを動かしますか？（{names} など）"
             if it.zone is None:
                 names = "・".join(z.aliases[0] for z in self.cfg.zones if z.aliases)
                 return f"どこに置きますか？（{names}）"
-            r = ex.pick_and_place(color, it.zone, it.hint, it.count)
-            if r.ok:
-                self.last_color = color
+            r = ex.pick_and_place(obj, it.zone, it.hint, it.count)
+            if r.ok and obj:
+                self.last_object = obj
             return r.message
         return "すみません、聞き取れませんでした。「赤いブロックを右のトレイに置いて」のように言ってください。"
 

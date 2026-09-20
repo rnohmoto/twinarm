@@ -62,7 +62,8 @@ def build(args) -> tuple:
     if cfg.camera.backend == "file" and not (isinstance(cfg.camera.index, str) and Path(cfg.camera.index).exists()):
         # 合成フレーム: 赤・緑・青のブロック（テストと同じ配置）
         frame = make_synthetic_frame(cfg.camera.width, cfg.camera.height,
-                                     [("red", 400, 300, 70), ("green", 700, 350, 70), ("blue", 900, 250, 70)])
+                                     [("red", 400, 300, 70), ("green", 700, 350, 70), ("blue", 900, 250, 70)],
+                                     balls=[("orange", 550, 520, 40)])
     camera = make_camera(cfg.camera, frame)
     camera.open()
     robot = make_robot(cfg.robot)
@@ -91,12 +92,12 @@ def tune_loop(cfg: AppConfig, camera) -> None:
     """検出しきい値のチューニング表示（数値は config.json を編集して再起動）。"""
     import cv2
 
-    from detect import annotate, detect_colors
+    from detect import annotate, detect_objects
     print("tune: 'q' で終了 / 's' でフレーム保存 (logs/frame_*.png)")
     while True:
         frame = camera.read()
-        dets = detect_colors(frame, cfg.colors, cfg.min_area_px, cfg.max_area_px)
-        vis = annotate(frame, dets, f"dets={len(dets)}  " + " ".join(f"{d.color}:{int(d.area)}" for d in dets[:6]))
+        dets = detect_objects(frame, cfg.objects, cfg.min_area_px, cfg.max_area_px)
+        vis = annotate(frame, dets, f"dets={len(dets)}  " + " ".join(f"{d.name}:{int(d.area)}" for d in dets[:6]))
         cv2.imshow("tune", vis)
         k = cv2.waitKey(30) & 0xFF
         if k == ord("q"):

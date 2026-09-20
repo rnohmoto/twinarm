@@ -248,11 +248,12 @@ class PickPlaceController:
         self.robot.move_to(x, y, self.c.z_safe)
 
     def pick_and_place(self, x: float, y: float, px: float, py: float,
-                       r: float | None = None, z_place: float | None = None) -> None:
+                       r: float | None = None, z_place: float | None = None,
+                       z_pick: float | None = None) -> None:
         # 先に両方の座標をガードに通す（拾ってから置けないと分かるのを防ぐ）
-        self.robot.guard.check(x, y, self.c.z_pick)
+        self.robot.guard.check(x, y, self.c.z_pick if z_pick is None else z_pick)
         self.robot.guard.check(px, py, self.c.z_place if z_place is None else z_place)
-        self.pick(x, y, r)
+        self.pick(x, y, r, z_pick)
         self.place(px, py, z_place)
 
 

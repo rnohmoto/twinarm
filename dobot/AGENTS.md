@@ -25,5 +25,11 @@ first-time setup manual.
   port of `robotics/scripts/magician_pnp/`.
 - Tests live in `tests/` and must pass with no hardware attached (`uv run pytest`). Add a test
   for any new guard or pure function before wiring it to hardware.
+- `demo.py` is the only long-running process that owns the camera and the arm, and it does so on
+  one worker thread. `panel_web.py` never touches hardware: browser buttons queue commands. Keep
+  that split when adding UI features.
+- `config.json` is generated from `config.py` defaults (`uv run python config.py config.json`)
+  and then edited by `setup_wizard.py` on the real bench. Do not hand-write coordinates into it
+  from here; they come from the arm's pose on site.
 - Ruff docstring rules (`D`) are switched off for this sandbox in `pyproject.toml`; `F` and import
   order still apply (`uv run ruff check .`).

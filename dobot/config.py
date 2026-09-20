@@ -1,11 +1,12 @@
-"""magician_pnp 設定（JSON永続化・依存ゼロ）。
+"""dobot 設定（JSON 永続化・依存ゼロ）。
 
 設計方針
-- 「LLMに座標を作らせない」: ロボット座標系で意味を持つのは、この設定に登録した
+- 「LLM に座標を作らせない」: ロボット座標系で意味を持つのは、この設定に登録した
   ゾーン（置き場）と、キャリブレーション（ホモグラフィ）で画像から変換した検出結果だけ。
 - 単位: ロボット座標は mm（Dobot Magician のベース座標系）。画像はピクセル。
-- 既定値は「卓上に 3cm 角の発泡ブロック（赤/緑/青/黄）を並べ、俯瞰カメラで拾う」想定。
-  実機で必ず `calibrate.py` と `main.py --tune` で上書きする（既定値のまま動かさない）。
+- 対象物は「色（HSV）＋形（円形度・縦横比）＋面積」で識別する（v2・2026-09-20）。
+  既定は 色つき立方体 4 色・卓球ボール（橙）・MONO 消しゴム（青帯）・白いボール（ゴルフ）。
+  実機で必ず `setup_wizard.py`（または calibrate.py と main.py --tune）で上書きする。
 """
 from __future__ import annotations
 
@@ -33,11 +34,11 @@ class CameraConfig:
 @dataclass
 class RobotConfig:
     backend: str = "dry"             # dry | pydobot
-    port: str | None = None          # None=自動探索（CP210x / Dobot）
+    port: str | None = None          # None=未指定（推測しない。--port か setup_wizard で書く）
     end_effector: str = "suction"    # suction | gripper
     ee_settle_s: float = 0.6         # 吸着/把持が効くまでの待ち
     z_safe: float = 40.0             # 移動時の退避高さ（テーブル面基準ではなく座標値）
-    z_pick: float = -30.0            # 物体上面に吸盤が当たる高さ（実機で較正して上書き）
+    z_pick: float = -30.0            # 物体上面に吸盤が当たる高さ（既定。物ごとの値は ObjectSpec.z_pick）
     z_place: float = -25.0           # 置くときの高さ
     r: float = 0.0                   # 手先回転（吸盤では未使用）
     velocity: float = 150.0          # pydobot speed(velocity, acceleration)
@@ -62,14 +63,38 @@ class Zone:
     x: float
     y: float
     z_place: float | None = None     # None なら RobotConfig.z_place
+    radius_mm: float = 60.0          # この半径内の物は「もうこのゾーンにある」とみなす（片付け・重複置きの防止）
+    slots: list[list[float]] = field(default_factory=list)  # 置く位置の候補 [[x,y],...]。空なら (x,y) に置く
 
 
 @dataclass
-class ColorRange:
-    """HSV しきい値（OpenCV: H=0..179, S=0..255, V=0..255）。赤はH両端を跨ぐので複数レンジ。"""
-    name: str
-    aliases: list[str]
-    ranges: list[list[list[int]]]    # [[[h_lo,s_lo,v_lo],[h_hi,s_hi,v_hi]], ...]
+class ObjectSpec:
+    """対象物 1 種。HSV 範囲＋形の条件で識別する。"""
+    name: str                        # 英字の識別名（LLM の enum・ログ）
+    label: str                       # 日本語の呼び名（返事・パネル）
+    aliases: list[str]               # 発話で拾う語（長い一致を優先）
+    ranges: list[list[list[int]]]    # [[[h_lo,s_lo,v_lo],[h_hi,s_hi,v_hi]], ...]（白は S 低・V 高の範囲で書く）
+    min_area_px: int | None = None   # None → AppConfig.min_area_px
+    max_area_px: int | None = None
+    min_circularity: float = 0.0     # 4πA/P² の下限（正方形 ≈0.79・円 ≈1.0）。球は 0.82 以上
+    aspect_min: float = 1.0          # 外接矩形の 長辺/短辺 の範囲（細長い物の識別）
+    aspect_max: float = 99.0
+    z_pick: float | None = None      # None → RobotConfig.z_pick（物の高さが違うので原則は物ごとに教える）
+    ee: str = "suction"              # suction | gripper（記録用）
+
+
+@dataclass
+class DemoConfig:
+    """実演の運転（demo.py）。"""
+    attract: bool = False            # 誰も話さない間、自動で「運ぶ→片付ける」を繰り返す
+    idle_s: float = 90.0             # 最後の操作からこの秒数で自動ループを始める
+    pause_s: float = 20.0            # 自動ループ 1 サイクル後の休み（モーター発熱の抑制）
+    attract_zone: str = "tray_right" # 自動ループで運ぶ先
+    start_zone: str = "start"        # 片付け先（スタート台）
+    max_cycles_per_hour: int = 40    # 自動ループの上限（発熱・摩耗）
+    panel_port: int = 8790           # ブラウザ UI（http://127.0.0.1:8790）
+    stream_fps: int = 8
+    jpeg_quality: int = 70
 
 
 @dataclass
@@ -112,33 +137,48 @@ class AppConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     asr: ASRConfig = field(default_factory=ASRConfig)
     tts: TTSConfig = field(default_factory=TTSConfig)
+    demo: DemoConfig = field(default_factory=DemoConfig)
     zones: list[Zone] = field(default_factory=list)
-    colors: list[ColorRange] = field(default_factory=list)
+    objects: list[ObjectSpec] = field(default_factory=list)
     homography_path: str = "assets/homography.json"
-    min_area_px: int = 400           # 検出の最小面積（1280x720・高さ50cm・3cm角で概ね 2000〜4000px）
+    min_area_px: int = 400           # 検出の最小面積（1280x720・高さ45cm・25mm角で概ね 2500〜4500px）
     max_area_px: int = 60000
     log_dir: str = "logs"
-    panel_window: bool = True        # OpenCV ウィンドウでパネル表示
+    panel_window: bool = True        # OpenCV ウィンドウでパネル表示（main.py）
 
     # ---------------------------------------------------------------- defaults
     @staticmethod
     def default() -> AppConfig:
         cfg = AppConfig()
         cfg.zones = [
-            Zone("tray_right", ["右", "みぎ", "右のトレイ", "右側", "右のお皿", "right"], 230.0, -110.0),
-            Zone("tray_left", ["左", "ひだり", "左のトレイ", "左側", "左のお皿", "left"], 230.0, 110.0),
+            Zone("tray_right", ["右", "みぎ", "右のトレイ", "右側", "右のお皿", "right"], 230.0, -110.0,
+                 slots=[[215.0, -125.0], [245.0, -125.0], [215.0, -95.0], [245.0, -95.0]]),
+            Zone("tray_left", ["左", "ひだり", "左のトレイ", "左側", "左のお皿", "left"], 230.0, 110.0,
+                 slots=[[215.0, 95.0], [245.0, 95.0], [215.0, 125.0], [245.0, 125.0]]),
             Zone("box_front", ["手前", "てまえ", "前", "手前の箱", "front"], 170.0, 0.0),
             Zone("box_back", ["奥", "おく", "後ろ", "奥の箱", "back"], 280.0, 0.0),
+            Zone("start", ["スタート", "元の場所", "もとの場所", "台", "start"], 235.0, 0.0, radius_mm=75.0,
+                 slots=[[210.0, -40.0], [210.0, 0.0], [210.0, 40.0], [260.0, -40.0], [260.0, 0.0], [260.0, 40.0]]),
         ]
-        cfg.colors = [
-            ColorRange("red", ["赤", "あか", "レッド", "赤い", "赤色"],
-                       [[[0, 120, 70], [8, 255, 255]], [[170, 120, 70], [179, 255, 255]]]),
-            ColorRange("green", ["緑", "みどり", "グリーン", "緑の", "緑色", "青緑"],
-                       [[[40, 80, 60], [85, 255, 255]]]),
-            ColorRange("blue", ["青", "あお", "ブルー", "青い", "青色", "水色"],
-                       [[[95, 120, 60], [130, 255, 255]]]),
-            ColorRange("yellow", ["黄", "きいろ", "黄色", "イエロー", "黄色い"],
-                       [[[20, 120, 100], [35, 255, 255]]]),
+        cube = {"min_circularity": 0.0, "aspect_min": 1.0, "aspect_max": 1.6}
+        cfg.objects = [
+            ObjectSpec("red_cube", "赤いブロック", ["赤", "あか", "レッド", "赤い", "赤色"],
+                       [[[0, 120, 70], [8, 255, 255]], [[170, 120, 70], [179, 255, 255]]], **cube),
+            ObjectSpec("green_cube", "緑のブロック", ["緑", "みどり", "グリーン", "緑の", "緑色", "青緑"],
+                       [[[40, 80, 60], [85, 255, 255]]], **cube),
+            ObjectSpec("blue_cube", "青いブロック", ["青", "あお", "ブルー", "青い", "青色", "水色"],
+                       [[[95, 120, 60], [130, 255, 255]]], **cube),
+            ObjectSpec("yellow_cube", "黄色いブロック", ["黄", "きいろ", "黄色", "イエロー", "黄色い"],
+                       [[[20, 120, 100], [35, 255, 255]]], **cube),
+            # 卓球ボール（橙・φ40mm・2.7g）: 橙の色相＋円形度で立方体と区別する
+            ObjectSpec("ball", "ボール", ["ボール", "ぼーる", "たま", "球", "ピンポン", "卓球", "橙", "オレンジ"],
+                       [[[8, 120, 120], [22, 255, 255]]], min_circularity=0.82, aspect_min=1.0, aspect_max=1.25),
+            # MONO 消しゴム: スリーブの青帯（細長い）。吸盤は帯の中心に来るので実機で pick 位置を確認（M0.5）
+            ObjectSpec("eraser", "消しゴム", ["消しゴム", "けしごむ", "ケシゴム", "MONO", "モノ"],
+                       [[[95, 120, 60], [130, 255, 255]]], aspect_min=2.2, aspect_max=8.0, ee="gripper"),
+            # 白いボール（ゴルフ）: S 低・V 高＋円形度。ArUco の白地（正方形 ≈0.79）を円形度で弾く
+            ObjectSpec("golf_ball", "ゴルフボール", ["ゴルフ", "ごるふ", "白いボール", "白い球"],
+                       [[[0, 0, 170], [179, 70, 255]]], min_circularity=0.85, aspect_min=1.0, aspect_max=1.2),
         ]
         return cfg
 
@@ -160,9 +200,13 @@ class AppConfig:
             llm=LLMConfig(**d.get("llm", {})),
             asr=ASRConfig(**d.get("asr", {})),
             tts=TTSConfig(**d.get("tts", {})),
+            demo=DemoConfig(**d.get("demo", {})),
             zones=[Zone(**z) for z in d.get("zones", [])],
-            colors=[ColorRange(**c) for c in d.get("colors", [])],
+            objects=[ObjectSpec(**o) for o in d.get("objects", [])],
         )
+        if not cfg.objects and d.get("colors"):  # v1 の config（colors）を読めるようにする
+            cfg.objects = [ObjectSpec(c["name"], c["aliases"][0] if c.get("aliases") else c["name"],
+                                      c.get("aliases", []), c["ranges"]) for c in d["colors"]]
         for k in ("homography_path", "min_area_px", "max_area_px", "log_dir", "panel_window"):
             if k in d:
                 setattr(cfg, k, d[k])
@@ -184,19 +228,33 @@ class AppConfig:
                     best = (len(a), z)
         return best[1] if best else None
 
-    def color_by_alias(self, text: str) -> ColorRange | None:
-        best: tuple[int, ColorRange] | None = None
-        for c in self.colors:
-            for a in [c.name] + c.aliases:
+    def object_by_name(self, name: str) -> ObjectSpec | None:
+        for o in self.objects:
+            if o.name == name:
+                return o
+        return None
+
+    def object_by_alias(self, text: str) -> ObjectSpec | None:
+        best: tuple[int, ObjectSpec] | None = None
+        for o in self.objects:
+            for a in [o.name, o.label] + o.aliases:
                 if a and a in text and (best is None or len(a) > best[0]):
-                    best = (len(a), c)
+                    best = (len(a), o)
         return best[1] if best else None
 
-    def color_names(self) -> list[str]:
-        return [c.name for c in self.colors]
+    def object_names(self) -> list[str]:
+        return [o.name for o in self.objects]
+
+    def label(self, name: str | None) -> str:
+        o = self.object_by_name(name) if name else None
+        return o.label if o else (name or "それ")
 
     def zone_names(self) -> list[str]:
         return [z.name for z in self.zones]
+
+    def zone_label(self, name: str) -> str:
+        z = self.zone_by_name(name)
+        return (z.aliases[0] if z and z.aliases else name)
 
 
 if __name__ == "__main__":  # `python config.py path.json` で既定設定を書き出す

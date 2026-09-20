@@ -191,6 +191,14 @@
 
 <!-- ===================================================== -->
 <h2 id="s4">4. ソフトの準備（uv・テスト・疎通チェック）</h2>
+<h3>4.0 いちばん早い道: 設定ウィザード</h3>
+<div class="step">
+  <p class="mb-1">Magician とカメラを繋いだら、次の 1 本で §4.2〜§6 と初回のピックまでを順に通せます（各ステップの結果は <code>config.json</code> に保存され、<code>--from N</code> で途中から再開できます。腕が動くのは <code>y</code> と答えたときだけ）。</p>
+<pre>cd twinarm/dobot
+uv sync &amp;&amp; uv run pytest
+uv run python setup_wizard.py      # 1 カメラ → 2 ロボット → 3 マーカー → 4 較正 → 5 置き場 → 6 高さ → 7 検出 → 8 試運転</pre>
+  <p class="mb-0">終わったら <code>uv run python demo.py --config config.json --robot pydobot --port &lt;ポート&gt; --camera-index &lt;番号&gt; --no-llm</code> で実演画面（§7）が立ち上がります。以下 4.1〜6 は、ウィザードが中で何をしているかの説明と、個別にやり直すときの手順です。</p>
+</div>
 <h3>4.1 環境を作る（初回のみ・ハード不要）</h3>
 <pre>cd twinarm/dobot
 uv sync                 # .venv を作る（Python 3.13・OpenCV・pydobot）
@@ -259,13 +267,52 @@ uv run python calibrate.py --config config.json            # カメラで 4 枚�
 <figure class="photo"><img src="img/07_objects_zones.jpg" alt="対象物と置き場" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 07 未撮影: 対象物と置き場を真上から</div><figcaption>写真 6-1: 配置。物同士は 1 個分以上離す。</figcaption></figure>
 
 <!-- ===================================================== -->
-<h2 id="s7">7. 初めてのピック＆プレース</h2>
-<pre>uv run python main.py --tune --camera-index 0            # 検出枠を見ながら照明・HSV・面積を追い込む（q で終了・s で保存）
-uv run python main.py --config config.json --robot pydobot --port /dev/tty.usbserial-XXXX --no-llm --keyboard
-#   → 「赤いブロックを右のトレイに置いて」と入力（LLM 無し・ルール解析）
+<h2 id="s7">7. 初めてのピック＆プレースと実演画面</h2>
+<pre>uv run python demo.py --config config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
+#   → ブラウザで http://127.0.0.1:8790 を開く（同じ PC。別 PC から見るなら --panel-port と PC の IP で）
+#   → 画面の入力欄に「赤いブロックを右のトレイに置いて」→ 送る
 #   → 20 回連続で成功（吸着ミス 1 回以内）が M3 の合格</pre>
-<p>画面の操作: <code>space</code> 発話（キーボード入力）・<code>h</code> ホーム・<code>e</code> 非常停止・<code>r</code> 解除・<code>q</code> 終了。物理の非常停止は本体の電源スイッチ。</p>
-<p>音声（faster-whisper）と LLM（Claude）は後から足せます: <code>uv sync --extra voice --extra llm</code> → <code>ANTHROPIC_API_KEY</code> を設定 → <code>--no-llm --keyboard</code> を外す。ネットが切れてもルール解析に自動で戻ります。</p>
+<figure class="diagram">
+<svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
+  <rect x="10" y="10" width="560" height="280" rx="8" fill="#1b1f24"/>
+  <rect x="20" y="20" width="540" height="170" rx="6" fill="#000"/>
+  <rect x="120" y="70" width="50" height="50" fill="#e74c3c"/><text x="125" y="62" fill="#e74c3c" font-size="11">#0 red_cube (235,60)</text>
+  <circle cx="330" cy="120" r="26" fill="#e67e22"/><text x="300" y="86" fill="#e67e22" font-size="11">#1 ball (222,-15)</text>
+  <rect x="440" y="60" width="50" height="50" fill="#2980b9"/><text x="445" y="52" fill="#3498db" font-size="11">#2 blue_cube</text>
+  <text x="30" y="40" fill="#fff" font-size="12">ready: talk / tidy / attract</text>
+  <rect x="20" y="200" width="380" height="28" rx="4" fill="#111" stroke="#555"/><text x="30" y="219" fill="#888" font-size="12">例: 赤いブロックを右のトレイに置いて / 片付けて</text>
+  <rect x="410" y="200" width="60" height="28" rx="4" fill="#3498db"/><text x="425" y="219" fill="#fff" font-size="12">送る</text>
+  <rect x="480" y="200" width="80" height="28" rx="4" fill="#3498db"/><text x="492" y="219" fill="#fff" font-size="12">🎤 マイク</text>
+  <rect x="20" y="240" width="70" height="28" rx="4" fill="#4a5568"/><text x="32" y="259" fill="#fff" font-size="12">ホーム</text>
+  <rect x="100" y="240" width="140" height="28" rx="4" fill="#e67e22"/><text x="112" y="259" fill="#fff" font-size="12">片付け（元に戻す）</text>
+  <rect x="250" y="240" width="90" height="28" rx="4" fill="#c0392b"/><text x="262" y="259" fill="#fff" font-size="12">非常停止</text>
+  <rect x="350" y="240" width="90" height="28" rx="4" fill="#4a5568"/><text x="362" y="259" fill="#fff" font-size="12">停止解除</text>
+  <rect x="450" y="240" width="110" height="28" rx="4" fill="#4a5568"/><text x="460" y="259" fill="#fff" font-size="12">自動ループ: OFF</text>
+  <rect x="590" y="10" width="300" height="280" rx="8" fill="#262b33"/>
+  <text x="605" y="35" fill="#9fb3c8" font-size="11">状態</text><text x="605" y="60" fill="#7bd88f" font-size="18" font-weight="bold">対話／idle</text>
+  <text x="605" y="82" fill="#ccc">見えている物: red_cube 1, ball 1, blue_cube 1</text>
+  <text x="605" y="100" fill="#ccc">拾った 12 ／ 失敗 0 ／ 片付け 3</text>
+  <text x="605" y="130" fill="#9fb3c8" font-size="11">いま聞いた → 判断 → 返事</text>
+  <text x="605" y="150" fill="#ccc">発話: ボールを左に置いて</text>
+  <text x="605" y="168" fill="#ccc">意図: pick_and_place ball → tray_left</text>
+  <text x="605" y="186" fill="#ccc">返事: ボールを左に置きました。</text>
+  <text x="605" y="216" fill="#9fb3c8" font-size="11">カメラ・ロボット</text>
+  <text x="605" y="236" fill="#ccc">1280x720@30 露出固定: 効いている</text>
+  <text x="605" y="254" fill="#ccc">robot: pydobot /dev/tty.usbserial-…</text>
+  <text x="605" y="280" fill="#9fb3c8" font-size="11">記録（直近のイベント）</text>
+</svg>
+<figcaption>図 7-1: 実演画面（demo.py）。左＝カメラ映像に検出枠、下＝話しかける欄とボタン、右＝状態・聞いた内容と判断・カメラとロボットの状態・記録。</figcaption>
+</figure>
+<h3>7.1 実演の流れ（案）</h3>
+<table class="table table-bordered">
+  <thead><tr><th>モード</th><th>動き</th><th>切り替わり</th></tr></thead>
+  <tbody>
+    <tr><td><strong>対話</strong>（既定）</td><td>来場者が「〜を右に置いて」→ 意図（LLM か、ネット無しならルール解析）→ 拾って置く → 返事。1 回 10〜20 秒。「片付けて」でスタート台に全部戻す（次の人のためのリセット）</td><td>—</td></tr>
+    <tr><td><strong>自動ループ</strong>（客寄せ）</td><td>90 秒だれも話さなければ、スタート台の物を右トレイへ運び、少し休んで片付ける。1 時間の上限回数と休みを設定で持つ（モーターの発熱）</td><td>話しかけ・ボタンで即座に対話へ。非常停止で OFF</td></tr>
+  </tbody>
+</table>
+<p>「取って→戻す」までを 1 セットにするなら、来場者の指示で運ばせたあと、説明員が「片付けて」と言う（またはボタン）だけで元に戻ります。3 種に絞るなら、既定の対象物は 色つき立方体・ボール（卓球）・消しゴム で、LLM も ルール解析も この名前にしか対応づけません。</p>
+<p>音声（faster-whisper）と LLM（Claude）は後から足せます: <code>uv sync --extra voice --extra llm</code> → <code>ANTHROPIC_API_KEY</code> を設定 → <code>--no-llm</code> を外す。ネットが切れてもルール解析に自動で戻ります。物理の非常停止は本体の電源スイッチ、画面の「非常停止」は以後の動作を拒否します。</p>
 <div class="row g-3">
   <div class="col-md-6"><figure class="photo"><img src="img/08_first_pick.jpg" alt="最初のピック" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 08 未撮影: 最初のピック成功の瞬間</div><figcaption>写真 7-1: 吸着中。</figcaption></figure></div>
   <div class="col-md-6"><figure class="photo"><img src="img/09_pc_setup.jpg" alt="PC 画面" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 09 未撮影: main.py --tune の検出枠（スクリーンショット可）</div><figcaption>写真 7-2: 検出枠の画面。</figcaption></figure></div>

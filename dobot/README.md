@@ -1,9 +1,11 @@
 # dobot — Magician pick-and-place sandbox
 
 Runnable port of `robotics/scripts/magician_pnp/` (skeleton v1, 2026-09-11) for the Dobot
-Magician (original, 4-axis, USB serial via CP210x). Pipeline: overhead UVC camera → HSV colour
-detection → homography (pixels → robot XY) → `pydobot` pick-and-place, with optional voice
-(faster-whisper) and LLM intent parsing (Claude tool use; a rule parser is the offline fallback).
+Magician (original, 4-axis, USB serial via CP210x), extended on 2026-09-20 (v2) with an object
+model (colour + shape), a setup wizard, a browser panel and a demo runner. Pipeline: overhead UVC
+camera → HSV + shape detection → homography (pixels → robot XY) → `pydobot` pick-and-place, with
+optional voice (faster-whisper) and LLM intent parsing (Claude tool use; a rule parser is the
+offline fallback).
 
 Part of the TwinArm monorepo; see [`../README.md`](../README.md) for the repository layout. Design
 and purchasing rationale live in the planning repo: `robotics/TacitCapture/91_Magician_P&P構成…`
@@ -14,9 +16,9 @@ object sizes).
 
 ## Status
 
-Offline tests pass with no hardware (`uv run pytest`). The `--dry-run` path (synthetic frame,
-recording robot) exercises the whole pipeline. Real-arm and real-camera steps have **not** been run
-yet: the Magician model/location and the camera purchase are still pending on the robotics side.
+Offline tests pass with no hardware (`uv run pytest`, 23 tests). `demo.py --dry-run` runs the whole
+pipeline against a synthetic frame and serves the browser panel. Real-arm and real-camera steps have
+**not** been run yet: the Magician is on hand but not connected, and the camera is not bought.
 
 ## Quick start
 
@@ -24,25 +26,41 @@ yet: the Magician model/location and the camera purchase are still pending on th
 cd dobot
 uv sync                                   # first time; creates .venv with Python 3.13
 uv run pytest                             # offline tests — must pass before touching hardware
-uv run python main.py --dry-run --no-llm --text "赤いブロックを右のトレイに置いて"
+uv run python demo.py --dry-run --no-llm  # synthetic camera + recording robot, panel at http://127.0.0.1:8790
 ```
 
-Then with hardware, in this order (each step is a gate for the next; details in the manual):
+With hardware, the wizard walks through the first-time setup and writes `config.json` +
+`assets/homography.json` (every step is resumable with `--from N`; the arm moves only after you
+answer `y`):
 
 ```bash
-uv run python check_camera.py --list                      # read-only
-uv run python check_camera.py --index 0                   # read-only: exposure/WB lock + brightness jitter report
-uv run python check_robot.py --list                       # read-only: candidate serial ports
-uv run python check_robot.py --port /dev/tty.usbserial-XXXX          # read-only: connect, print pose
-uv run python check_robot.py --port /dev/tty.usbserial-XXXX --home   # MOVES the arm
-uv run python calibrate.py --make-markers assets/markers  # print the 4 ArUco markers
-uv run python calibrate.py --config config.json           # jog the suction cup to each marker (moves on your command)
-uv run python main.py --tune --camera-index 0             # HSV/area tuning view (camera only)
-uv run python main.py --config config.json --robot pydobot --port ... --no-llm --keyboard   # first real pick-and-place
+uv run python setup_wizard.py             # 1 camera · 2 robot · 3 markers · 4 calibrate · 5 zones · 6 heights · 7 detect · 8 smoke test
+uv run python demo.py --config config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
 ```
 
-`config.json` is the committed default (1280×720 @ 30 fps, manual exposure, suction cup, 3 cm colour
-blocks). Put your camera index and serial port in it, or pass `--camera-index` / `--port`.
+Then open http://127.0.0.1:8790 (camera with detection boxes, what was heard → intent → reply,
+robot state, buttons: send text / mic / home / tidy / e-stop / resume / attract loop).
+
+Read-only checks used inside the wizard are also standalone:
+
+```bash
+uv run python check_camera.py --list ; uv run python check_camera.py --index 0
+uv run python check_robot.py --list  ; uv run python check_robot.py --port /dev/tty.usbserial-XXXX
+```
+
+## Demo modes (`demo.py`)
+
+| Mode | What happens | Ends when |
+| ---- | ------------ | --------- |
+| Dialog (default) | Visitor says "〜を右に置いて" (text box, or the mic button = push-to-talk on the PC) → intent (Claude tool use, or the rule parser offline) → pick and place → spoken/printed reply. "片付けて" returns everything to the start pad (`start` zone slots) for the next visitor. | — |
+| Attract (`--attract` or the panel button) | After `demo.idle_s` seconds without input: move everything from the start pad to `demo.attract_zone`, pause, tidy back. Capped by `max_cycles_per_hour` and `pause_s` (motor heat). | Any command or utterance switches back to dialog; e-stop disables it. |
+| `--once "text"` | Handle one utterance and exit (smoke test). | immediately |
+
+Objects (`config.json` → `objects[]`): red/green/blue/yellow cubes (colour, aspect ≤ 1.6), `ball`
+(orange table-tennis ball: hue + circularity ≥ 0.82), `eraser` (MONO blue band: elongated), `golf_ball`
+(white: low saturation + circularity ≥ 0.85, which rejects ArUco's white squares). Each object carries
+its own `z_pick`. Zones have a radius (objects already inside are not moved again) and optional
+`slots` (place positions, first free one is used).
 
 ## Script inventory
 
@@ -50,26 +68,27 @@ Risk classes: **read-only** (no motion), **moves arm** (commands motion), **came
 
 | Script | Purpose | Hardware risk |
 | ------ | ------- | ------------- |
+| `setup_wizard.py` | Guided first-time setup: camera + exposure lock, port + homing check, ArUco markers, calibration, zone teaching (hand-guide with the forearm unlock key), per-object `z_pick`, detection tuning, smoke test. Saves `config.json` after each step. | reads only by default; **moves arm** only after `y` (home / smoke test) |
+| `demo.py` | Demo runner: browser panel + dialog mode + attract loop. One worker thread owns camera and robot; the panel only queues commands. | **moves arm** with `--robot pydobot`; `--dry-run` never does |
+| `panel_web.py` | stdlib HTTP server: `/` page, `/stream` MJPEG, `/status` JSON, `POST /cmd`. | none |
 | `check_camera.py` | Enumerate cameras; open one, lock exposure/WB, measure brightness jitter, save a snapshot to `logs/`. | camera only |
-| `check_robot.py` | List candidate ports (`--list`); connect and print pose; `--home` / `--round-trip` move the arm; `--dry` rehearses without hardware. | read-only by default; **moves arm** with `--home` / `--round-trip` |
-| `calibrate.py` | Eye-to-hand calibration: print ArUco markers (`--make-markers`), then fit pixels→robot XY from 4+ correspondences into `assets/homography.json`. Reads the arm pose while *you* jog it. | read-only (arm pose is read, not commanded) |
-| `main.py` | The application: `--tune` (camera view only), `--dry-run` (synthetic frame + recording robot), or live with `--robot pydobot`. | **moves arm** when `--robot pydobot` |
-| `robot_dobot.py` | pydobot wrapper with workspace guard (AABB + reach annulus), emergency stop, dry-run robot. `python robot_dobot.py --live` runs home → one pick/place → home. | **moves arm** with `--live` |
-| `camera.py` | OpenCV UVC / RealSense / file camera with exposure & WB locking and read-back. | camera only |
-| `detect.py` | HSV colour detection, synthetic test frame, panel drawing, YOLO-World hook. | none |
-| `planner.py` | TaskExecutor (observe → choose → pick and place), JSONL log. | via robot |
-| `rule_parser.py` / `llm_agent.py` | Japanese rule parser (offline) / Claude tool-use agent (enum-only arguments, no coordinates from the LLM). | none |
+| `check_robot.py` | List candidate ports (`--list`); connect and print pose; `--home` / `--round-trip` move the arm; `--dry` rehearses without hardware. | read-only by default; **moves arm** with flags |
+| `calibrate.py` | Eye-to-hand calibration: print ArUco markers (`--make-markers`), then fit pixels→robot XY into `assets/homography.json` while *you* jog the arm. | read-only |
+| `main.py` | CLI app (OpenCV window): `--tune` (camera only), `--dry-run`, or live with `--robot pydobot`. `demo.py` reuses its `build()`. | **moves arm** when `--robot pydobot` |
+| `robot_dobot.py` | pydobot wrapper with workspace guard (AABB + reach annulus), emergency stop, dry-run robot; refuses to guess a port. | **moves arm** with `--live` |
+| `camera.py` / `detect.py` / `planner.py` | UVC/RealSense/file camera with exposure lock and read-back; HSV + shape detection; TaskExecutor (observe → select → pick and place, tidy up, zone slots). | camera / via robot |
+| `rule_parser.py` / `llm_agent.py` | Japanese rule parser (offline) / Claude tool-use agent (enum-only arguments, no coordinates from the LLM; tools: list_objects, pick_and_place, tidy_up, go_home, stop). | none |
 | `asr.py` / `tts.py` | Push-to-talk faster-whisper / VOICEVOX-say-SAPI. Optional extras. | none |
-| `config.py` | Dataclasses + JSON (`python config.py out.json` writes the defaults). | none |
-| `tests/` | Offline tests: detection, homography, parsing, guards, end-to-end dry run. | none |
+| `config.py` | Dataclasses + JSON (`python config.py config.json` writes the defaults). | none |
+| `tests/` | Offline tests: detection incl. shapes, homography, parsing, guards, executor, panel HTTP, demo runner, wizard helpers. | none |
 
 ## Layout
 
 ```
 dobot/
   AGENTS.md  README.md  pyproject.toml  config.json
-  main.py check_camera.py check_robot.py calibrate.py camera.py detect.py planner.py
-  robot_dobot.py rule_parser.py llm_agent.py asr.py tts.py config.py
+  setup_wizard.py  demo.py  panel_web.py  main.py  check_camera.py  check_robot.py  calibrate.py
+  camera.py  detect.py  planner.py  robot_dobot.py  rule_parser.py  llm_agent.py  asr.py  tts.py  config.py
   tests/           offline tests (pytest)
   manual/          first-time setup manual (index.html) + img/ photo slots
   assets/          homography.json, printed markers (git-ignored)

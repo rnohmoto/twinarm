@@ -1,0 +1,4 @@
+# koch4 - machine-specific config, run artifacts, vendored three.js (fetch with webxr/setup_assets.py)
+koch4/config/koch4_config.json
+koch4/work/
+koch4/webxr/three.module.js

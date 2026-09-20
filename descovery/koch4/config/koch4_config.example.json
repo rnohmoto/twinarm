@@ -1,0 +1,25 @@
+{
+  "pairs": {
+    "A": {
+      "leader_port": "/dev/tty.usbmodemXXXX",
+      "follower_port": "/dev/tty.usbmodemYYYY",
+      "follower_host": "udp://192.168.50.20:9101",
+      "leader_serial": null,
+      "follower_serial": null,
+      "leader_id": "koch_leader_A",
+      "follower_id": "koch_follower_A",
+      "cams": ""
+    },
+    "B": {
+      "leader_port": "/dev/tty.usbmodemZZZZ",
+      "follower_port": "/dev/tty.usbmodemWWWW",
+      "follower_host": "udp://192.168.50.20:9102",
+      "leader_serial": null,
+      "follower_serial": null,
+      "leader_id": "koch_leader_B",
+      "follower_id": "koch_follower_B",
+      "cams": ""
+    }
+  },
+  "_memo": "リーダーは Mac に有線(leader_port)。follower_host があれば無線(既定 --follower wireless): 握手の場の PC で koch4_follower_host.py --listen 9101/9102 を先に起動。follower_port は有線バックアップ(--follower wired)。VR 用リーダーのみは follower_port=none。--init で雛形を作り koch4_config.json に記入(git 管理外)。serial は --list の値。"
+}

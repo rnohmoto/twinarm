@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koch4 XR — 仮想物体を握る</title>
+<style>
+  html,body { margin:0; height:100%; overflow:hidden; background:#0f172a; font-family:"Meiryo UI",Meiryo,sans-serif; }
+  #hud { position:fixed; top:10px; left:10px; z-index:10; color:#e2e8f0; background:rgba(15,23,42,.7);
+         padding:8px 12px; border-radius:8px; font-size:13px; line-height:1.5; pointer-events:none; max-width:70vw; }
+  #hud b { color:#fbbf24; }
+  #alert { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:12; display:none; max-width:80vw;
+           background:rgba(127,29,29,.92); color:#fff; border:2px solid #f87171; border-radius:10px; padding:10px 16px;
+           font-size:18px; font-weight:bold; line-height:1.4; pointer-events:none; text-align:center; }
+  #btns { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:10; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  #btns button, #editor button { font-size:14px; padding:9px 14px; border-radius:10px; border:1px solid #475569; background:#1e293b; color:#f1f5f9; cursor:pointer; }
+  #btns button.on { background:#b45309; border-color:#f59e0b; }
+  #btns button:active { background:#334155; }
+  #editor { position:fixed; top:10px; right:10px; z-index:11; width:min(360px, 46vw); max-height:88vh; overflow:auto; color:#e2e8f0;
+            background:rgba(15,23,42,.92); border:1px solid #475569; border-radius:10px; padding:10px 12px; font-size:12px; display:none; }
+  #editor h3 { margin:6px 0 4px; font-size:13px; color:#fbbf24; }
+  #editor label { display:inline-block; width:64px; color:#94a3b8; }
+  #editor input[type=number] { width:64px; background:#0f172a; color:#f1f5f9; border:1px solid #475569; border-radius:4px; padding:2px 4px; margin:1px 4px 1px 0; }
+  #editor select { background:#0f172a; color:#f1f5f9; border:1px solid #475569; border-radius:4px; }
+  #editor .row { margin:2px 0; }
+  #editor button { padding:4px 8px; font-size:12px; margin:2px 2px 2px 0; }
+</style>
+</head>
+<body>
+<div id="hud">Koch4 XR<br><span id="mode">接続待ち...</span></div>
+<div id="alert"></div>
+<div id="editor"></div>
+<div id="btns"></div>
+<script type="module">
+import * as THREE from './three.module.js';
+
+// ───────── 既定値（ブリッジの DEFAULT_TWIN_CONFIG と同じ。/config が返す値で上書き） ─────────
+const DEFAULTS = {
+  joints: { shoulder_pan:{span_deg:180,offset_deg:0,sign:1}, shoulder_lift:{span_deg:100,offset_deg:0,sign:1},
+            elbow_flex:{span_deg:100,offset_deg:0,sign:1}, wrist_flex:{span_deg:100,offset_deg:0,sign:1}, wrist_roll:{span_deg:180,offset_deg:0,sign:1} },
+  base: { x:0, y:0.75, z:-0.6, yaw_deg:0 },
+  objects: {
+    ball:   { label:'硬いボール', width:45, p_gain:900,  cap_ma:350, release:1.5, mass_g:45,  color:'#ef4444', kind:'sphere', spot:[0.16,0,0.10] },
+    sponge: { label:'スポンジ',   width:60, p_gain:250,  cap_ma:120, release:2.0, mass_g:10,  color:'#facc15', kind:'box',    spot:[-0.14,0,0.12] },
+    block:  { label:'ブロック',   width:30, p_gain:1200, cap_ma:400, release:1.5, mass_g:120, color:'#60a5fa', kind:'box',    spot:[0.02,0,0.22] },
+  },
+};
+let CONFIG = structuredClone(DEFAULTS);
+const JOINTS = ['shoulder_pan','shoulder_lift','elbow_flex','wrist_flex','wrist_roll'];
+const GAP_MIN = 0.010, GAP_MAX = 0.040;                 // twin の指間隔 [m]（開き 0→100）
+const gapAt = w => GAP_MIN + (GAP_MAX - GAP_MIN) * w / 100;
+const REACH_MARGIN = 0.03;                              // 指先中点がこの距離まで寄れば「手の中」
+const KEEPALIVE_MS = 500, G = 9.81, REST_LIFT = 0.02;
+const SPECTATOR = new URLSearchParams(location.search).get('spectator') === '1';
+const rad = d => d * Math.PI / 180;
+const normToRad = (name, v) => { const m = CONFIG.joints[name]; return m.sign * rad(v / 100 * m.span_deg / 2 + m.offset_deg); };
+
+// ───────── 基本セットアップ ─────────
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 30);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.0));
+const dir = new THREE.DirectionalLight(0xffffff, 1.2); dir.position.set(0.5, 1.5, 0.8); scene.add(dir);
+const INLINE_BG = new THREE.Color(0x1e293b);
+const grid = new THREE.GridHelper(2, 20, 0x64748b, 0x334155); scene.add(grid);
+
+// ───────── Koch 分身（実寸・m。84_ の WebXR ビューアと同じ骨組み） ─────────
+const M = {
+  base: new THREE.MeshStandardMaterial({ color:0xe2e8f0, roughness:.6 }),
+  link: new THREE.MeshStandardMaterial({ color:0x334155, roughness:.5 }),
+  joint: new THREE.MeshStandardMaterial({ color:0xf8fafc, roughness:.3 }),
+  grip: new THREE.MeshStandardMaterial({ color:0xd97706, roughness:.5 }),
+};
+const box = (w,h,d,m) => new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m);
+const cyl = (r,h,m) => new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,20), m);
+const robot = new THREE.Group(); scene.add(robot);
+const desk = box(0.50, 0.012, 0.40, new THREE.MeshStandardMaterial({ color:0x475569, roughness:.8 }));
+desk.position.set(0.05, -0.006, 0.05); robot.add(desk);
+const base = box(0.05, 0.035, 0.05, M.base); base.position.y = 0.0175; robot.add(base);
+const jPan = new THREE.Group(); jPan.position.y = 0.035; base.add(jPan); jPan.add(cyl(0.016, 0.02, M.joint));
+const jLift = new THREE.Group(); jLift.position.y = 0.02; jPan.add(jLift); jLift.add(cyl(0.014, 0.034, M.joint).rotateZ(Math.PI/2));
+const upper = box(0.02, 0.11, 0.02, M.link); upper.position.y = 0.055; jLift.add(upper);
+const jElbow = new THREE.Group(); jElbow.position.y = 0.11; jLift.add(jElbow); jElbow.add(cyl(0.013, 0.032, M.joint).rotateZ(Math.PI/2));
+const fore = box(0.018, 0.108, 0.018, M.link); fore.position.y = 0.054; jElbow.add(fore);
+const jWristF = new THREE.Group(); jWristF.position.y = 0.108; jElbow.add(jWristF); jWristF.add(cyl(0.011, 0.028, M.joint).rotateZ(Math.PI/2));
+const wrist = box(0.016, 0.05, 0.016, M.link); wrist.position.y = 0.025; jWristF.add(wrist);
+const jWristR = new THREE.Group(); jWristR.position.y = 0.05; jWristF.add(jWristR); jWristR.add(cyl(0.012, 0.016, M.joint));
+const palm = box(0.034, 0.018, 0.02, M.grip); palm.position.y = 0.017; jWristR.add(palm);
+const fingerL = box(0.006, 0.045, 0.012, M.grip), fingerR = box(0.006, 0.045, 0.012, M.grip);
+fingerL.position.set(-0.012, 0.048, 0); fingerR.position.set(0.012, 0.048, 0); jWristR.add(fingerL, fingerR);
+const tip = new THREE.Object3D(); tip.position.set(0, 0.065, 0); jWristR.add(tip);   // 指先の中点
+
+// ───────── 仮想物体（設定から生成。握ると指先に付き、放すと机へ落ちる） ─────────
+let objs = [];                                          // {name, cfg, mesh, held, falling, vy}
+function buildObjects(){
+  objs.forEach(o => robot.remove(o.mesh));
+  objs = Object.entries(CONFIG.objects).map(([name, cfg]) => {
+    const d = gapAt(cfg.width);
+    const geo = cfg.kind === 'sphere' ? new THREE.SphereGeometry(d/2, 24, 16) : new THREE.BoxGeometry(d, d*1.2, d);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color:new THREE.Color(cfg.color), roughness:.7, emissive:0x000000 }));
+    robot.add(mesh);
+    const o = { name, cfg, mesh, held:false, falling:false, vy:0, rest: d/2 + REST_LIFT };
+    placeAtSpot(o);
+    return o;
+  });
+}
+function placeAtSpot(o){ o.mesh.position.set(o.cfg.spot[0], o.rest, o.cfg.spot[2]); o.held = false; o.falling = false; o.vy = 0; o.mesh.scale.set(1,1,1); }
+function applyBase(){ robot.position.set(CONFIG.base.x, CONFIG.base.y, CONFIG.base.z); robot.rotation.y = rad(CONFIG.base.yaw_deg); }
+function resetPlacement(){ objs.forEach(placeAtSpot); setForced(null); }
+applyBase(); buildObjects();
+
+// ───────── /config ・ /state ─────────
+async function loadConfig(){
+  try { const r = await fetch('/config', { cache:'no-store' }); if (r.ok) { CONFIG = await r.json(); applyBase(); buildObjects(); buildEditor(); } }
+  catch(e) { /* サーバなし=既定値 */ }
+}
+let st = null, lastOk = -1e9;
+async function poll(){
+  try { const r = await fetch('/state', { cache:'no-store' }); if (r.ok) { st = await r.json(); lastOk = performance.now(); } }
+  catch(e) { /* サーバなし=デモ継続 */ }
+}
+setInterval(poll, 50);
+loadConfig();
+
+// ───────── 接触判定 → /contact 送信（変化時＋キープアライブ。観客モードは送らない） ─────────
+let forced = null, lastSent = null, lastSentAt = 0, sendStatus = SPECTATOR ? '観客モード(送信なし)' : '未送信', current = null;
+const tipW = new THREE.Vector3(), objW = new THREE.Vector3(), tipL = new THREE.Vector3();
+function nearestObject(){
+  tip.getWorldPosition(tipW);
+  let best = null, bestD = Infinity;
+  objs.forEach(o => {
+    o.mesh.getWorldPosition(objW);
+    const d = tipW.distanceTo(objW) - gapAt(o.cfg.width) / 2;
+    if (d < REACH_MARGIN && d < bestD) { best = o; bestD = d; }
+  });
+  return best;
+}
+async function sendContact(o, force){
+  if (SPECTATOR) return;
+  const c = o ? o.cfg : null;
+  const payload = c ? { name:o.name, width:c.width, p_gain:c.p_gain, cap_ma:c.cap_ma, release:c.release, mass_g:c.mass_g } : null;
+  const key = JSON.stringify(payload);
+  const now = performance.now();
+  if (!force && key === lastSent && now - lastSentAt < KEEPALIVE_MS) return;
+  lastSent = key; lastSentAt = now;
+  try { const r = await fetch('/contact', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ vwall: payload }) });
+        sendStatus = r.ok ? `送信OK ${new Date().toLocaleTimeString()}` : `HTTP ${r.status}`; }
+  catch(e) { sendStatus = '送信失敗(サーバなし)'; }
+}
+
+const hudMode = document.getElementById('mode');
+const alertBox = document.getElementById('alert');
+let lastFrame = 0;
+function applyPose(tms){
+  const dt = Math.min(0.05, (tms - lastFrame) / 1000 || 0.016); lastFrame = tms;
+  let pos, open, label, vwall = null, vw = null, src = 'none';
+  if (st && performance.now() - lastOk < 2000) {
+    pos = st.pos || {}; open = st.open ?? 100; vwall = st.vwall; vw = st.vw; src = st.src;
+    label = `ソース: <b>${src === 'teleop' ? 'テレオペ(リーダー実機)' : src === 'sim' ? 'シミュレータ' : '停止中'}</b>`;
+  } else {
+    const t = tms / 1000;
+    pos = { shoulder_pan:40*Math.sin(t*.6), shoulder_lift:45*Math.sin(t*.8)+25, elbow_flex:50*Math.sin(t*.7+1), wrist_flex:40*Math.sin(t*.9+2), wrist_roll:60*Math.sin(t*.5) };
+    open = 50 + 50*Math.sin(t*1.2);
+    label = 'ソース: <b>内蔵デモ</b>（/state 未接続）';
+  }
+  jPan.rotation.y = normToRad('shoulder_pan', pos.shoulder_pan ?? 0);
+  jLift.rotation.x = normToRad('shoulder_lift', pos.shoulder_lift ?? 0);
+  jElbow.rotation.x = normToRad('elbow_flex', pos.elbow_flex ?? 0);
+  jWristF.rotation.x = normToRad('wrist_flex', pos.wrist_flex ?? 0);
+  jWristR.rotation.y = normToRad('wrist_roll', pos.wrist_roll ?? 0);
+  const half = gapAt(open) / 2;
+  fingerL.position.x = -half; fingerR.position.x = half;
+  robot.updateMatrixWorld(true);
+
+  // 接触候補: 手動強制 > 近接判定
+  current = forced ?? nearestObject();
+  sendContact(current, false);
+
+  // 物体の挙動: 握られている間は指先に付く／放したら落ちる／候補は光る／潰れる
+  tip.getWorldPosition(tipW); robot.worldToLocal(tipL.copy(tipW));
+  objs.forEach(o => {
+    const engaged = !!(vwall && vwall.engaged && vwall.name === o.name);
+    const cand = current && current.name === o.name;
+    if (engaged) { o.held = true; o.falling = false; o.vy = 0; o.mesh.position.copy(tipL); }
+    else if (o.held) { o.held = false; o.falling = true; o.vy = 0; }
+    if (o.falling) { o.vy += G * dt; o.mesh.position.y -= o.vy * dt; if (o.mesh.position.y <= o.rest) { o.mesh.position.y = o.rest; o.falling = false; o.vy = 0; } }
+    o.mesh.material.emissive.setHex(engaged ? 0x7f1d1d : cand ? 0x3f3f00 : 0x000000);
+    const pen = engaged ? Math.min(0.5, Math.max(0, (o.cfg.width - open) / o.cfg.width)) : 0;
+    o.mesh.scale.set(1 - 0.6*pen, 1 + 0.3*pen, 1);
+  });
+  const c = current ? current.cfg : null;
+  const objTxt = c ? `${c.label}(幅${c.width}・P${c.p_gain}・上限${c.cap_ma}mA・${c.mass_g}g)` : 'なし(自由空間)';
+  const engTxt = vwall ? (vwall.engaged ? '<b>握っている</b>' : '触れていない') : '—';
+  const vwTxt = vw ? ` / 重さ: 肩 ${vw.shoulder_lift ?? 0} mA・肘 ${vw.elbow_flex ?? 0} mA` : '';
+  const alerts = (st && performance.now() - lastOk < 2000) ? [...(st.alerts || [])] : ['⚠ テレオペ／ブリッジと未接続'];
+  if (st && src === 'none') alerts.unshift('⚠ テレオペが止まっています（分身は最後の姿勢）');
+  alertBox.style.display = alerts.length ? 'block' : 'none';
+  alertBox.textContent = alerts.join('　|　');
+  hudMode.innerHTML = `${label}<br>開き: ${open.toFixed(0)} / 物体: ${objTxt}<br>壁: ${engTxt}${vwTxt}<br>送信: ${sendStatus}`
+    + `<br>表示: ${renderer.xr.isPresenting ? (arActive ? 'AR(パススルー)' : 'VR') : 'インライン'}`
+    + (forced ? `<br><b>手動強制中</b>(0 で解除)` : '') + (SPECTATOR ? '<br><b>観客モード</b>' : '');
+}
+
+// ───────── インライン簡易オービット ─────────
+let yaw = 0.6, pitch = 0.35, dist = 0.9, dragging = false, px = 0, py = 0;
+function updateCam(){
+  const target = new THREE.Vector3(CONFIG.base.x, CONFIG.base.y + 0.1, CONFIG.base.z + 0.05);
+  camera.position.set(target.x + dist*Math.cos(pitch)*Math.sin(yaw), target.y + dist*Math.sin(pitch), target.z + dist*Math.cos(pitch)*Math.cos(yaw));
+  camera.lookAt(target);
+}
+renderer.domElement.addEventListener('pointerdown', e => { dragging = true; px = e.clientX; py = e.clientY; });
+addEventListener('pointerup', () => dragging = false);
+addEventListener('pointermove', e => {
+  if (!dragging || renderer.xr.isPresenting) return;
+  yaw -= (e.clientX - px) * 0.005; pitch = Math.min(1.4, Math.max(-0.2, pitch + (e.clientY - py) * 0.005));
+  px = e.clientX; py = e.clientY; updateCam();
+});
+renderer.domElement.addEventListener('wheel', e => { dist = Math.min(3, Math.max(0.3, dist + e.deltaY * 0.001)); updateCam(); });
+updateCam();
+
+// ───────── ボタン / キー: 物体の手動強制・配置リセット・編集モード ─────────
+const btns = document.getElementById('btns');
+let forceBtns = [];
+function addBtn(label, fn){ const b = document.createElement('button'); b.textContent = label; b.onclick = fn; btns.appendChild(b); return b; }
+function setForced(o){ forced = o; forceBtns.forEach(([b, name]) => b.classList.toggle('on', o && o.name === name)); sendContact(forced ?? nearestObject(), true); }
+function buildButtons(){
+  btns.innerHTML = ''; forceBtns = [];
+  if (!SPECTATOR) objs.forEach((o, i) => forceBtns.push([addBtn(`${i+1} ${o.cfg.label}`, () => setForced(forced === o ? null : o)), o.name]));
+  if (!SPECTATOR) addBtn('0 解除', () => setForced(null));
+  addBtn('R 配置リセット', resetPlacement);
+  addBtn('E 編集', toggleEditor);
+  xrButtons.forEach(([l, f]) => addBtn(l, f));
+}
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === '0') setForced(null);
+  if (e.key === 'r' || e.key === 'R') resetPlacement();
+  if (e.key === 'e' || e.key === 'E') toggleEditor();
+  const i = parseInt(e.key, 10) - 1; if (i >= 0 && i < objs.length) setForced(objs[i]);
+});
+addEventListener('beforeunload', () => { if (!SPECTATOR && navigator.sendBeacon) navigator.sendBeacon('/contact', new Blob([JSON.stringify({ vwall:null })], { type:'application/json' })); });
+
+// ───────── 編集モード（分身の関節オフセット・台の位置・物体の硬さ/重さ/置き場所。保存＝/config） ─────────
+const editor = document.getElementById('editor');
+let editorOpen = false;
+function toggleEditor(){ editorOpen = !editorOpen; editor.style.display = editorOpen ? 'block' : 'none'; if (editorOpen) buildEditor(); }
+function num(label, get, set, step, min, max){
+  const d = document.createElement('div'); d.className = 'row';
+  d.innerHTML = `<label>${label}</label>`;
+  const i = document.createElement('input'); i.type = 'number'; i.step = step; if (min !== undefined) i.min = min; if (max !== undefined) i.max = max; i.value = get();
+  i.oninput = () => { const v = parseFloat(i.value); if (!isNaN(v)) { set(v); applyBase(); } };
+  d.appendChild(i); return d;
+}
+function buildEditor(){
+  if (!editorOpen) return;
+  editor.innerHTML = '<h3>編集モード（E で閉じる）</h3><div class="row">分身が実機とずれるとき: 関節の offset/sign、台の位置を合わせて保存。物体は「ここに置く」で指先の位置に。</div>';
+  const head = document.createElement('div'); head.className = 'row';
+  const save = document.createElement('button'); save.textContent = '保存'; save.onclick = saveConfig;
+  const rst = document.createElement('button'); rst.textContent = '既定に戻す'; rst.onclick = () => resetConfig();
+  const cls = document.createElement('button'); cls.textContent = '閉じる'; cls.onclick = toggleEditor;
+  head.append(save, rst, cls); editor.appendChild(head);
+  const hj = document.createElement('h3'); hj.textContent = '分身の関節（表示スパン°・オフセット°・向き）'; editor.appendChild(hj);
+  JOINTS.forEach(j => {
+    const m = CONFIG.joints[j];
+    const d = document.createElement('div'); d.className = 'row'; d.innerHTML = `<label>${j}</label>`;
+    const span = document.createElement('input'); span.type = 'number'; span.step = 5; span.value = m.span_deg; span.title = 'span_deg'; span.oninput = () => { m.span_deg = parseFloat(span.value) || m.span_deg; };
+    const off = document.createElement('input'); off.type = 'number'; off.step = 1; off.value = m.offset_deg; off.title = 'offset_deg'; off.oninput = () => { m.offset_deg = parseFloat(off.value) || 0; };
+    const sg = document.createElement('select'); sg.innerHTML = '<option value="1">+</option><option value="-1">−</option>'; sg.value = String(m.sign); sg.onchange = () => { m.sign = parseInt(sg.value, 10); };
+    d.append(span, off, sg); editor.appendChild(d);
+  });
+  const hb = document.createElement('h3'); hb.textContent = '台の位置（m・yaw°）'; editor.appendChild(hb);
+  editor.appendChild(num('x', () => CONFIG.base.x, v => CONFIG.base.x = v, 0.01));
+  editor.appendChild(num('y', () => CONFIG.base.y, v => CONFIG.base.y = v, 0.01));
+  editor.appendChild(num('z', () => CONFIG.base.z, v => CONFIG.base.z = v, 0.01));
+  editor.appendChild(num('yaw', () => CONFIG.base.yaw_deg, v => CONFIG.base.yaw_deg = v, 5));
+  const ho = document.createElement('h3'); ho.textContent = '物体（幅・P・上限mA・重さg）'; editor.appendChild(ho);
+  objs.forEach(o => {
+    const c = o.cfg;
+    const d = document.createElement('div'); d.className = 'row'; d.innerHTML = `<label>${c.label}</label>`;
+    [['width',1,0,100],['p_gain',50,0,16383],['cap_ma',10,0,900],['mass_g',5,0,2000]].forEach(([k,step,lo,hi]) => {
+      const i = document.createElement('input'); i.type = 'number'; i.step = step; i.min = lo; i.max = hi; i.value = c[k]; i.title = k;
+      i.oninput = () => { const v = parseFloat(i.value); if (!isNaN(v)) { c[k] = v; if (k === 'width') buildObjects(); } };
+      d.appendChild(i);
+    });
+    const here = document.createElement('button'); here.textContent = 'ここに置く';
+    here.onclick = () => { tip.getWorldPosition(tipW); robot.worldToLocal(tipL.copy(tipW)); c.spot = [+tipL.x.toFixed(3), 0, +tipL.z.toFixed(3)]; placeAtSpot(o); };
+    d.appendChild(here); editor.appendChild(d);
+  });
+}
+async function saveConfig(){
+  try { const r = await fetch('/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(CONFIG) });
+        if (r.ok) { CONFIG = await r.json(); applyBase(); buildObjects(); buildEditor(); sendStatus = '設定を保存'; } else sendStatus = `設定保存 HTTP ${r.status}`; }
+  catch(e) { sendStatus = '設定保存 失敗(サーバなし)'; }
+}
+async function resetConfig(){
+  CONFIG = structuredClone(DEFAULTS); applyBase(); buildObjects(); buildEditor();
+  try { const r = await fetch('/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ reset:true }) });
+        if (r.ok) { CONFIG = await r.json(); applyBase(); buildObjects(); buildEditor(); } } catch(e) { /* offline */ }
+}
+
+// ───────── XR セッション（AR 優先・VR・非対応はインライン） ─────────
+let arActive = false;
+const xrButtons = [];
+async function startXR(mode){
+  try {
+    const init = { optionalFeatures: ['local-floor', 'dom-overlay', 'hand-tracking'], domOverlay: { root: document.body } };
+    const s = await navigator.xr.requestSession(mode, init);
+    arActive = (mode === 'immersive-ar');
+    scene.background = arActive ? null : new THREE.Color(0x27364a);
+    grid.visible = !arActive;
+    renderer.xr.setReferenceSpaceType('local-floor');
+    await renderer.xr.setSession(s);
+    s.addEventListener('end', () => { arActive = false; scene.background = INLINE_BG; grid.visible = true; });
+  } catch(e) { hudMode.innerHTML = 'XR開始失敗: ' + e.message; }
+}
+(async () => {
+  scene.background = INLINE_BG;
+  if (navigator.xr) {
+    if (await navigator.xr.isSessionSupported('immersive-ar').catch(() => false)) xrButtons.push(['AR表示（パススルー）', () => startXR('immersive-ar')]);
+    if (await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)) xrButtons.push(['VR表示', () => startXR('immersive-vr')]);
+  }
+  buildButtons();
+})();
+const _buildObjects = buildObjects;
+buildObjects = function(){ _buildObjects(); buildButtons(); };
+addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+renderer.setAnimationLoop((t) => { applyPose(t); renderer.render(scene, camera); });
+</script>
+</body>
+</html>

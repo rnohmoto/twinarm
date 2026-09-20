@@ -26,7 +26,7 @@ pipeline against a synthetic frame and serves the browser panel. Real-arm and re
 
 ```bash
 cd dobot
-./start.sh            # Mac/Linux: wizard if not configured yet, otherwise the demo panel (start.bat on Windows)
+./start.sh            # Mac/Linux: wizard if not configured yet, otherwise the demo panel (.\start.bat on Windows)
 ./start.sh dry        # no hardware: synthetic camera + recording robot, panel at http://127.0.0.1:8790
 ./start.sh check      # read-only: cameras, candidate ports, offline tests
 ```

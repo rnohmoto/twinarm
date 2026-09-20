@@ -197,7 +197,7 @@
   <p class="mb-1"><strong>Magician とカメラを繋いだら（接続マニュアル §2）、次の 1 本で §4.2〜§6 と初回のピックまでを順に通せます。</strong>設定が済んでいなければウィザード、済んでいれば実演画面が起動します。各ステップの結果は <code>config.json</code> に保存され、途中から再開できます。腕が動くのは <code>y</code> と答えたときだけです。</p>
 <pre>cd twinarm/dobot
 ./start.sh              # Mac / Linux（初回は uv が Python 環境を作る）
-start.bat               # Windows
+.\start.bat             # Windows（PowerShell／コマンドプロンプト。エクスプローラーからのダブルクリックでも可）
 ./start.sh wizard       # 設定をやり直す（1 カメラ → 2 ロボット → 3 マーカー → 4 較正 → 5 置き場 → 6 高さ → 7 検出 → 8 試運転）</pre>
   <p class="mb-0">ウィザードが終わると、次回から <code>./start.sh</code> だけで実演画面（§7）が開きます。以下 4.1〜6 は、ウィザードが中で何をしているかの説明と、個別にやり直すときの手順です。</p>
 </div>

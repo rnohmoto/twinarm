@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Magician 接続マニュアル</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { font-family: 'Segoe UI', 'Meiryo', sans-serif; line-height: 1.8; background: #fff; color: #212529; }
+    .nav-top { background: #2c3e50; padding: 10px 20px; position: sticky; top: 0; z-index: 10; }
+    .nav-top a { color: #ecf0f1; text-decoration: none; margin-right: 15px; font-size: .95rem; }
+    h2 { border-left: 6px solid #3498db; padding-left: 12px; margin-top: 2.2rem; }
+    h3 { margin-top: 1.4rem; font-size: 1.15rem; }
+    .step { border-left: 4px solid #3498db; background: #f8f9fa; padding: 12px 16px; margin: 12px 0; }
+    .gate { border-left: 4px solid #e67e22; background: #fff8f0; padding: 12px 16px; margin: 12px 0; }
+    .danger { border-left: 4px solid #c0392b; background: #fdf2f2; padding: 12px 16px; margin: 12px 0; }
+    figure.photo { border: 1px dashed #adb5bd; border-radius: 8px; padding: 10px; background: #fafafa; }
+    figure.photo img { width: 100%; height: auto; border-radius: 6px; }
+    figure.photo.missing img { display: none; }
+    figure.photo .placeholder { display: none; color: #6c757d; text-align: center; padding: 40px 10px; }
+    figure.photo.missing .placeholder { display: block; }
+    figure.photo figcaption, figure.diagram figcaption { font-size: .9rem; color: #495057; margin-top: 6px; }
+    figure.diagram { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 10px; }
+    figure.diagram svg { width: 100%; height: auto; }
+    pre { background: #2c3e50; color: #ecf0f1; padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-size: .9rem; }
+    table { width: 100%; font-size: .93rem; }
+    footer { color: #6c757d; font-size: .85rem; margin: 40px 0 20px; }
+  </style>
+</head>
+<body>
+<nav class="nav-top">
+  <a href="index.html">← 初期設定マニュアル</a><a href="purchase.html">購入リスト</a><span style="color:#7f8c8d">｜</span>
+  <a href="#s0">全体図</a><a href="#s1">端子</a><a href="#s2">手順</a><a href="#s3">カメラ</a><a href="#s4">PC</a><a href="#s5">温度</a><a href="#s6">吸着・電流</a><a href="#s7">困ったとき</a>
+</nav>
+<div class="container py-4">
+
+<header class="mb-4">
+  <h1 class="h2">Dobot Magician 接続マニュアル（v1・2026-09-20）</h1>
+  <p class="text-muted mb-1">何を・どこに・どの順で繋ぐか。端子の値は Dobot 公式の Interface Description（旧版・V2）と User Manual V1.2.4 で確認したもの（★）。現物で確認すべき点は「要現物確認」と書いた。</p>
+  <p class="mb-0">対象は初代 Magician（4 軸・USB シリアル・本体内蔵制御器）。Lite（Magic Box 付き）・E6（6 軸・Ethernet）は端子が違うので、このページの表は使えません。</p>
+</header>
+
+<h2 id="s0">0. 全体図</h2>
+<figure class="diagram">
+<svg viewBox="0 0 960 440" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
+  <defs><marker id="ar" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2c3e50"/></marker></defs>
+  <!-- PC -->
+  <rect x="20" y="150" width="170" height="120" rx="10" fill="#f8f9fa" stroke="#2c3e50" stroke-width="2"/>
+  <text x="105" y="180" text-anchor="middle" font-weight="bold">PC</text>
+  <text x="105" y="202" text-anchor="middle" font-size="12">Mac / Windows</text>
+  <text x="105" y="222" text-anchor="middle" font-size="12">USB 口 ×2</text>
+  <text x="105" y="242" text-anchor="middle" font-size="12">demo.py / パネル</text>
+  <!-- camera -->
+  <rect x="20" y="20" width="170" height="80" rx="10" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+  <text x="105" y="50" text-anchor="middle" font-weight="bold">俯瞰カメラ</text>
+  <text x="105" y="72" text-anchor="middle" font-size="12">C920n・USB 2.0・45cm 上</text>
+  <line x1="105" y1="100" x2="105" y2="148" stroke="#3498db" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="120" y="128" font-size="11">USB（映像）</text>
+  <!-- Magician base -->
+  <rect x="330" y="120" width="300" height="180" rx="10" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
+  <text x="480" y="148" text-anchor="middle" font-weight="bold">Magician 本体（背面インタフェース）</text>
+  <text x="345" y="175" font-size="12">電源ジャック 12V（公式 6.5A）</text>
+  <text x="345" y="195" font-size="12">USB（PC へ・ケーブルは付属品）</text>
+  <text x="345" y="215" font-size="12">SW1 12V/1A ← ポンプ電源線</text>
+  <text x="345" y="235" font-size="12">GP1 3.3/5V 20mA ← ポンプ信号線</text>
+  <text x="345" y="255" font-size="12">SW2 12V/1A・GP2・Stepper1/2 12V/0.9A</text>
+  <text x="345" y="280" font-size="12">電源スイッチ／キー（ホーミング 2 秒）／リセット</text>
+  <line x1="190" y1="210" x2="328" y2="195" stroke="#2c3e50" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="215" y="192" font-size="11">USB（指令・CP210x）</text>
+  <!-- AC adapter -->
+  <rect x="330" y="340" width="140" height="60" rx="8" fill="#f8f9fa" stroke="#2c3e50" stroke-width="2"/>
+  <text x="400" y="365" text-anchor="middle" font-size="12">AC アダプタ</text>
+  <text x="400" y="385" text-anchor="middle" font-size="12">100–240V → 12V</text>
+  <line x1="400" y1="340" x2="400" y2="302" stroke="#2c3e50" stroke-width="2" marker-end="url(#ar)"/>
+  <!-- pump box -->
+  <rect x="700" y="120" width="230" height="110" rx="10" fill="#f8f9fa" stroke="#2c3e50" stroke-width="2"/>
+  <text x="815" y="148" text-anchor="middle" font-weight="bold">エアポンプボックス</text>
+  <text x="815" y="172" text-anchor="middle" font-size="12">電源線 → SW1</text>
+  <text x="815" y="192" text-anchor="middle" font-size="12">信号線 → GP1</text>
+  <text x="815" y="212" text-anchor="middle" font-size="12">チューブ → 吸盤（手先）</text>
+  <line x1="700" y1="175" x2="632" y2="215" stroke="#2c3e50" stroke-width="2" marker-end="url(#ar)"/>
+  <!-- end effector -->
+  <rect x="700" y="260" width="230" height="70" rx="10" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+  <text x="815" y="288" text-anchor="middle" font-weight="bold">吸盤（またはグリッパ）</text>
+  <text x="815" y="310" text-anchor="middle" font-size="12">前腕先端に取付・チューブで接続</text>
+  <line x1="815" y1="230" x2="815" y2="258" stroke="#3498db" stroke-width="2" marker-end="url(#ar)"/>
+  <!-- optional -->
+  <rect x="700" y="350" width="230" height="70" rx="10" fill="#fff" stroke="#95a5a6" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="815" y="375" text-anchor="middle" font-size="12" fill="#555">任意: サーミスタ → Temp（EIO1）</text>
+  <text x="815" y="397" text-anchor="middle" font-size="12" fill="#555">負圧センサ／電流センサ → GP（ADC）</text>
+  <line x1="700" y1="385" x2="632" y2="275" stroke="#95a5a6" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ar)"/>
+</svg>
+<figcaption>図 0-1: 実線＝必須の接続、点線＝任意（温度・吸着・電流）。PC と Magician は USB シリアル、カメラは PC に直接。</figcaption>
+</figure>
+
+<h2 id="s1">1. 端子一覧（★公式 Interface Description 旧版・V2 で一致）</h2>
+<table class="table table-striped table-hover">
+  <thead><tr><th>場所</th><th>端子</th><th>電圧・電流</th><th>この構成での用途</th><th>注意</th></tr></thead>
+  <tbody>
+    <tr><td>背面</td><td>電源ジャック</td><td>12V DC（公式サイト仕様 6.5A。二次情報に 7A もあり→アダプタ銘板で確認）</td><td>付属 AC アダプタ</td><td>電源を切るときは LED が消えるまで待つ</td></tr>
+    <tr><td>背面</td><td>USB</td><td>USB シリアル（CP210x）</td><td>PC へ</td><td>コネクタ形状は公式文書に記載なし→要現物確認。付属ケーブルを使う</td></tr>
+    <tr><td>背面</td><td>電源スイッチ／キー／リセット</td><td>—</td><td>キー 2 秒長押し＝ホーミング、リセット＝MCU 再起動</td><td>ホーミングは電源投入のたびに</td></tr>
+    <tr><td>背面</td><td>SW1・SW2</td><td>12V / 1A 出力</td><td>SW1＝ポンプボックスの電源線</td><td>通電中に抜き挿ししない</td></tr>
+    <tr><td>背面</td><td>GP1・GP2</td><td>3.3V(/5V)・20mA。入力（ADC）⇔出力（PWM）切替</td><td>GP1＝ポンプボックスの信号線（吸着 ON/OFF）</td><td>GP2 は空き（任意のセンサ入力に使える）</td></tr>
+    <tr><td>背面</td><td>Stepper1・Stepper2</td><td>12V / 0.9A 出力</td><td>使わない（コンベア等の外部ステッパ用）</td><td>—</td></tr>
+    <tr><td>前腕</td><td>GP3・GP4・GP5</td><td>3.3V(/5V)・20mA。ADC／PWM</td><td>空き（負圧センサ・電流センサの入力候補）</td><td>20mA 以内のモジュールを選ぶ</td></tr>
+    <tr><td>前腕</td><td>SW3</td><td>12V / 3A 出力（加熱用）</td><td>使わない</td><td>3D プリント用</td></tr>
+    <tr><td>前腕</td><td>SW4</td><td>12V / 1A 出力（ファン用）</td><td>使わない</td><td>—</td></tr>
+    <tr><td>前腕（推定）</td><td><strong>Temp（EIO1）</strong></td><td>アナログ入力・<strong>4.7kΩ で 3.3V にプルアップ済み</strong></td><td>サーミスタ（温度計測・§5）</td><td>3D プリントキットではサーミスタ線を前腕のインタフェース 6 に挿す（☆）→ 物理位置はシルク印刷で要現物確認</td></tr>
+  </tbody>
+</table>
+<div class="row g-3">
+  <div class="col-md-6"><figure class="photo"><img src="img/02_rear_ports.jpg" alt="背面の端子" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 02 未撮影: 背面の端子（電源・USB・SW1/GP1 にケーブルを挿した状態）</div><figcaption>写真 1-1: 背面インタフェース。</figcaption></figure></div>
+  <div class="col-md-6"><figure class="photo"><img src="img/11_forearm_ports.jpg" alt="前腕の端子" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 11 未撮影: 前腕の端子（Temp／GP3〜5／SW3／SW4 のシルク印刷が読めるように）</div><figcaption>写真 1-2: 前腕インタフェース。Temp ピンの位置をここで確定する。</figcaption></figure></div>
+</div>
+
+<h2 id="s2">2. 接続手順（この順で・電源は最後）</h2>
+<div class="step">
+  <ol class="mb-0">
+    <li><strong>置く</strong>: 本体を机の奥中央に置き、作業域（前方 半径 32cm）に物が無いことを確認。土台を養生テープかクランプで固定。</li>
+    <li><strong>電源 OFF を確認</strong>してから配線する（SW／GP の抜き挿しは必ず電源 OFF で）。</li>
+    <li><strong>吸盤（またはグリッパ）を前腕先端に取り付ける</strong>（付属のネジ）。チューブをポンプボックスへ。</li>
+    <li><strong>ポンプボックス</strong>: 電源線 → 背面 <strong>SW1</strong>、信号線 → 背面 <strong>GP1</strong>（★User Manual）。グリッパキットも同じポンプボックスを使う。</li>
+    <li><strong>USB ケーブル</strong>: 本体背面 USB → PC。ハブを使うならカメラと別の口が望ましい（1 台ずつなら同じハブでも可）。</li>
+    <li><strong>AC アダプタ</strong>を本体の電源ジャックへ。コンセントは最後に。</li>
+    <li><strong>電源 ON</strong> → 腕に触れずに待つ → 本体の<strong>キーを 2 秒長押し</strong>（LED 青点滅 → 緑でホーミング完了）。</li>
+    <li>PC でポートを確認（§4）→ <code>check_robot.py --list</code> → <code>--port</code> を指定して接続（動かない）→ <code>--home</code>（動く）。</li>
+    <li>カメラを USB に挿す（§3）→ <code>check_camera.py --index 0</code>。</li>
+  </ol>
+</div>
+<div class="danger">初代 Magician に衝突検知はありません。ホーミング中と動作中は作業域に手を入れない。止めるときは電源スイッチ。電源を切るときは LED が消えるまで待つ（腕がゆっくり所定位置へ動いてから止まる）。</div>
+<figure class="photo"><img src="img/12_pump_wiring.jpg" alt="ポンプ配線" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 12 未撮影: ポンプボックスの電源線（SW1）と信号線（GP1）、チューブの取り回し</div><figcaption>写真 2-1: ポンプボックスの配線。</figcaption></figure>
+<div class="gate"><strong>関門</strong>: LED 緑・PC にポートが見える・<code>check_robot.py --port … --home</code> でホーム姿勢へ動いて止まる・<code>check_camera.py</code> が「手動露出が効いています／明るさは安定しています」を出す。</div>
+
+<h2 id="s3">3. カメラの接続</h2>
+<ul>
+  <li>PC の USB 2.0 以上の口に直接。ケーブルは 3m 以内（延長するならアクティブケーブル）。</li>
+  <li>Magician と同じ USB ハブは避ける（1 台ずつなら支障は出にくいが、切り分けが楽）。カメラを 2 台にするときは別系統に分ける。</li>
+  <li>取り付けは 1/4-20（クリップの三脚穴 or マジックアーム）。高さ 45cm・真下向き。詳細は初期設定マニュアル §3。</li>
+  <li>露出・WB・AF の固定は <code>check_camera.py</code> で確認。Mac で効かない場合は Logi Tune（対応機種なら）か OS 側で固定。</li>
+</ul>
+
+<h2 id="s4">4. PC 側の設定</h2>
+<table class="table table-bordered">
+  <thead><tr><th>OS</th><th>ポート名</th><th>ドライバ</th><th>確認コマンド</th></tr></thead>
+  <tbody>
+    <tr><td>macOS</td><td><code>/dev/tty.usbserial-XXXX</code> または <code>/dev/tty.SLAB_USBtoUART</code></td><td>出ないときは Silicon Labs CP210x VCP ドライバ（Apple Silicon 対応版）</td><td><code>ls /dev/tty.*</code></td></tr>
+    <tr><td>Windows</td><td><code>COMn</code>（デバイスマネージャー「Silicon Labs CP210x USB to UART Bridge」）</td><td>出ないときは CP210x ドライバ</td><td>デバイスマネージャー</td></tr>
+    <tr><td>Linux</td><td><code>/dev/ttyUSB0</code></td><td>カーネル標準。<code>dialout</code> グループに追加</td><td><code>ls /dev/ttyUSB*</code></td></tr>
+  </tbody>
+</table>
+<pre>cd twinarm/dobot
+uv run python check_robot.py --list                          # 候補ポート（選ばない）
+uv run python check_robot.py --port /dev/tty.usbserial-XXXX  # 接続して現在位置を読む
+uv run python setup_wizard.py                                # 以後はウィザードに従う</pre>
+<p>ポートは自動では選びません（誤った機器に指令を送らないため）。<code>config.json</code> の <code>robot.port</code> と <code>camera.index</code> に書いておくと、以後の起動で引数が要りません。</p>
+
+<h2 id="s5">5. 温度センサの接続（任意・B3〜B5）</h2>
+<figure class="diagram">
+<svg viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
+  <rect x="20" y="40" width="260" height="140" rx="10" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
+  <text x="150" y="68" text-anchor="middle" font-weight="bold">Magician（Temp＝EIO1）</text>
+  <text x="40" y="96" font-size="12">3.3V ──[4.7kΩ 内蔵]──┐</text>
+  <text x="40" y="118" font-size="12">Temp ピン ────────────┤→ ADC（12bit・0〜4095）</text>
+  <text x="40" y="140" font-size="12">GND ──────────────────┘</text>
+  <rect x="380" y="70" width="200" height="80" rx="10" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+  <text x="480" y="98" text-anchor="middle" font-weight="bold">NTC サーミスタ 100kΩ</text>
+  <text x="480" y="120" text-anchor="middle" font-size="12">Temp ピン と GND の間に</text>
+  <text x="480" y="138" text-anchor="middle" font-size="12">（極性なし）</text>
+  <line x1="280" y1="110" x2="378" y2="110" stroke="#2c3e50" stroke-width="2"/>
+  <rect x="660" y="60" width="220" height="100" rx="10" fill="#f8f9fa" stroke="#2c3e50" stroke-width="2"/>
+  <text x="770" y="88" text-anchor="middle" font-weight="bold">モーター筐体に貼る</text>
+  <text x="770" y="110" text-anchor="middle" font-size="12">J1（土台）を第一候補</text>
+  <text x="770" y="130" text-anchor="middle" font-size="12">カプトンテープで密着</text>
+  <line x1="580" y1="110" x2="658" y2="110" stroke="#2c3e50" stroke-width="2"/>
+  <text x="450" y="200" text-anchor="middle" font-size="12" fill="#495057">V = 3.3 × R / (4.7k + R) → R = 4.7k × V / (3.3 − V) → T = 1 / (1/298.15 + ln(R/100k)/B) − 273.15（B≈3950・要 2 点較正）</text>
+</svg>
+<figcaption>図 5-1: Temp ピンは内部で 4.7kΩ を介して 3.3V に吊られている（★Interface Description）。サーミスタを Temp–GND 間に入れるだけで分圧ができる。</figcaption>
+</figure>
+<div class="step">
+  <ol class="mb-0">
+    <li>サーミスタ（3D プリンタ用 NTC 100kΩ・B≈3950・ケーブル付き）の先端を、J1（土台）モーターの筐体にカプトンテープで密着させる。次に J2・J3 も同様（増やすなら GP の ADC 入力を使う）。</li>
+    <li>電源 OFF で、サーミスタの 2 線を Temp（EIO1）と GND に挿す（デュポンワイヤ。コネクタ形状は現物で）。</li>
+    <li>ソフト側は <code>SetIOMultiplexing(EIO1, ADC)</code> → <code>GetIOADC</code>（コマンド ID 134・12bit）で読む。pydobot には無いので <code>robot_dobot.py</code> に追加する（未実装・依頼があれば 1 時間）。</li>
+    <li>換算は 2 点で較正する（室温と 50℃ 程度のお湯にサーミスタを入れ、放射温度計の値と合わせる）。</li>
+    <li>パネルに温度を出し、熱の予算に「60℃ で自動動作を休止・50℃ で再開」のような温度基準を重ねる。</li>
+  </ol>
+</div>
+<p>サーミスタの正式な抵抗値・B 定数は Dobot の公式資料に記載がありません（4.7kΩ プルアップの設計から 100kΩ 系 NTC と推定）。まずは放射温度計（B2）で実測し、サーミスタは記録を自動化したくなってからで十分です。</p>
+<figure class="photo"><img src="img/13_thermistor.jpg" alt="サーミスタ取付" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 13 未撮影: モーター筐体に貼ったサーミスタと Temp ピンへの配線</div><figcaption>写真 5-2: サーミスタの取り付け。</figcaption></figure>
+
+<h2 id="s6">6. 吸着の成否と電流（任意・C1〜C3）— トルクは見られるか</h2>
+<div class="danger"><strong>初代 Magician は、モーターの電流・トルク・負荷を返しません</strong>（★通信プロトコル V1.1.5・API Description V1.2.2・DobotDll.h の 3 ソースとも該当コマンド無し）。あるのは脱調検知（<code>SetLostStepParams</code> の位置誤差しきい値）だけです。関節ごとの電流・トルク・手先負荷がフィードバックで取れるのは MG400／CR 系（E6 も同系列）の TCP/IP です。</div>
+<table class="table table-bordered">
+  <thead><tr><th>見たいもの</th><th>方法</th><th>接続</th><th>備考</th></tr></thead>
+  <tbody>
+    <tr><td><strong>吸えたか（ピックの成否）</strong></td><td>負圧センサ（−100〜0kPa・アナログ 0.5〜4.5V・5V 電源）を吸盤の配管に T 継手で割り込ませる</td><td>センサ出力 → 空きの GP（ADC・最大 5V）、電源 → GP の 5V（20mA 以内）、GND</td><td>純正吸盤キットに真空センサは無い（★）。国内の入手先は要選定（Amazon.co.jp 上位の MPXV7002 は ±2kPa で不可、秋月の MPX5700DP は正圧用）</td></tr>
+    <tr><td><strong>腕全体の負荷の目安</strong></td><td>12V 供給線の電流を見る（DC 電力計をバレルジャックに割り込ませる／ACS712 モジュール）</td><td>ACS712: 出力 → GP（ADC）、電源 5V、GND。電力計: 表示を読むだけ</td><td>関節ごとには分解できない。物を持ったとき・ぶつかったときの増分を見る用途</td></tr>
+    <tr><td>ぶつかった（脱調）</td><td><code>SetLostStepParams(threshold)</code>・<code>SetLostStepCmd</code>（既定しきい値 5・単位は文書に無し）</td><td>ソフトのみ</td><td>アラーム 0x50〜0x53（各軸脱調）で分かる。衝突の「瞬間に止まる」保証は無い</td></tr>
+  </tbody>
+</table>
+
+<h2 id="s7">7. 困ったとき（接続まわり）</h2>
+<table class="table table-bordered">
+  <thead><tr><th>症状</th><th>まず疑う</th><th>手当て</th></tr></thead>
+  <tbody>
+    <tr><td>PC にポートが出ない</td><td>ケーブルが充電専用／CP210x ドライバ／電源 OFF</td><td>付属ケーブルに戻す・ドライバ・電源 ON</td></tr>
+    <tr><td>LED が赤</td><td>リミット到達かアラーム未解除</td><td>電源を入れ直してホーミング。続くなら DobotStudio でアラーム解除（ID 21）</td></tr>
+    <tr><td>ポンプが動かない・吸わない</td><td>SW1（電源線）と GP1（信号線）の挿し違い／チューブ外れ／吸盤ゴムの劣化</td><td>電源 OFF で挿し直す。チューブとゴムを点検</td></tr>
+    <tr><td>吸着が弱い</td><td>物の上面が多孔・小さい・凸凹／z_pick が浅い</td><td>対象物を変える（購入リスト A4〜A6）。z_pick を 1〜2mm 深く</td></tr>
+    <tr><td>動作中に USB が切れる</td><td>ケーブルの取り回し・ハブの電源</td><td>ケーブルを固定・ハブを外して直挿し・再接続後にホーミング</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  生成: 2026-09-20（TwinArm <code>dobot/manual/connection.html</code> v1）。出典: Dobot Magician Interface Description（旧版・V2）・User Manual V1.2.4（吸盤キット配線）・Communication Protocol V1.1.5・API Description V1.2.2（トルク／電流の不在・脱調検知）・公式サイト仕様（12V/6.5A）。整理は robotics <code>web_research/magician_interface_wiring_260920.md</code>・<code>magician_temperature_260920.md</code>。
+</footer>
+</div>
+</body>
+</html>

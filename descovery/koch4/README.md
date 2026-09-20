@@ -1,24 +1,27 @@
 # koch4 — two Koch pairs (four arms), dedicated config/work folders, VR virtual wall
 
 Successor of the `mock/v0/` scripts for the Learning Fest setup (2026-10-26/27): two
-leader/follower pairs run side by side, everything machine-specific lives in this folder,
-and the leader gripper can "grasp" a virtual object seen in a Quest Pro. Part of
-[descovery](../README.md); the repository's hardware safety rules apply to every script here.
+leader/follower pairs run side by side as the rule (one panel, one set of gains),
+everything machine-specific lives in this folder, and — as a separate track — a single
+leader can "grasp" a virtual object seen in a Quest Pro, feeling its stiffness on the
+trigger and its weight on the arm. Part of [descovery](../README.md); the repository's
+hardware safety rules apply to every script here.
 
 ## Layout
 
 ```
 koch4/
-├── koch4_teleop.py        one pair: teleop + telemetry + leader force feedback (3 styles)
-├── koch4_dual_launch.py   start pair A / B / both as parallel processes (fixed ports, logs)
-├── koch4_web_panel.py     browser panel (copy of the robotics panel: --http/--cams/--no-browser)
+├── koch4_teleop.py        one pair: teleop + telemetry + leader force feedback (3 styles + virtual wall/weight)
+├── koch4_dual_launch.py   both pairs by default (--pair A|B for staging), one panel, fixed ports, logs
+├── koch4_web_panel.py     one browser panel for every pair: shared sliders broadcast to all pairs
 ├── koch4_live_plot.py     matplotlib telemetry viewer (unchanged copy of mock/v0)
-├── koch4_vr_bridge.py     serves webxr/ to the headset, relays contacts to the teleop
-├── webxr/index.html       three.js page: digital twin + virtual objects (+ setup_assets.py)
-├── config/                koch4_config.json (git-ignored; see .example) + calibration/
+├── koch4_calib_offset.py  leader/follower pose-offset check (torque off) — after overloads / drift
+├── koch4_vr_bridge.py     serves webxr/ to the headset, /state /config /contact, relays to the teleop
+├── webxr/index.html       three.js page: digital twin, objects (pick up / drop), editor mode (+ setup_assets.py)
+├── config/                koch4_config.json (git-ignored; see .example), koch4_twin.json (saved by the editor)
 │   └── calibration/koch_follower/<id>.json, koch_leader/<id>.json   ← lerobot calibration
 ├── work/                  logs/ csv/ _certs/  (git-ignored)
-└── CHECKLIST.md           Mac test procedure TEST 0–6 + VR V0–V3 with record fields
+└── CHECKLIST.md           Mac test procedure TEST 0–6 + VR V0–V3 (+ weight, editor) with record fields
 ```
 
 `--config-dir` / `--work-dir` (defaults: the two folders above) are passed to every process by
@@ -32,11 +35,12 @@ Risk classes are the ones defined in [`../README.md`](../README.md).
 
 | Script | Purpose | Hardware risk | Extra I/O |
 | ------ | ------- | ------------- | --------- |
-| `koch4_teleop.py` | One pair. `--ff gripper --ff-style spring` (default; the 2026-09-04 fixes: `Position_P_Gain` 800 written after the mode, anchor inherited across reconnects, anchor at the calibrated open end) / `--ff-style error` (error reflection, mode 0) / `--ff arm` (arm joints, untested on hardware) / `--ff vwall` (virtual wall, follower optional: `--follower-port none`). `--selftest` runs the control laws with no hardware. | moves motors; force feedback puts leader joints into current control; `vwall` holds the leader gripper in current-based position mode | UDP telemetry out (`--viz-port`, comma list), control in (`--ctl-port`), CSV in `work/csv/` |
-| `koch4_dual_launch.py` | `--list` ports+serials (read-only), `--init` config template, `--pair A|B|both`, `--vr A|B` adds the bridge and forces that pair to `vwall`, `--dry-run` prints the commands. Ports: A 8765/8766/8780/8443, B 8767/8768/8781/8444. | launches `koch4_teleop.py` → moves motors | logs in `work/logs/dual_<pair>_*.log` |
-| `koch4_web_panel.py` | Stdlib browser panel with sliders, mode switch, resync, stop, optional camera tiles. | network only, but it commands a live teleop session | HTTP `--http`, UDP in `--telemetry`, out `--ctl-port` |
+| `koch4_teleop.py` | One pair. `--ff gripper --ff-style spring` (default; the 2026-09-04 fixes) / `--ff-style error` / `--ff arm` (untested on hardware) / `--ff vwall` (virtual wall, follower optional: `--follower-port none`) / `--vw` (virtual weight on `shoulder_lift` + `elbow_flex`, only while an object is grasped; `--vw-scale`, `--vw-cap` 120 mA, `--vw-invert`) / `--follower-grip-ma` (Goal_Current cap on the follower gripper against overload shutdowns). `--selftest` runs the laws with no hardware. | moves motors; force feedback and `--vw` put leader joints into current control; `vwall` holds the leader gripper in current-based position mode | UDP telemetry out (`--viz-port`, comma list), control in (`--ctl-port`), CSV in `work/csv/` |
+| `koch4_dual_launch.py` | `--list` ports+serials (read-only), `--init` config template, `--pair both` (default) / `A` / `B`, `--vr A|B` (+`--vw`) adds the bridge and forces that pair to `vwall`, `--grip-ma`, `--dry-run`. Ports: A 8765/8766 (+8769/8443), B 8767/8768 (+8770/8444), panel 8780. | launches `koch4_teleop.py` → moves motors | logs in `work/logs/dual_*.log` |
+| `koch4_web_panel.py` | One page for all launched pairs: status chips and 4 graphs per pair, one row of sliders and mode buttons (OFF / gripper / arm / vwall) that go to every pair. | network only, but it commands live teleop sessions | HTTP `--http`, UDP in `--telemetry` (list), out `--ctl-port` (list) |
 | `koch4_live_plot.py` | matplotlib telemetry viewer. | network only | UDP in |
-| `koch4_vr_bridge.py` | Serves `webxr/`, republishes telemetry as `/state`, forwards `POST /contact` to the teleop as `{"vwall": ...}`. `--sim` needs no teleop. | network only, but it commands the leader gripper's virtual wall (the teleop clamps every field and drops the wall after 3 s without a refresh) | HTTP(S) `--port`, UDP in `--telemetry`, out `--ctl-port` |
+| `koch4_calib_offset.py` | Torque off both arms, hold the same pose by hand, print raw ticks and normalized % per joint with the JSON fix to apply. Reads `config/calibration/`. | torque off (both arms) | reads calibration JSON |
+| `koch4_vr_bridge.py` | Serves `webxr/`, republishes telemetry as `/state`, keeps `config/koch4_twin.json` behind `/config`, forwards `POST /contact` to the teleop and the twin joint map to it (for the weight FK). `--sim` needs no teleop. | network only, but it commands the leader's virtual wall and weight (clamped by the teleop; dropped after 3 s without a refresh) | HTTP(S) `--port`, UDP in `--telemetry`, out `--ctl-port` |
 | `webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. | none | network (once) |
 
 ## Quick start (Mac, from `descovery/`)
@@ -46,25 +50,26 @@ uv sync
 uv run python koch4/koch4_teleop.py --selftest          # no hardware: control laws
 uv run python koch4/koch4_dual_launch.py --list         # read-only: ports + USB serials
 uv run python koch4/koch4_dual_launch.py --init         # → config/koch4_config.json, fill it in
-uv run python koch4/koch4_dual_launch.py --pair A --ff gripper        # TEST 2
-uv run python koch4/koch4_dual_launch.py --pair both --ff gripper     # TEST 4
-# VR: pair B leader-only (follower_port "none" in the config), page on https://<mac-ip>:8444/
+uv run python koch4/koch4_dual_launch.py --pair A --ff gripper        # TEST 2 (staging)
+uv run python koch4/koch4_dual_launch.py --ff gripper --grip-ma 500   # TEST 4: both pairs (default)
+# VR is a separate track: one leader, wall + weight, page on https://<mac-ip>:8444/
 python koch4/webxr/setup_assets.py
-uv run python koch4/koch4_dual_launch.py --pair both --vr B
+uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw
 ```
 
 Ports are supplied by the user (never guessed); leader and follower ports are not
 interchangeable. Every command above that starts a teleop moves motors — run it only when
 asked. The full procedure with pass criteria and record fields is in [CHECKLIST.md](CHECKLIST.md).
 
-## Force-feedback styles (leader gripper, XL330-M077)
+## Force-feedback styles (leader arm, XL330-M077)
 
 | `--ff` | Servo mode | Law | Where it comes from |
 | --- | --- | --- | --- |
 | `gripper` + `spring` | 5 (current-based position), `Goal_Position` = calibrated open end, `Position_P_Gain` 800 | `Goal_Current = floor + gain × EMA(|I_follower| − deadband)`, capped | mock/v0 + branch `rn/fix/gripper-force-feedback` (measured on hardware 2026-09-04) |
 | `gripper` + `error` | 0 (current) | current ∝ (leader command − follower position) beyond a deadband, only after the follower has stalled, slew-limited | robotics 2026-08-04 (hardware session S23) |
 | `arm` | 0 on elbow/wrist joints | `−gain × EMA(I_follower)` per joint | FACTR-style; not yet verified on hardware |
-| `vwall` | 5, `Goal_Position` = wall tick, `Goal_Current` = 0 outside / cap inside, `Position_P_Gain` = object stiffness | host only decides *engaged* (opening ≤ width, with hysteresis); the servo's own loop renders the wall | this folder; see robotics `TacitCapture/94_` for the rationale |
+| `vwall` | 5, `Goal_Position` = wall tick, `Goal_Current` = 0 outside / cap inside, `Position_P_Gain` = object stiffness | host only decides *engaged* (opening ≤ width, with hysteresis); the servo's own loop renders the wall | this folder; robotics `TacitCapture/94_` |
+| `vwall --vw` | 0 on `shoulder_lift` + `elbow_flex` | `I = scale × (m·g·lever) / Kt`, lever from the twin's planar FK, capped, EMA; zero unless an object is grasped | this folder; direction must be checked on hardware (CHECKLIST V-w) |
 
 The laws are pure functions mirrored from
 [`twinarm/src/twinarm/domain/gripper_feedback.py`](../../twinarm/src/twinarm/domain/gripper_feedback.py),
@@ -72,25 +77,40 @@ which is unit-tested (`mise run test` in `twinarm/`). descovery scripts may not 
 library (separate uv projects, standalone-script rule), so the two copies are kept in sync by
 hand; `koch4_teleop.py --selftest` checks the mirrored copy against the same vectors.
 
+## VR page (`webxr/index.html`)
+
+- Objects come from `config/koch4_twin.json` (`/config`): touch width (normalized opening),
+  `p_gain`, `cap_ma`, `release`, `mass_g`, colour, kind, spot. A grasped object follows the
+  fingertips; on release it falls back to the desk. **R** / 「配置リセット」 puts every object
+  back on its spot (visible inside AR/VR through the DOM overlay).
+- **E** / 「編集」 opens the editor: per-joint span / offset / sign of the twin (when it does
+  not match the real arm), base position and yaw (AR alignment), per-object width / gain / cap /
+  mass and 「ここに置く」 (spot = current fingertip). 「保存」 writes the file and sends the joint
+  map to the teleop; the JSON can also be edited by hand.
+- `?spectator=1` shows the same scene without sending contacts (desktop mirror next to the
+  headset; Meta casting or scrcpy show the headset's own view instead).
+- Keys 1/2/3 force an object (test the wall without moving the arm), 0 clears.
+
 ## Graduating to `twinarm/`
 
 What can move into the library is what needs no arm attached: the control laws (already in
 `domain/gripper_feedback.py`), the config schema and port resolution (`infrastructure/`), the
-virtual-wall state machine and the `/stream`–`/ctl` contract (`api/features/telemetry`,
+virtual-wall/weight state machines and the `/stream`–`/ctl` contract (`api/features/telemetry`,
 `control`). What stays here is the bus-driving frame loop and anything that only makes sense
 with hardware. Move a piece only after it has been exercised on the arms and recorded in
 CHECKLIST.md; write the test first (TDD rule in `../../.claude/rules/common/testing.md`).
 
 ## Known limits
 
-- `koch4_web_panel.py` / `koch4_live_plot.py` are copies of the v0 scripts and carry their
-  lint findings; the four new scripts pass `ruff check` and `ruff format --check`, and `ty`
-  reports only the imports that need the hardware environment (`lerobot`, `serial`).
-- `koch4_teleop.py` is ~1,160 lines after `ruff format`, above the 800-line guideline in
+- `koch4_live_plot.py` is a copy of the v0 script and carries its lint findings; the other
+  scripts pass `ruff check` and `ruff format --check`, and `ty` reports only the imports that
+  need the hardware environment (`lerobot`, `serial`, `dynamixel_sdk`).
+- `koch4_teleop.py` is ~1,300 lines after `ruff format`, above the 800-line guideline in
   `.claude/rules/common/coding-style.md`. It keeps the hardware-tested frame-loop shape of
   `mock/v0/koch_teleop_plus.py` plus the mirrored laws on purpose; split it only after the
   loop has been exercised on the arms (the laws already live in `twinarm/domain`).
-- The digital twin is the primitive model of robotics `84_`; joint spans for the display are
-  nominal, not calibrated. Object widths are in lerobot's normalized 0–100 gripper units.
-- The WebXR page was checked in a desktop browser (inline mode, `--sim`); AR/VR mode needs the
-  headset (CHECKLIST V1).
+- The digital twin is the primitive model of robotics `84_`; joint spans are nominal until the
+  editor's offsets are set against the real arm. Object widths are in lerobot's normalized
+  0–100 gripper units; the weight lever arms use the twin's link lengths.
+- Checked in a desktop browser (inline mode, `--sim`) and with the launcher's `--dry-run`;
+  nothing here has run on the arms or on the headset yet.

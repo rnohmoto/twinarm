@@ -45,6 +45,7 @@ import csv
 import inspect
 import json
 import logging
+import math
 import socket
 import subprocess
 import sys
@@ -60,6 +61,20 @@ LEADER_ONLY = "none"
 
 XL430_JOINTS = {"shoulder_pan", "shoulder_lift"}  # フォロワーの XL430（負荷 0.1%/unit）
 ARM_FF_JOINTS = ["elbow_flex", "wrist_flex", "wrist_roll"]  # 電流が読める XL330 の腕3軸
+VW_JOINTS = [
+    "shoulder_lift",
+    "elbow_flex",
+]  # 仮想重さを返すリーダー腕関節(どちらも XL330-M077)
+JOINT_SPAN_DEG = {
+    "shoulder_pan": 180.0,
+    "shoulder_lift": 100.0,
+    "elbow_flex": 100.0,
+    "wrist_flex": 100.0,
+    "wrist_roll": 180.0,
+}
+LINK_M = (0.11, 0.108, 0.115)  # 上腕・前腕・手首＋グリッパ先端まで(分身モデルと同じ)
+G_MPS2 = 9.81
+KT_NM_PER_A = 0.146  # XL330-M077 5V ストール値(0.215 N*m / 1.47 A)
 # 位置ループ剛性。既定のままでは偏差 158 ticks で ~124mA しか要求せず、Goal_Current を
 # 450 まで上げても実電流が頭打ち（9/4 実測）。Operating_Mode を書くと既定へ戻るので
 # 必ずモード設定の後に書く。
@@ -181,6 +196,7 @@ class VirtualWall:
     p_gain: int = 800
     cap_ma: int = 300
     release: float = 1.0
+    mass_g: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -231,24 +247,93 @@ def thermal_derate(guard, temp_c, gain):
     return gain, False
 
 
+@dataclass(frozen=True)
+class JointMap:
+    """How a normalized joint value (+-100) becomes a display/model angle."""
+
+    span_deg: float
+    offset_deg: float = 0.0
+    sign: int = 1
+
+
+def norm_to_rad(value, joint_map):
+    """Map a normalized joint value to radians with the joint's span, offset and sign."""
+    degrees = value / 100.0 * joint_map.span_deg / 2.0 + joint_map.offset_deg
+    return joint_map.sign * math.radians(degrees)
+
+
+def tip_levers(lift_rad, elbow_rad, wrist_rad, links=LINK_M):
+    """Horizontal lever arms [m] of the tip about shoulder_lift and elbow (0 rad = up)."""
+    a1 = lift_rad
+    a2 = a1 + elbow_rad
+    a3 = a2 + wrist_rad
+    x1 = links[0] * math.sin(a1)
+    x2 = x1 + links[1] * math.sin(a2)
+    x3 = x2 + links[2] * math.sin(a3)
+    return x3, x3 - x1
+
+
+@dataclass(frozen=True)
+class VirtualWeightLaw:
+    """Render a grasped object's weight as current on the leader's lift and elbow."""
+
+    scale: float = 0.12
+    cap_ma: int = 120
+    alpha: float = 0.2
+    release: float = 0.5
+    invert_shoulder: bool = False
+    invert_elbow: bool = False
+
+
+@dataclass(frozen=True)
+class VirtualWeightState:
+    """Smoothed currents [mA] for shoulder_lift and elbow_flex."""
+
+    shoulder_ma: float = 0.0
+    elbow_ma: float = 0.0
+
+
+def _weight_target_ma(law, torque_nm, invert):
+    physical_ma = torque_nm / KT_NM_PER_A * 1000.0
+    target = max(min(physical_ma * law.scale, law.cap_ma), -law.cap_ma)
+    return -target if invert else target
+
+
+def virtual_weight_step(law, state, engaged, mass_g, levers_m):
+    """Advance the weight law by one frame; releases decay faster than they rise."""
+    if engaged and mass_g > 0.0:
+        force_n = mass_g / 1000.0 * G_MPS2
+        target_s = _weight_target_ma(law, force_n * levers_m[0], law.invert_shoulder)
+        target_e = _weight_target_ma(law, force_n * levers_m[1], law.invert_elbow)
+        alpha = law.alpha
+    else:
+        target_s = target_e = 0.0
+        alpha = law.release
+    return VirtualWeightState(
+        shoulder_ma=(1.0 - alpha) * state.shoulder_ma + alpha * target_s,
+        elbow_ma=(1.0 - alpha) * state.elbow_ma + alpha * target_e,
+    )
+
+
 # ================================================================ helpers
 
 
 def parse_wall(spec):
-    """Parse ``name:width[:p_gain[:cap_ma[:release]]]`` into a VirtualWall."""
+    """Parse ``name:width[:p_gain[:cap_ma[:release[:mass_g]]]]`` into a VirtualWall."""
     parts = spec.split(":")
     if len(parts) < 2:
         raise argparse.ArgumentTypeError(
-            "--wall は name:width[:p_gain[:cap_ma[:release]]]"
+            "--wall は name:width[:p_gain[:cap_ma[:release[:mass_g]]]]"
         )
     name, width = parts[0], float(parts[1])
     p_gain = int(parts[2]) if len(parts) > 2 else 800
     cap = int(parts[3]) if len(parts) > 3 else 300
     release = float(parts[4]) if len(parts) > 4 else 1.0
-    return wall_from_fields(name, width, p_gain, cap, release)
+    mass_g = float(parts[5]) if len(parts) > 5 else 0.0
+    return wall_from_fields(name, width, p_gain, cap, release, mass_g)
 
 
-def wall_from_fields(name, width, p_gain, cap_ma, release):
+def wall_from_fields(name, width, p_gain, cap_ma, release, mass_g=0.0):
     """Build a VirtualWall with every field clamped to a safe range."""
     return VirtualWall(
         name=str(name)[:32],
@@ -256,6 +341,7 @@ def wall_from_fields(name, width, p_gain, cap_ma, release):
         p_gain=int(min(max(int(p_gain), 0), 16383)),
         cap_ma=int(min(max(int(cap_ma), 0), FF_CAP_MAX_MA)),
         release=min(max(float(release), 0.0), 20.0),
+        mass_g=min(max(float(mass_g), 0.0), 2000.0),
     )
 
 
@@ -269,6 +355,7 @@ def wall_from_message(payload):
         payload.get("p_gain", 800),
         payload.get("cap_ma", 300),
         payload.get("release", 1.0),
+        payload.get("mass_g", 0.0),
     )
 
 
@@ -287,7 +374,14 @@ def selftest():
     assert hit.engaged and hit.goal_current_ma == 300, hit
     assert wall_tick(50.0, 2000, 2800) == 2400
     assert thermal_derate(ThermalGuard(), 65, 1.5) == (1.5, True)
-    print("selftest OK: spring/error/vwall/thermal 制御則は twinarm domain と同じ値")
+    levers = tip_levers(math.pi / 2, 0.0, 0.0)
+    assert abs(levers[0] - sum(LINK_M)) < 1e-9, levers
+    vw = VirtualWeightLaw(scale=0.12, cap_ma=120, alpha=1.0)
+    w = virtual_weight_step(vw, VirtualWeightState(), True, 100.0, (0.2, 0.1))
+    assert w.shoulder_ma == 120.0 and 80.0 < w.elbow_ma < 81.0, w
+    print(
+        "selftest OK: spring/error/vwall/weight/thermal 制御則は twinarm domain と同じ値"
+    )
 
 
 def to_signed16(v):
@@ -429,11 +523,28 @@ def release_gripper(bus):
     bus.write("Torque_Enable", "gripper", 0, normalize=False)
 
 
-def release_arm(bus):
+def release_arm(bus, joints=ARM_FF_JOINTS):
     """Zero the arm-joint currents and drop their torque (safe exit)."""
-    for j in ARM_FF_JOINTS:
+    for j in joints:
         bus.write("Goal_Current", j, 0, normalize=False)
         bus.write("Torque_Enable", j, 0, normalize=False)
+
+
+def apply_follower_grip_cap(robot, cap_ma):
+    """Bound the follower gripper's Goal_Current (mode 5 = torque limit) if asked.
+
+    フォロワー gripper は lerobot が Current-based Position Mode にするが Goal_Current は
+    書かない(電源投入時の値のまま)。物を掴んで位置偏差が残ると電流が張り付き、
+    過負荷停止(Hardware_Error bit5)→落下になるので、上限を明示する。
+    """
+    if robot is None or cap_ma is None:
+        return
+    cap = int(min(max(cap_ma, 0), 1750))
+    robot.bus.write("Goal_Current", "gripper", cap, normalize=False)
+    back = int(robot.bus.read("Goal_Current", "gripper", normalize=False))
+    print(
+        f"[grip] フォロワーgripper Goal_Current={back}mA(期待{cap}) — 過負荷停止の予防"
+    )
 
 
 def check_hw_errors(dev, label):
@@ -569,6 +680,31 @@ def build_parser():
         help="vwall の固定壁 name:width[:p_gain[:cap_ma[:release]]] 例 ball:45:800:300",
     )
     ap.add_argument(
+        "--vw",
+        action="store_true",
+        help="vwall で握った物体の重さをリーダーの肩・肘に電流で返す(腕反力は実機未検証。--vw-cap 小から)",
+    )
+    ap.add_argument(
+        "--vw-scale",
+        type=float,
+        default=0.12,
+        help="重さの倍率(物理値=1/Kt に対する割合)",
+    )
+    ap.add_argument(
+        "--vw-cap", type=int, default=120, help="重さ電流の上限[mA/関節](最大400)"
+    )
+    ap.add_argument(
+        "--vw-invert",
+        default="",
+        help="重さの向きが逆の関節をカンマ列挙(shoulder_lift,elbow_flex)",
+    )
+    ap.add_argument(
+        "--follower-grip-ma",
+        type=int,
+        default=None,
+        help="フォロワーgripperの Goal_Current 上限[mA]。過負荷停止対策(未指定=触らない)",
+    )
+    ap.add_argument(
         "--viz-port",
         default="8765",
         help="テレメトリ UDP 配信ポート(カンマ区切りで複数可。例 8765,8769 / 0=なし)",
@@ -662,6 +798,10 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         args.ff_arm_cap = ARM_CAP_MAX_MA
         print(f"[ff-arm] 腕capは安全のため最大{ARM_CAP_MAX_MA}mAに制限しました")
     arm_invert = {s.strip() for s in args.ff_arm_invert.split(",") if s.strip()}
+    vw_invert = {s.strip() for s in args.vw_invert.split(",") if s.strip()}
+    if args.vw_cap > ARM_CAP_MAX_MA:
+        args.vw_cap = ARM_CAP_MAX_MA
+        print(f"[vw] 重さ cap は安全のため最大{ARM_CAP_MAX_MA}mAに制限しました")
     guard = ThermalGuard()
     viz_ports = parse_ports(args.viz_port)
     if args.wall is not None and args.wall.cap_ma > args.ff_cap:
@@ -709,6 +849,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     if robot is not None:
         check_hw_errors(robot, "フォロワー")
     check_hw_errors(teleop, "リーダー")
+    apply_follower_grip_cap(robot, args.follower_grip_ma)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) if viz_ports else None
     ctl = None
@@ -726,7 +867,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             + [f"{m}.cur" for m in motors]
             + [f"{m}.Lpos" for m in motors]
             + [f"{m}.Fpos" for m in motors]
-            + ["ff_mA", "vwall_engaged"]
+            + ["ff_mA", "vwall_engaged", "vw_shoulder_mA", "vw_elbow_mA"]
         )
 
     ff_on = args.ff in ("gripper", "arm")
@@ -744,6 +885,12 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             "[vwall] ⚠ リーダーgripperの較正がありません — 壁位置を決められないので vwall を無効化"
         )
         vwall_on = False
+    vw_on = vwall_on and args.vw
+    if vw_on:
+        setup_arm_ff(teleop, VW_JOINTS)
+        print(
+            "[vw] ⚠ 仮想重さON: 握っている間だけ肩・肘に電流が出る。リーダーから手を離さない"
+        )
     wall = [args.wall]  # 現在の仮想物体(None=自由空間)
     wall_cmd = [None]  # 最後に書いた WallCommand
     wall_expire = [
@@ -764,6 +911,17 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     ff_hot = [False]
     n = [0]
     reconnects = [0]
+    vw_state = [VirtualWeightState()]
+    vw_out = {j: 0 for j in VW_JOINTS}
+    twin_map = {j: JointMap(JOINT_SPAN_DEG[j]) for j in JOINT_SPAN_DEG}
+
+    def vw_law():
+        return VirtualWeightLaw(
+            scale=args.vw_scale,
+            cap_ma=args.vw_cap,
+            invert_shoulder="shoulder_lift" in vw_invert,
+            invert_elbow="elbow_flex" in vw_invert,
+        )
 
     def spring_law():
         return SpringLaw(args.ff_gain, args.ff_floor, args.ff_cap, args.ff_deadband)
@@ -791,9 +949,30 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             )
         wall_cmd[0] = cmd
 
+    def stop_weight():
+        """Drop the weight currents and free the lift/elbow joints."""
+        nonlocal vw_on
+        if vw_on:
+            release_arm(teleop.bus, VW_JOINTS)
+        vw_on = False
+        vw_state[0] = VirtualWeightState()
+        for j in VW_JOINTS:
+            vw_out[j] = 0
+
+    def update_twin_map(payload):
+        """Take the joint spans/offsets/signs the bridge uses for the twin (weight FK)."""
+        joints = (payload or {}).get("joints", {})
+        for j, m in joints.items():
+            if j in twin_map and isinstance(m, dict):
+                twin_map[j] = JointMap(
+                    float(m.get("span_deg", twin_map[j].span_deg)),
+                    float(m.get("offset_deg", twin_map[j].offset_deg)),
+                    1 if int(m.get("sign", twin_map[j].sign)) >= 0 else -1,
+                )
+
     def set_ff_mode(new):
         """Switch FF mode from the panel / bridge (off/gripper/arm/vwall) with cleanup."""
-        nonlocal ff_on, ff_arm, vwall_on
+        nonlocal ff_on, ff_arm, vwall_on, vw_on
         if new not in ("off", "gripper", "arm", "vwall"):
             return
         if new in ("gripper", "arm") and leader_only:
@@ -802,6 +981,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         if new in ("gripper", "arm") and not ff_on:
             if vwall_on:
                 vwall_on, wall_cmd[0] = False, None
+                stop_weight()
             args.ff = new
             ff_anchor[0] = arm_gripper_ff(teleop, args)
             ff_on = True
@@ -809,9 +989,13 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             args.ff = new
             ff_anchor[0] = arm_gripper_ff(teleop, args)
             ff_on, vwall_on, wall_cmd[0] = False, True, None
+            if args.vw:
+                setup_arm_ff(teleop, VW_JOINTS)
+                vw_on = True
         if new == "off" and (ff_on or vwall_on):
             release_gripper(teleop.bus)
             ff_on, vwall_on, wall_cmd[0] = False, False, None
+            stop_weight()
         if new == "arm" and not ff_arm:
             setup_arm_ff(teleop, ARM_FF_JOINTS)
             ff_arm = True
@@ -850,6 +1034,12 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 )
             if "max_rel" in cmd and robot is not None:
                 robot.config.max_relative_target = float(cmd["max_rel"])
+            if "vw_scale" in cmd:
+                args.vw_scale = min(max(float(cmd["vw_scale"]), 0.0), 1.0)
+            if "vw_cap" in cmd:
+                args.vw_cap = int(min(max(float(cmd["vw_cap"]), 0), ARM_CAP_MAX_MA))
+            if "twin" in cmd:
+                update_twin_map(cmd["twin"])
             if "mode" in cmd:
                 set_ff_mode(cmd["mode"])
             if "vwall" in cmd:
@@ -935,6 +1125,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         cmd = virtual_wall_step(wall[0], opening, ticks[0], ticks[1], engaged)
         apply_wall(cmd)
         ff_ma[0] = cmd.goal_current_ma if cmd.engaged else 0
+        if vw_on:
+            weight_feedback(action, cmd.engaged)
         if n[0] % TEMP_CHECK_EVERY == 0:
             temp = int(
                 teleop.bus.read("Present_Temperature", "gripper", normalize=False)
@@ -954,6 +1146,34 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 )
                 teleop.bus.write("Goal_Current", "gripper", 0, normalize=False)
                 vwall_on = False
+
+    def weight_feedback(action, engaged):
+        """One frame of virtual weight: grasped mass × tip lever → lift/elbow current."""
+        angles = [
+            norm_to_rad(float(action.get(f"{j}.pos", 0.0)), twin_map[j])
+            for j in ("shoulder_lift", "elbow_flex", "wrist_flex")
+        ]
+        levers = tip_levers(*angles)
+        mass = wall[0].mass_g if wall[0] else 0.0
+        vw_state[0] = virtual_weight_step(vw_law(), vw_state[0], engaged, mass, levers)
+        outs = {
+            "shoulder_lift": vw_state[0].shoulder_ma,
+            "elbow_flex": vw_state[0].elbow_ma,
+        }
+        for j in VW_JOINTS:
+            out = round(outs[j])
+            if abs(out - vw_out[j]) >= 3 or (out == 0 and vw_out[j] != 0):
+                teleop.bus.write("Goal_Current", j, out, normalize=False)
+                vw_out[j] = out
+        if n[0] % TEMP_CHECK_EVERY == TEMP_CHECK_EVERY // 2:
+            j = VW_JOINTS[(n[0] // TEMP_CHECK_EVERY) % len(VW_JOINTS)]
+            at = int(teleop.bus.read("Present_Temperature", j, normalize=False))
+            args.vw_scale, stop = thermal_derate(guard, at, args.vw_scale)
+            if stop:
+                print(f"\n[vw] {j} {at}°C — 仮想重さを停止します(冷えたら再起動)")
+                stop_weight()
+            elif at >= guard.derate_c:
+                print(f"\n[vw] {j} {at}°C — 重さ倍率を{args.vw_scale:.2f}に減衰")
 
     def arm_feedback(cur):
         """One frame of arm-joint feedback (FACTR style, signed current mirror)."""
@@ -1006,6 +1226,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                     "rec": reconnects[0],
                     "n": n[0],
                     "leader_only": leader_only,
+                    "vw": {j: vw_out[j] for j in VW_JOINTS} if vw_on else None,
                     "vwall": (
                         {
                             "name": wall[0].name,
@@ -1022,6 +1243,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                         "ff_floor": args.ff_floor,
                         "arm_gain": args.ff_arm_gain,
                         "arm_cap": args.ff_arm_cap,
+                        "vw_scale": args.vw_scale,
+                        "vw_cap": args.vw_cap,
                         "max_rel": (robot.config.max_relative_target or 0)
                         if robot
                         else 0,
@@ -1036,7 +1259,12 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 + [round(cur.get(m, 0.0), 1) for m in motors]
                 + [round(float(action.get(f"{m}.pos", 0.0)), 1) for m in motors]
                 + [round(float(fpos.get(m, 0.0)), 1) for m in motors]
-                + [ff_ma[0], int(engaged)]
+                + [
+                    ff_ma[0],
+                    int(engaged),
+                    vw_out["shoulder_lift"],
+                    vw_out["elbow_flex"],
+                ]
             )
 
     t0 = time.perf_counter()
@@ -1099,6 +1327,12 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         if args.ff == "arm":
             setup_arm_ff(teleop, ARM_FF_JOINTS)
             ff_arm = True
+        if vw_on:
+            setup_arm_ff(teleop, VW_JOINTS)
+            vw_state[0] = VirtualWeightState()
+            for j in VW_JOINTS:
+                vw_out[j] = 0
+        apply_follower_grip_cap(robot, args.follower_grip_ma)
         spring[0], erefl[0], ff_ma[0], wall_cmd[0] = (
             SpringState(),
             ErrorReflectionState(),
@@ -1137,6 +1371,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 release_gripper(teleop.bus)
             if args.ff == "arm":
                 release_arm(teleop.bus)
+            if vw_on:
+                release_arm(teleop.bus, VW_JOINTS)
         except Exception:  # noqa: BLE001, S110 - the bus may already be gone
             pass
         if fcsv:

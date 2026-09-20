@@ -1,27 +1,30 @@
 #!/usr/bin/env python3
-"""Launch one or two Koch pairs (4 arms) as parallel koch4_teleop.py processes.
+"""Launch the two Koch pairs (four arms) as parallel koch4_teleop.py processes.
 
 Koch には lerobot 公式の bimanual 設定が無い（v0.6.1 に bi_koch なし）ため、
 「独立2ペアを2プロセスで並行起動」する。本スクリプトは起動・ポート衝突回避・
 ログ分離・一括停止を受け持つ（robotics `scripts/koch/koch_dual_launch.py` 2026-08-11 の後継）。
+**2ペアが原則**: 既定は `--pair both`、パネルは1枚で両ペアを表示し、ゲイン等は全ペアへ同じ値を送る。
 
 固定ポート（2ペアで衝突しない）:
-  ペアA: telemetry UDP 8765 / 制御 UDP 8766 / パネル http://127.0.0.1:8780 / VR ブリッジ 8443
-  ペアB: telemetry UDP 8767 / 制御 UDP 8768 / パネル http://127.0.0.1:8781 / VR ブリッジ 8444
+  ペアA: telemetry UDP 8765 / 制御 UDP 8766 / VR ブリッジ 8443（テレメトリ複製 8769）
+  ペアB: telemetry UDP 8767 / 制御 UDP 8768 / VR ブリッジ 8444（テレメトリ複製 8770）
+  パネル: http://127.0.0.1:8780（1枚で全ペア）
 
 専用フォルダ（既定・`--config-dir` / `--work-dir` で変更可）:
   config/koch4_config.json              ペアごとのポート・シリアル番号・id・カメラ
+  config/koch4_twin.json                VR の分身・物体の設定（ページの編集モードで保存）
   config/calibration/koch_follower/<id>.json, koch_leader/<id>.json   lerobot の較正
-  work/logs/dual_<pair>_{teleop,panel,vr}.log   各プロセスの標準出力
+  work/logs/dual_<pair>_{teleop,vr}.log, dual_panel.log   各プロセスの標準出力
   work/csv/                                     --csv の記録
 
 使い方（Mac・descovery で `uv run`。ポートはユーザーが渡す＝推測しない）:
   uv run python koch4/koch4_dual_launch.py --list        # ポート+シリアル列挙(読み取りのみ)
   uv run python koch4/koch4_dual_launch.py --init        # config 雛形を作る → 記入
-  uv run python koch4/koch4_dual_launch.py --pair A --ff gripper       # ペアA単独(TEST 2)
-  uv run python koch4/koch4_dual_launch.py --pair both --ff gripper    # 2ペア同時(TEST 4)
-  uv run python koch4/koch4_dual_launch.py --pair A --vr A             # ペアAで VR 仮想反力
-  uv run python koch4/koch4_dual_launch.py --pair both --dry-run       # コマンドを表示するだけ
+  uv run python koch4/koch4_dual_launch.py --ff gripper                # 2ペア同時(既定)
+  uv run python koch4/koch4_dual_launch.py --pair A --ff gripper       # ペアA単独(段階テスト)
+  uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw        # VR は別枠: ペアBだけ仮想反力＋重さ
+  uv run python koch4/koch4_dual_launch.py --dry-run                   # コマンドを表示するだけ
 
 設定ファイルのシリアル番号: /dev/tty.usbmodem* の名前はハブ差し替え・再起動で変わり得るので、
 USB シリアル番号を登録すれば起動時に現在のポート名へ解決する。CH343 ボードは個体シリアルが
@@ -44,9 +47,10 @@ CONFIG_NAME = "koch4_config.json"
 LEADER_ONLY = "none"
 PAIR_SETTLE_SEC = 2.0
 STOP_GRACE_SEC = 2.0
+PANEL_HTTP = 8780
 PORTS = {  # ペアごとの通信ポート割り当て(vrviz=ブリッジ専用のテレメトリ複製先)
-    "A": {"viz": 8765, "ctl": 8766, "http": 8780, "vr": 8443, "vrviz": 8769},
-    "B": {"viz": 8767, "ctl": 8768, "http": 8781, "vr": 8444, "vrviz": 8770},
+    "A": {"viz": 8765, "ctl": 8766, "vr": 8443, "vrviz": 8769},
+    "B": {"viz": 8767, "ctl": 8768, "vr": 8444, "vrviz": 8770},
 }
 
 CONFIG_TEMPLATE = {
@@ -72,7 +76,7 @@ CONFIG_TEMPLATE = {
     },
     "_memo": "serial は --list の USB シリアル番号(ユニークなら登録)。id は較正ファイル名。"
     "follower_port を none にするとそのペアはリーダーのみ(VR 用)。"
-    "cams はそのペアのパネルに映すカメラ index(空=無効)。",
+    "cams はパネルに映すカメラ index(空=無効)。",
 }
 
 
@@ -150,7 +154,7 @@ def is_leader_only(port):
 
 
 def pair_commands(pair, cfg, args, log_dir):
-    """Build [(name, cmd, log)] for one pair: panel, teleop, optional VR bridge."""
+    """Build [(name, cmd, log)] for one pair: teleop and the optional VR bridge."""
     ports = PORTS[pair]
     lp_, warn1 = resolve_port(cfg, "leader")
     fp_, warn2 = cfg.get("follower_port", LEADER_ONLY), None
@@ -173,23 +177,7 @@ def pair_commands(pair, cfg, args, log_dir):
     if is_leader_only(fp_) and ff in ("gripper", "arm"):
         print(f"[{pair}] ⚠ follower_port=none なので --ff {ff} は使えません → off")
         ff = "off"
-    plan = []
-    if args.panel:
-        cmd = [
-            sys.executable,
-            str(HERE / "koch4_web_panel.py"),
-            "--http",
-            str(ports["http"]),
-            "--telemetry",
-            str(ports["viz"]),
-            "--ctl-port",
-            str(ports["ctl"]),
-        ]
-        if cfg.get("cams"):
-            cmd += ["--cams", cfg["cams"]]
-        if pair == "B" or args.no_browser:
-            cmd += ["--no-browser"]
-        plan.append((f"{pair}-panel", cmd, log_dir / f"dual_{pair}_panel.log"))
+    viz = f"{ports['viz']},{ports['vrviz']}" if args.vr == pair else str(ports["viz"])
     cmd = [
         sys.executable,
         str(HERE / "koch4_teleop.py"),
@@ -206,19 +194,23 @@ def pair_commands(pair, cfg, args, log_dir):
         "--work-dir",
         str(args.work_dir),
         "--viz-port",
-        (f"{ports['viz']},{ports['vrviz']}" if args.vr == pair else str(ports["viz"])),
+        viz,
         "--ctl-port",
         str(ports["ctl"]),
         "--ff",
         ff,
     ]
+    if args.vr == pair and args.vw:
+        cmd += ["--vw"]
+    if args.grip_ma is not None:
+        cmd += ["--follower-grip-ma", str(args.grip_ma)]
     if args.lerobot_cache:
         cmd += ["--lerobot-cache"]
     if args.csv:
         cmd += ["--csv"]
     if args.extra:
         cmd += args.extra.split()
-    plan.append((f"{pair}-teleop", cmd, log_dir / f"dual_{pair}_teleop.log"))
+    plan = [(f"{pair}-teleop", cmd, log_dir / f"dual_{pair}_teleop.log")]
     if args.vr == pair:
         cmd = [
             sys.executable,
@@ -229,6 +221,8 @@ def pair_commands(pair, cfg, args, log_dir):
             str(ports["ctl"]),
             "--port",
             str(ports["vr"]),
+            "--config-dir",
+            str(args.config_dir),
             "--work-dir",
             str(args.work_dir),
         ]
@@ -236,6 +230,33 @@ def pair_commands(pair, cfg, args, log_dir):
             cmd += ["--http"]
         plan.append((f"{pair}-vr", cmd, log_dir / f"dual_{pair}_vr.log"))
     return plan
+
+
+def panel_command(pairs, config, args):
+    """One panel for every launched pair (shared sliders, broadcast control)."""
+    cmd = [
+        sys.executable,
+        str(HERE / "koch4_web_panel.py"),
+        "--http",
+        str(PANEL_HTTP),
+        "--telemetry",
+        ",".join(str(PORTS[p]["viz"]) for p in pairs),
+        "--ctl-port",
+        ",".join(str(PORTS[p]["ctl"]) for p in pairs),
+        "--labels",
+        ",".join(pairs),
+    ]
+    cams = [
+        c
+        for p in pairs
+        for c in config["pairs"][p].get("cams", "").split(",")
+        if c.strip()
+    ]
+    if cams:
+        cmd += ["--cams", ",".join(dict.fromkeys(cams))]
+    if args.no_browser:
+        cmd += ["--no-browser"]
+    return cmd
 
 
 def build_parser():
@@ -247,21 +268,37 @@ def build_parser():
         "--list", action="store_true", help="接続中ポート+シリアル列挙(読み取りのみ)"
     )
     ap.add_argument("--init", action="store_true", help="config 雛形を作成")
-    ap.add_argument("--pair", choices=["A", "B", "both"], help="起動するペア")
+    ap.add_argument(
+        "--pair",
+        choices=["A", "B", "both"],
+        default="both",
+        help="起動するペア(既定 both)",
+    )
     ap.add_argument(
         "--ff",
         choices=["off", "gripper", "arm", "vwall"],
         default="gripper",
-        help="力覚 FB モード(両ペア共通。既定 gripper=握手)",
+        help="力覚 FB モード(全ペア共通。既定 gripper=握手)",
     )
     ap.add_argument(
         "--vr",
         choices=["A", "B"],
         default=None,
-        help="このペアを VR 仮想反力(--ff vwall)にしてブリッジも起動",
+        help="このペアを VR 仮想反力(--ff vwall)にしてブリッジも起動(VR は別枠で運用)",
+    )
+    ap.add_argument(
+        "--vw",
+        action="store_true",
+        help="VR ペアで握った物体の重さを肩・肘に返す(--vw-cap 小から)",
     )
     ap.add_argument(
         "--vr-http", action="store_true", help="ブリッジを TLS なしで(adb reverse 方式)"
+    )
+    ap.add_argument(
+        "--grip-ma",
+        type=int,
+        default=None,
+        help="フォロワー gripper の Goal_Current 上限[mA](過負荷停止対策。例 500)",
     )
     ap.add_argument(
         "--panel",
@@ -271,14 +308,14 @@ def build_parser():
     )
     ap.add_argument("--no-panel", dest="panel", action="store_false")
     ap.add_argument(
-        "--no-browser", action="store_true", help="ブラウザ自動オープンを全て抑止"
+        "--no-browser", action="store_true", help="ブラウザ自動オープンを抑止"
     )
-    ap.add_argument("--csv", action="store_true", help="両ペアの CSV 記録")
+    ap.add_argument("--csv", action="store_true", help="全ペアの CSV 記録")
     ap.add_argument(
         "--lerobot-cache", action="store_true", help="較正を lerobot 既定の場所から読む"
     )
     ap.add_argument(
-        "--extra", default="", help="koch4_teleop.py へ透過する追加引数(両ペア共通)"
+        "--extra", default="", help="koch4_teleop.py へ透過する追加引数(全ペア共通)"
     )
     ap.add_argument("--config-dir", type=Path, default=DEFAULT_CONFIG_DIR)
     ap.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR)
@@ -323,10 +360,6 @@ def main():
     if args.init:
         write_template(config_path)
         return
-    if not args.pair:
-        sys.exit(
-            "--pair A|B|both を指定(初回は --list → --init → 設定記入 → --pair A から段階的に)"
-        )
     if not config_path.exists():
         sys.exit(f"{config_path} がありません。まず --init で作成してください")
     with open(config_path, encoding="utf-8") as f:
@@ -336,21 +369,29 @@ def main():
     pairs = ["A", "B"] if args.pair == "both" else [args.pair]
     if args.vr and args.vr not in pairs:
         sys.exit(f"--vr {args.vr} は起動するペアに含まれていません")
-    if args.panel and len(pairs) == 2:
-        ca = set(config["pairs"]["A"].get("cams", "").split(",")) - {""}
-        cb = set(config["pairs"]["B"].get("cams", "").split(",")) - {""}
-        if ca & cb:
-            sys.exit(f"✗ カメラ index {ca & cb} がペア A/B 両方に割り当てられています")
 
+    plan = []
+    if args.panel:
+        plan.append(
+            ("panel", panel_command(pairs, config, args), log_dir / "dual_panel.log")
+        )
+    per_pair = {
+        pair: pair_commands(pair, config["pairs"][pair], args, log_dir)
+        for pair in pairs
+    }
+    if not any(per_pair.values()):
+        sys.exit(1)
     procs = []
     try:
+        for name, cmd, log in plan:
+            proc, f = spawn(cmd, log, args.dry_run)
+            if proc is not None:
+                procs.append((name, proc, f))
         for pair in pairs:
-            plan = pair_commands(pair, config["pairs"][pair], args, log_dir)
-            if not plan:
+            if not per_pair[pair]:
                 continue
-            names = " / ".join(name for name, _, _ in plan)
-            print(f"[{pair}] {names}  (panel http://127.0.0.1:{PORTS[pair]['http']})")
-            for name, cmd, log in plan:
+            print(f"[{pair}] " + " / ".join(name for name, _, _ in per_pair[pair]))
+            for name, cmd, log in per_pair[pair]:
                 proc, f = spawn(cmd, log, args.dry_run)
                 if proc is not None:
                     procs.append((name, proc, f))
@@ -359,10 +400,8 @@ def main():
         if args.dry_run:
             print("dry-run: 何も起動していません")
             return
-        if not procs:
-            sys.exit(1)
         print(
-            f"\n全プロセス起動完了({len(procs)}個)。ログ: {log_dir}/dual_*.log\n終了: Ctrl+C"
+            f"\n全プロセス起動完了({len(procs)}個)。パネル http://127.0.0.1:{PANEL_HTTP}  ログ: {log_dir}\n終了: Ctrl+C"
         )
         while True:
             time.sleep(2)

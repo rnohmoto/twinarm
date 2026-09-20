@@ -25,8 +25,13 @@ import argparse
 import glob
 import json
 import os
+import sys
 import time
 from pathlib import Path
+
+_reconfigure = getattr(sys.stdout, "reconfigure", None)
+if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
+    _reconfigure(errors="replace")
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_CONFIG_DIR = HERE / "config"

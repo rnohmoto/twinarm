@@ -40,8 +40,27 @@ Risk classes are the ones defined in [`../README.md`](../README.md).
 | `koch4_web_panel.py` | One page for all launched pairs: status chips and 4 graphs per pair, one row of sliders and mode buttons (OFF / gripper / arm / vwall) that go to every pair. | network only, but it commands live teleop sessions | HTTP `--http`, UDP in `--telemetry` (list), out `--ctl-port` (list) |
 | `koch4_live_plot.py` | matplotlib telemetry viewer. | network only | UDP in |
 | `koch4_calib_offset.py` | Torque off both arms, hold the same pose by hand, print raw ticks and normalized % per joint with the JSON fix to apply. Reads `config/calibration/`. | torque off (both arms) | reads calibration JSON |
+| `koch4_follower_host.py` | **Wireless follower.** Runs on the computer next to the follower (Raspberry Pi 4, or any Windows/Mac/Linux PC with lerobot): receives joint targets over UDP from the Mac's teleop (`--follower-port udp://<host>:9101`), drives lerobot's KochFollower, streams currents/positions/temperature/errors back. Holds the pose after 0.5 s without targets (torque kept), ramps back in after a gap; `--sim` needs no hardware. Same role as lerobot's LeKiwi host. | moves motors | UDP `--listen` (A 9101, B 9102) |
 | `koch4_vr_bridge.py` | Serves `webxr/`, republishes telemetry as `/state`, keeps `config/koch4_twin.json` behind `/config`, forwards `POST /contact` to the teleop and the twin joint map to it (for the weight FK). `--sim` needs no teleop. | network only, but it commands the leader's virtual wall and weight (clamped by the teleop; dropped after 3 s without a refresh) | HTTP(S) `--port`, UDP in `--telemetry`, out `--ctl-port` |
 | `webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. | none | network (once) |
+
+## Wireless follower (leader wired to the Mac, follower on its own computer)
+
+```
+Mac ── USB ── leader                 handshake table: host PC ── USB ── follower ── 12 V
+ koch4_teleop.py --follower-port udp://<host>:9101     koch4_follower_host.py --port <serial> --listen 9101
+                     └── own 5 GHz router (Mac, host PC, Quest only) ──┘
+```
+
+- The Dynamixel bus stays local on each side; only joint targets (30 fps, with sequence
+  numbers) and state go over UDP. A transparent "wireless serial cable" would put the radio
+  inside the bus's request/response timeout and fail; this design does not.
+- Link watchdog (`twinarm/domain/link_watchdog.py`, mirrored in both scripts): 0.3 s late
+  → alert on the panel/VR; 0.5 s → the host holds the pose (torque kept, so the arm does not
+  drop); 3 s → the Mac treats it as a dropout and reconnects; on resume the host ramps in
+  over 1.5 s. The Mac shows `age_ms` / `rtt_ms` / loss in the telemetry.
+- Backup: `koch4_dual_launch.py --follower wired` uses the USB `follower_port` again with the
+  same config. A Raspberry Pi is not required — any computer that runs lerobot works.
 
 ## Quick start (Mac, from `descovery/`)
 

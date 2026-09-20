@@ -44,6 +44,10 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+_reconfigure = getattr(sys.stdout, "reconfigure", None)
+if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
+    _reconfigure(errors="replace")
+
 HERE = Path(__file__).resolve().parent
 WEBXR_DIR = HERE / "webxr"
 DEFAULT_CONFIG_DIR = HERE / "config"

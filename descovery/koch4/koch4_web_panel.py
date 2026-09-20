@@ -13,11 +13,16 @@ koch4_teleop.py の UDP テレメトリをペアごとに受けてブラウザ�
 import argparse
 import json
 import socket
+import sys
 import threading
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
+
+_reconfigure = getattr(sys.stdout, "reconfigure", None)
+if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
+    _reconfigure(errors="replace")
 
 LATEST: list[dict] = []  # ペアごとの最新テレメトリ
 LABELS: list[str] = []

@@ -40,6 +40,10 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+_reconfigure = getattr(sys.stdout, "reconfigure", None)
+if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
+    _reconfigure(errors="replace")
+
 HERE = Path(__file__).resolve().parent
 DEFAULT_CONFIG_DIR = HERE / "config"
 DEFAULT_WORK_DIR = HERE / "work"
@@ -62,6 +66,7 @@ CONFIG_TEMPLATE = {
             "follower_serial": None,
             "leader_id": "koch_leader_A",
             "follower_id": "koch_follower_A",
+            "follower_host": None,
             "cams": "",
         },
         "B": {
@@ -71,12 +76,15 @@ CONFIG_TEMPLATE = {
             "follower_serial": None,
             "leader_id": "koch_leader_B",
             "follower_id": "koch_follower_B",
+            "follower_host": None,
             "cams": "",
         },
     },
     "_memo": "serial は --list の USB シリアル番号(ユニークなら登録)。id は較正ファイル名。"
     "follower_port を none にするとそのペアはリーダーのみ(VR 用)。"
-    "cams はパネルに映すカメラ index(空=無効)。",
+    "cams はパネルに映すカメラ index(空=無効)。"
+    "follower_host に udp://<握手の場の PC の IP>:9101 を書くとフォロワー無線(--follower wireless 既定)。"
+    "その PC では koch4_follower_host.py を先に起動。有線に戻すときは --follower wired。",
 }
 
 
@@ -158,7 +166,11 @@ def pair_commands(pair, cfg, args, log_dir):
     ports = PORTS[pair]
     lp_, warn1 = resolve_port(cfg, "leader")
     fp_, warn2 = cfg.get("follower_port", LEADER_ONLY), None
-    if not is_leader_only(fp_):
+    host = cfg.get("follower_host")
+    if args.follower == "wireless" and host and not is_leader_only(fp_):
+        fp_ = str(host)  # udp://… → koch4_teleop.py が RemoteFollower で繋ぐ
+        print(f"[{pair}] フォロワー無線 {fp_}（有線に戻す: --follower wired）")
+    elif not is_leader_only(fp_):
         fp_, warn2 = resolve_port(cfg, "follower")
     for w in (warn1, warn2):
         if w:
@@ -168,7 +180,12 @@ def pair_commands(pair, cfg, args, log_dir):
             f"[{pair}] ✗ leader ポートが存在しません: {lp_} — --list で確認して config を直してください"
         )
         return []
-    if not is_leader_only(fp_) and not args.dry_run and not Path(fp_).exists():
+    if (
+        not is_leader_only(fp_)
+        and not str(fp_).startswith("udp://")
+        and not args.dry_run
+        and not Path(fp_).exists()
+    ):
         print(
             f"[{pair}] ✗ follower ポートが存在しません: {fp_} — --list で確認して config を直してください"
         )
@@ -321,6 +338,12 @@ def build_parser():
     ap.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR)
     ap.add_argument(
         "--dry-run", action="store_true", help="起動せずコマンドを表示(ハード不要)"
+    )
+    ap.add_argument(
+        "--follower",
+        choices=["wireless", "wired"],
+        default="wireless",
+        help="config に follower_host があれば無線(既定)。wired=USB のフォロワーポートを使う(バックアップ)",
     )
     return ap
 

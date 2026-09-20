@@ -138,6 +138,52 @@ fps A=      B=      クロストーク: なし/あり   10分: 通信断  回・
 
 ---
 
+## W — フォロワー無線（リーダー有線・フォロワー無線・バックアップ有線）
+
+握手の場の PC（Raspberry Pi 4 か手持ちの Windows／Mac）で `koch4_follower_host.py` を動かし、Mac の teleop は
+`udp://<その PC>:9101` に目標角を送る。ラズパイは必須ではない（lerobot が動く PC なら同じ）。
+
+### W0 — 経路だけ（ハード無し・Mac 1 台）
+```bash
+uv run python koch4/koch4_follower_host.py --sim --listen 9101              # 端末 1
+uv run python koch4/koch4_teleop.py --leader-port <L> --follower-port udp://127.0.0.1:9101 --ff off   # 端末 2
+```
+- 合格: teleop に `[link] フォロワー無線 接続 127.0.0.1:9101`、パネルに `age`/`rtt` が出る。端末 1 を止めると 3 秒で通信断→再接続待ち、再起動で復帰
+```
+接続 [ ]  rtt=   ms  端末1停止→赤帯 [ ] →復帰 [ ]
+```
+
+### W1 — 実機フォロワーを Mac 自身の host で（有線と同じ動きになること）
+```bash
+uv run python koch4/koch4_follower_host.py --port <F> --id koch_follower_A --listen 9101 --grip-ma 500
+uv run python koch4/koch4_teleop.py --leader-port <L> --follower-port udp://127.0.0.1:9101 --ff gripper
+```
+```
+追従 [ ]  握り返し [ ]  有線(TEST 2)との体感差:            rtt=   ms
+```
+
+### W2 — 握手の場の PC で（5 GHz 自前ルータ越し）
+- その PC: `uv sync` 済み・フォロワーの USB・12 V 電源。`hostname -I`（Pi/Linux）や `ipconfig`（Windows）で IP を確認
+- Mac: config の `follower_host` に `udp://<IP>:9101` → `koch4_dual_launch.py --pair A --ff gripper`
+```
+IP=              rtt=   ms  age 最大=   ms  欠落=   %  10 分: 赤帯  回・通信断  回
+```
+
+### W3 — 切断試験（位置保持と復帰）
+- Mac 側の Wi-Fi を 2 秒切る／ルータの電源を 10 秒切る／host PC を持って歩く
+- 期待: 0.5 秒で「位置保持」（腕が落ちない）→ 復帰後 1.5 秒で滑らかに追従。赤帯「フォロワー無線 遅延」→ 復帰で消える
+```
+2秒断: 保持 [ ] 復帰 [ ]   10秒断: 再接続 [ ] 合流ランプ [ ]   腕の落下: なし [ ]
+```
+
+### W4 — 有線バックアップへの切替（当日の手順書に入れる）
+```bash
+uv run python koch4/koch4_dual_launch.py --follower wired --ff gripper    # USB の follower_port を使う
+```
+```
+切替所要:   分   動作 [ ]
+```
+
 ## VR — 仮想物体の反力（別枠。リーダー 1 本）
 
 ### V0 — 壁だけ（ヘッドセットなし・10 分）

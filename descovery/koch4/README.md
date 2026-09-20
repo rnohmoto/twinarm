@@ -1,5 +1,9 @@
 # koch4 — two Koch pairs (four arms), dedicated config/work folders, VR virtual wall
 
+**Starting fresh (a new session, a new machine)? Read [HANDOFF.md](HANDOFF.md) first:** it holds
+the state of the work, the decisions already made, the open ones, and the prompt to start a
+new conversation with.
+
 Successor of the `mock/v0/` scripts for the Learning Fest setup (2026-10-26/27): two
 leader/follower pairs run side by side as the rule (one panel, one set of gains),
 everything machine-specific lives in this folder, and — as a separate track — a single

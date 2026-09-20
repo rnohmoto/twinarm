@@ -49,7 +49,8 @@ All scripts below live in [`mock/v0/`](mock/v0/). Risk classes:
 panel, and a VR bridge that lets the leader gripper "grasp" a virtual object rendered by
 the servo's own position loop. Calibration JSON, config and logs live under
 `koch4/config/` and `koch4/work/` instead of `~/.cache`. Its README lists every script
-with the same risk classes as the table above; the same hardware rules apply.
+with the same risk classes as the table above; the same hardware rules apply. A new
+session should start at [`koch4/HANDOFF.md`](koch4/HANDOFF.md).
 
 ## UI mocks
 

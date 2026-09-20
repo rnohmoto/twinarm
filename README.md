@@ -16,7 +16,7 @@ example slice; it has no backend and runs against mocks.
 | Path | What it is |
 | ---- | ---------- |
 | [`twinarm/`](twinarm/README.md) | The installable Python library (src layout). |
-| [`descovery/`](descovery/README.md) | Hardware experiment sandbox: standalone Koch-arm scripts. |
+| [`descovery/`](descovery/README.md) | Hardware experiment sandbox: standalone Koch-arm scripts. `descovery/koch4/` is the Learning Fest setup (start at its HANDOFF.md). |
 | [`dobot/`](dobot/README.md) | Dobot Magician pick-and-place sandbox: overhead camera → homography → pydobot, plus the first-time setup manual. |
 | [`twinarm-web-ui/`](twinarm-web-ui/README.md) | The web teleoperation UI: React and Vite, mock-backed. |
 | `docs/` | Reserved for documentation. Empty. |

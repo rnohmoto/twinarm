@@ -115,3 +115,7 @@ too (community reports); Magician E6 is TCP/IP and needs a different adapter (fo
 uv sync --extra llm      # anthropic (Claude tool use); set ANTHROPIC_API_KEY
 uv sync --extra voice    # faster-whisper + sounddevice (push-to-talk)
 ```
+
+LLM defaults (`config.json` → `llm`): `claude-sonnet-5`, adaptive thinking, `effort: low`, five strict
+enum-only tools. Switch to `claude-opus-5` by editing `llm.model`; `claude-haiku-4-5` would need the call in
+`llm_agent.py` changed (no `effort` / adaptive thinking). Without a key or network the rule parser takes over.

@@ -3,8 +3,8 @@
 設計（claude-api skill 準拠・anthropic SDK 1.x・Messages API）
 - ツールは 5 つだけ: list_objects / pick_and_place / tidy_up / go_home / stop。**座標を受け取るツールは無い**。
   引数は enum（対象物名・ゾーン名・選び方ヒント）で `strict: True`。LLM が勝手な値を作れない。
-- モデル既定 `claude-opus-5`（skill 規約）、adaptive thinking、effort=low（展示は応答速度優先）。
-  応答速度を最優先するなら `claude-haiku-4-5` をユーザー判断で（LLMConfig.model）。
+- モデル既定 `claude-sonnet-5`（ユーザー裁定 2026-09-20）、adaptive thinking、effort=low（展示は応答速度優先）。
+  `claude-opus-5` へは LLMConfig.model の 1 行で戻せる。`claude-haiku-4-5` は effort/adaptive 非対応なので、この呼び出しを変える必要がある。
 - stop_reason == "refusal" は `stop_details` を見て日本語で言い直しを促す（例外にしない）。
 - 会話履歴は直近 N 往復だけ保持（「もう一個」「それを左に」に対応）。
 - ネット断・鍵なし・例外時は rule_parser にフォールバック（main/demo が制御）。

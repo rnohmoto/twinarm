@@ -106,8 +106,8 @@ class DemoConfig:
 class LLMConfig:
     enabled: bool = True
     provider: str = "anthropic"      # anthropic | none（none=ルールベース解析のみ）
-    model: str = "claude-opus-5"     # 既定（claude-api skill 規約）。遅延優先なら claude-haiku-4-5 をユーザー判断で
-    effort: str = "low"              # low | medium | high（展示は応答速度優先で low）
+    model: str = "claude-sonnet-5"   # ユーザー裁定 2026-09-20「Sonnet でよい」。品質優先なら claude-opus-5（1 行で戻せる）
+    effort: str = "low"              # low | medium | high（展示は応答速度優先で low。adaptive thinking と併用）
     max_tokens: int = 1024
     max_turns: int = 6               # ツール呼び出しループの上限
     history_turns: int = 4           # 直近の会話を何往復持つか（「もう一個」対応）

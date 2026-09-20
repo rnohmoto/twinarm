@@ -9,6 +9,9 @@
   #hud { position:fixed; top:10px; left:10px; z-index:10; color:#e2e8f0; background:rgba(15,23,42,.7);
          padding:8px 12px; border-radius:8px; font-size:13px; line-height:1.5; pointer-events:none; max-width:70vw; }
   #hud b { color:#fbbf24; }
+  #alert { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:12; display:none; max-width:80vw;
+           background:rgba(127,29,29,.92); color:#fff; border:2px solid #f87171; border-radius:10px; padding:10px 16px;
+           font-size:18px; font-weight:bold; line-height:1.4; pointer-events:none; text-align:center; }
   #btns { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:10; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
   #btns button, #editor button { font-size:14px; padding:9px 14px; border-radius:10px; border:1px solid #475569; background:#1e293b; color:#f1f5f9; cursor:pointer; }
   #btns button.on { background:#b45309; border-color:#f59e0b; }
@@ -25,6 +28,7 @@
 </head>
 <body>
 <div id="hud">Koch4 XR<br><span id="mode">接続待ち...</span></div>
+<div id="alert"></div>
 <div id="editor"></div>
 <div id="btns"></div>
 <script type="module">
@@ -149,6 +153,7 @@ async function sendContact(o, force){
 }
 
 const hudMode = document.getElementById('mode');
+const alertBox = document.getElementById('alert');
 let lastFrame = 0;
 function applyPose(tms){
   const dt = Math.min(0.05, (tms - lastFrame) / 1000 || 0.016); lastFrame = tms;
@@ -191,6 +196,10 @@ function applyPose(tms){
   const objTxt = c ? `${c.label}(幅${c.width}・P${c.p_gain}・上限${c.cap_ma}mA・${c.mass_g}g)` : 'なし(自由空間)';
   const engTxt = vwall ? (vwall.engaged ? '<b>握っている</b>' : '触れていない') : '—';
   const vwTxt = vw ? ` / 重さ: 肩 ${vw.shoulder_lift ?? 0} mA・肘 ${vw.elbow_flex ?? 0} mA` : '';
+  const alerts = (st && performance.now() - lastOk < 2000) ? [...(st.alerts || [])] : ['⚠ テレオペ／ブリッジと未接続'];
+  if (st && src === 'none') alerts.unshift('⚠ テレオペが止まっています（分身は最後の姿勢）');
+  alertBox.style.display = alerts.length ? 'block' : 'none';
+  alertBox.textContent = alerts.join('　|　');
   hudMode.innerHTML = `${label}<br>開き: ${open.toFixed(0)} / 物体: ${objTxt}<br>壁: ${engTxt}${vwTxt}<br>送信: ${sendStatus}`
     + `<br>表示: ${renderer.xr.isPresenting ? (arActive ? 'AR(パススルー)' : 'VR') : 'インライン'}`
     + (forced ? `<br><b>手動強制中</b>(0 で解除)` : '') + (SPECTATOR ? '<br><b>観客モード</b>' : '');

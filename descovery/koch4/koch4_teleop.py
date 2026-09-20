@@ -90,6 +90,14 @@ WALL_TTL_SEC = (
     3.0  # VR ブリッジからの壁更新が途絶えたら壁を解除する秒数(固定壁は無期限)
 )
 TELEMETRY_HOST = "127.0.0.1"
+HW_ERROR_BITS = {
+    0: "入力電圧",
+    2: "過熱",
+    3: "エンコーダ",
+    4: "電気ショック",
+    5: "過負荷",
+}
+ALERT_TTL_SEC = 4.0
 
 
 class _DropClampWarning(logging.Filter):
@@ -556,13 +564,14 @@ def check_hw_errors(dev, label):
             f"[hw] {label}: エラーレジスタ読み取り不可({type(e).__name__}) — 診断スキップ"
         )
         return
-    bits = {0: "入力電圧", 2: "過熱", 3: "エンコーダ", 4: "電気ショック", 5: "過負荷"}
     hit = False
     for m, v in errs.items():
         v = int(v)
         if v:
             hit = True
-            names = "/".join(n for b, n in bits.items() if v >> b & 1) or str(v)
+            names = "/".join(n for b, n in HW_ERROR_BITS.items() if v >> b & 1) or str(
+                v
+            )
             print(
                 f"[hw] ⚠ {label}の{m} がエラー停止中({names}) — 電源を10秒抜いて入れ直すまで動きません"
             )
@@ -914,6 +923,56 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     vw_state = [VirtualWeightState()]
     vw_out = {j: 0 for j in VW_JOINTS}
     twin_map = {j: JointMap(JOINT_SPAN_DEG[j]) for j in JOINT_SPAN_DEG}
+    alerts = {}  # key -> (text, expire_monotonic): パネル・VR HUD に出す警告
+    hw_bits = {"L": 0, "F": 0}
+    cap_frames = [0]  # 握り反力が上限に張り付いた連続フレーム
+    fgrip_frames = [0]  # フォロワー握力が上限付近の連続フレーム
+
+    def raise_alert(key, text, ttl=ALERT_TTL_SEC):
+        """Keep an alert visible on the panel / VR HUD for ttl seconds."""
+        alerts[key] = (text, time.monotonic() + ttl)
+
+    def active_alerts():
+        """Drop expired alerts and return the texts still active."""
+        now = time.monotonic()
+        for key in [k for k, (_, exp) in alerts.items() if exp < now]:
+            del alerts[key]
+        return [text for text, _ in alerts.values()]
+
+    def check_hw_alert():
+        """Every 2 s: latched hardware errors (overload etc.) on both grippers."""
+        try:
+            hw_bits["L"] = int(
+                teleop.bus.read("Hardware_Error_Status", "gripper", normalize=False)
+            )
+            hw_bits["F"] = (
+                int(robot.bus.read("Hardware_Error_Status", "gripper", normalize=False))
+                if robot is not None
+                else 0
+            )
+        except Exception:  # noqa: BLE001 - diagnostics must never stop the loop
+            return
+        for label, key in (("リーダー", "L"), ("フォロワー", "F")):
+            bits = hw_bits[key]
+            if bits:
+                names = "/".join(n for b, n in HW_ERROR_BITS.items() if bits >> b & 1)
+                raise_alert(
+                    f"hw{key}",
+                    f"⛔ {label}gripper エラー停止({names or bits}) — 電源を10秒抜いて入れ直す",
+                    ttl=6.0,
+                )
+
+    def check_follower_grip_alert(cur):
+        """Warn when the follower gripper sits near its current cap for a second."""
+        cap = args.follower_grip_ma
+        if robot is None or not cap:
+            return
+        near = abs(cur.get("gripper", 0.0)) >= 0.9 * cap
+        fgrip_frames[0] = fgrip_frames[0] + 1 if near else 0
+        if fgrip_frames[0] >= int(args.fps):
+            raise_alert(
+                "fgrip", f"⚠ フォロワー握力が上限 {cap}mA 付近 — 滑り・過負荷停止に注意"
+            )
 
     def vw_law():
         return VirtualWeightLaw(
@@ -1070,6 +1129,9 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             spring[0] = spring_step(spring_law(), spring[0], cur.get("gripper", 0.0))
             ff_ma[0] = spring[0].command_ma
         teleop.bus.write("Goal_Current", "gripper", ff_ma[0], normalize=False)
+        cap_frames[0] = cap_frames[0] + 1 if abs(ff_ma[0]) >= args.ff_cap else 0
+        if cap_frames[0] >= int(args.fps):
+            raise_alert("cap", f"⚠ 握り反力が上限 {args.ff_cap}mA に張り付いています")
         th_on = 120 if args.ff_style == "error" else args.ff_floor + 80
         th_off = 60 if args.ff_style == "error" else args.ff_floor + 40
         now = time.monotonic()
@@ -1093,6 +1155,9 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                     print(
                         f"\n[hw] ⚠ フォロワーgripper {ftemp}°C — 物を掴んだまま放置しない"
                     )
+                    raise_alert(
+                        "ftemp", f"⚠ フォロワーgripper {ftemp}°C — 掴んだまま放置しない"
+                    )
             arm_max = max((abs(x) for x in arm_out.values()), default=0)
             print(
                 f"\r[ff] grip={cur.get('gripper', 0.0):5.0f}mA cmd={ff_ma[0]:4d}mA "
@@ -1109,10 +1174,14 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                     "Goal_Current", "gripper", args.ff_floor, normalize=False
                 )
                 ff_on = False
+                raise_alert(
+                    "ltemp", f"⛔ リーダーgripper {temp}°C — 力覚FBを停止", ttl=10.0
+                )
             elif temp >= guard.derate_c:
                 print(
                     f"\n[ff] リーダーgripper {temp}°C — ゲインを{args.ff_gain:.2f}に減衰"
                 )
+                raise_alert("ltemp", f"⚠ リーダーgripper {temp}°C — ゲイン減衰中")
 
     def wall_feedback(action):
         """One frame of virtual-wall feedback (VR / fixed wall)."""
@@ -1120,6 +1189,9 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         if wall[0] is not None and time.monotonic() > wall_expire[0]:
             wall[0] = None  # ブリッジが止まった/ページが閉じた → 壁を残さない
             print("\n[vwall] ブリッジからの更新が途絶えたので壁を解除しました")
+            raise_alert(
+                "wallttl", "⚠ VR からの更新が途絶えたので壁を解除しました", ttl=6.0
+            )
         opening = float(action.get("gripper.pos", 100.0))
         engaged = bool(wall_cmd[0].engaged) if wall_cmd[0] else False
         cmd = virtual_wall_step(wall[0], opening, ticks[0], ticks[1], engaged)
@@ -1146,6 +1218,11 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 )
                 teleop.bus.write("Goal_Current", "gripper", 0, normalize=False)
                 vwall_on = False
+                raise_alert(
+                    "ltemp", f"⛔ リーダーgripper {temp}°C — 仮想壁を停止", ttl=10.0
+                )
+            elif temp >= guard.derate_c:
+                raise_alert("ltemp", f"⚠ リーダーgripper {temp}°C — 発熱注意")
 
     def weight_feedback(action, engaged):
         """One frame of virtual weight: grasped mass × tip lever → lift/elbow current."""
@@ -1165,6 +1242,11 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             if abs(out - vw_out[j]) >= 3 or (out == 0 and vw_out[j] != 0):
                 teleop.bus.write("Goal_Current", j, out, normalize=False)
                 vw_out[j] = out
+        if engaged and any(abs(v) >= args.vw_cap for v in vw_out.values()):
+            raise_alert(
+                "vwcap",
+                f"⚠ 重さの電流が上限 {args.vw_cap}mA — 物体が重すぎるか倍率が高い",
+            )
         if n[0] % TEMP_CHECK_EVERY == TEMP_CHECK_EVERY // 2:
             j = VW_JOINTS[(n[0] // TEMP_CHECK_EVERY) % len(VW_JOINTS)]
             at = int(teleop.bus.read("Present_Temperature", j, normalize=False))
@@ -1172,8 +1254,10 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             if stop:
                 print(f"\n[vw] {j} {at}°C — 仮想重さを停止します(冷えたら再起動)")
                 stop_weight()
+                raise_alert("vwtemp", f"⛔ {j} {at}°C — 仮想重さを停止", ttl=10.0)
             elif at >= guard.derate_c:
                 print(f"\n[vw] {j} {at}°C — 重さ倍率を{args.vw_scale:.2f}に減衰")
+                raise_alert("vwtemp", f"⚠ {j} {at}°C — 重さ倍率を減衰中")
 
     def arm_feedback(cur):
         """One frame of arm-joint feedback (FACTR style, signed current mirror)."""
@@ -1226,6 +1310,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                     "rec": reconnects[0],
                     "n": n[0],
                     "leader_only": leader_only,
+                    "alerts": active_alerts(),
+                    "hw": dict(hw_bits),
                     "vw": {j: vw_out[j] for j in VW_JOINTS} if vw_on else None,
                     "vwall": (
                         {
@@ -1294,12 +1380,15 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 for m, v in cur_raw.items()
             }
             fpos = robot.bus.sync_read("Present_Position")
+            check_follower_grip_alert(cur)
         if ff_on:
             gripper_feedback(action, cur, fpos)
         elif vwall_on:
             wall_feedback(action)
         if ff_arm:
             arm_feedback(cur)
+        if n[0] % TEMP_CHECK_EVERY == TEMP_CHECK_EVERY // 4:
+            check_hw_alert()
         publish(time.perf_counter() - t0, action, cur, fpos)
         n[0] += 1
         time.sleep(max(0.0, 1.0 / args.fps - (time.perf_counter() - t_frame)))
@@ -1356,6 +1445,11 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 print(
                     f"\n[robust] 通信断を検知: {e}\n"
                     f"[robust] 2秒後に再接続します… ({reconnects[0]}/{MAX_RECONNECTS})"
+                )
+                raise_alert(
+                    "link",
+                    f"⚠ 通信断 → 再接続中 ({reconnects[0]}/{MAX_RECONNECTS})",
+                    ttl=8.0,
                 )
                 try:
                     reconnect()

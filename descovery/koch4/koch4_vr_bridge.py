@@ -118,6 +118,8 @@ STATE: dict[str, Any] = {
     "open": 100.0,
     "vwall": None,
     "vw": None,
+    "alerts": [],
+    "hw": None,
     "mode": "off",
     "src": "none",
 }
@@ -223,6 +225,8 @@ def telemetry_loop(port):
                 open=float(pos.get("gripper", 100.0)),
                 vwall=frame.get("vwall"),
                 vw=frame.get("vw"),
+                alerts=frame.get("alerts", []),
+                hw=frame.get("hw"),
                 mode=frame.get("mode", "off"),
                 src="teleop",
             )
@@ -263,6 +267,12 @@ def sim_loop(hz):
                     "shoulder_lift": 40 if engaged else 0,
                     "elbow_flex": 20 if engaged else 0,
                 },
+                alerts=(
+                    ["⚠ 上限負荷（模擬）: 握り反力が上限に張り付いています"]
+                    if engaged and pos["gripper"] < 20.0
+                    else []
+                ),
+                hw={"L": 0, "F": 0},
                 mode="vwall",
                 src="sim",
             )

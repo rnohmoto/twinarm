@@ -61,6 +61,7 @@ canvas{background:#12151a;border-radius:6px;width:100%;height:110px;display:bloc
 .lbl{font-size:11px;color:#9aa0a6;margin:6px 0 2px}
 .chip{display:inline-block;background:#12151a;border-radius:12px;padding:3px 10px;margin:2px;font-size:12px}
 .chip b{color:#7fd1ff}
+.chip.warn{background:#7f1d1d;color:#fff;font-weight:bold}
 input[type=range]{width:150px;vertical-align:middle}
 button{background:#2d5be3;color:#fff;border:0;border-radius:6px;padding:6px 14px;margin:2px;cursor:pointer;font-size:13px}
 button.warn{background:#c0392b} button.mode{background:#3a4150} button.mode.on{background:#1e8e3e}
@@ -130,6 +131,7 @@ es.onmessage=e=>{
       ["off","gripper","arm","vwall"].forEach(m=>document.getElementById('m_'+m).classList.toggle('on',d.mode===m));}
     const vw=d.vw?` <span class="chip">重さ 肩<b>${d.vw.shoulder_lift??0}</b> 肘<b>${d.vw.elbow_flex??0}</b> mA</span>`:'';
     const wall=d.vwall?` <span class="chip">物体 <b>${d.vwall.name}</b> ${d.vwall.engaged?'握':'−'}</span>`:'';
+    const al=(d.alerts||[]).map(a=>` <span class="chip warn">${a}</span>`).join('');
     document.getElementById('chips'+i).innerHTML=
       `<span class="chip">grip <b>${(d.cur||{}).gripper??0} mA</b></span>`+
       `<span class="chip">FF指令 <b>${d.ff??0} mA</b></span>`+
@@ -137,7 +139,7 @@ es.onmessage=e=>{
       `<span class="chip">フレーム <b>${d.n??0}</b></span>`+
       `<span class="chip">再接続 <b>${d.rec??0}</b></span>`+
       `<span class="chip">モード <b>${d.mode??'-'}</b></span>`+
-      (d.leader_only?'<span class="chip">リーダーのみ</span>':'')+wall+vw;
+      (d.leader_only?'<span class="chip">リーダーのみ</span>':'')+wall+vw+al;
   });
   document.getElementById('conn').innerHTML=anyLive?'<b>接続中</b>':'停止中';
 };

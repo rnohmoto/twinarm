@@ -89,6 +89,10 @@ hand; `koch4_teleop.py --selftest` checks the mirrored copy against the same vec
   map to the teleop; the JSON can also be edited by hand.
 - `?spectator=1` shows the same scene without sending contacts (desktop mirror next to the
   headset; Meta casting or scrcpy show the headset's own view instead).
+- Alerts from the teleop (current cap held, follower grip near its cap, latched hardware
+  error such as overload, temperature derate/stop, weight cap, bus dropout, wall released
+  after a lost link) travel in the telemetry and appear as a red banner in the page and as
+  red chips on the panel; CHECKLIST.md lists what to do for each.
 - Keys 1/2/3 force an object (test the wall without moving the arm), 0 clears.
 
 ## Graduating to `twinarm/`

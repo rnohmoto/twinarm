@@ -1,0 +1,23 @@
+{
+  "pairs": {
+    "A": {
+      "leader_port": "/dev/tty.usbmodemXXXX",
+      "follower_port": "/dev/tty.usbmodemYYYY",
+      "leader_serial": null,
+      "follower_serial": null,
+      "leader_id": "koch_leader_A",
+      "follower_id": "koch_follower_A",
+      "cams": ""
+    },
+    "B": {
+      "leader_port": "/dev/tty.usbmodemZZZZ",
+      "follower_port": "none",
+      "leader_serial": null,
+      "follower_serial": null,
+      "leader_id": "koch_leader_B",
+      "follower_id": "koch_follower_B",
+      "cams": ""
+    }
+  },
+  "_memo": "例: A=握手ペア(リーダー+フォロワー)、B=VR 用リーダーのみ(follower_port=none)。--init で雛形を作り koch4_config.json に記入する(こちらは git 管理外)。serial は --list の値。"
+}

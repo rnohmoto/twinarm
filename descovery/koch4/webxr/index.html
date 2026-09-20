@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Koch4 XR — 仮想物体を握る</title>
+<style>
+  html,body { margin:0; height:100%; overflow:hidden; background:#0f172a; font-family:"Meiryo UI",Meiryo,sans-serif; }
+  #hud { position:fixed; top:10px; left:10px; z-index:10; color:#e2e8f0; background:rgba(15,23,42,.7);
+         padding:8px 12px; border-radius:8px; font-size:13px; line-height:1.5; pointer-events:none; max-width:70vw; }
+  #hud b { color:#fbbf24; }
+  #btns { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:10; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+  #btns button { font-size:14px; padding:9px 14px; border-radius:10px; border:1px solid #475569;
+                 background:#1e293b; color:#f1f5f9; cursor:pointer; }
+  #btns button.on { background:#b45309; border-color:#f59e0b; }
+  #btns button:active { background:#334155; }
+</style>
+</head>
+<body>
+<div id="hud">Koch4 XR<br><span id="mode">接続待ち...</span></div>
+<div id="btns"></div>
+<script type="module">
+import * as THREE from './three.module.js';
+
+// ───────── 仮想物体の定義（幅は lerobot 正規化の開き 0=閉〜100=開。硬さ=Position_P_Gain・上限=Goal_Current mA） ─────────
+// 幅 45 = 「開きが 45% まで閉じたら触れる」。twin の指間隔 10〜40mm(☆表示用)に合わせて見た目の直径を決める。
+const OBJECTS = [
+  { name:'ball',   label:'硬いボール', width:45, p_gain:900,  cap_ma:350, release:1.5, color:0xef4444, kind:'sphere' },
+  { name:'sponge', label:'スポンジ',   width:60, p_gain:250,  cap_ma:120, release:2.0, color:0xfacc15, kind:'box' },
+  { name:'block',  label:'ブロック',   width:30, p_gain:1200, cap_ma:400, release:1.5, color:0x60a5fa, kind:'box' },
+];
+const GAP_MIN = 0.010, GAP_MAX = 0.040;                 // twin の指間隔 [m]（開き 0→100）
+const gapAt = w => GAP_MIN + (GAP_MAX - GAP_MIN) * w / 100;
+const REACH_MARGIN = 0.03;                              // 指先中点がこの距離まで寄れば「手の中」
+const KEEPALIVE_MS = 500;
+
+// ───────── 基本セットアップ ─────────
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.01, 30);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.0));
+const dir = new THREE.DirectionalLight(0xffffff, 1.2); dir.position.set(0.5, 1.5, 0.8); scene.add(dir);
+const INLINE_BG = new THREE.Color(0x1e293b);
+const grid = new THREE.GridHelper(2, 20, 0x64748b, 0x334155); scene.add(grid);
+
+// ───────── Koch 分身（実寸・m。84_ の WebXR ビューアと同じ骨組み） ─────────
+const M = {
+  base: new THREE.MeshStandardMaterial({ color:0xe2e8f0, roughness:.6 }),
+  link: new THREE.MeshStandardMaterial({ color:0x334155, roughness:.5 }),
+  joint: new THREE.MeshStandardMaterial({ color:0xf8fafc, roughness:.3 }),
+  grip: new THREE.MeshStandardMaterial({ color:0xd97706, roughness:.5 }),
+};
+const box = (w,h,d,m) => new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m);
+const cyl = (r,h,m) => new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,20), m);
+const robot = new THREE.Group(); robot.position.set(0, 0.75, -0.6); scene.add(robot);
+const desk = box(0.50, 0.012, 0.40, new THREE.MeshStandardMaterial({ color:0x475569, roughness:.8 }));
+desk.position.set(0.05, -0.006, 0.05); robot.add(desk);
+const base = box(0.05, 0.035, 0.05, M.base); base.position.y = 0.0175; robot.add(base);
+const jPan = new THREE.Group(); jPan.position.y = 0.035; base.add(jPan); jPan.add(cyl(0.016, 0.02, M.joint));
+const jLift = new THREE.Group(); jLift.position.y = 0.02; jPan.add(jLift); jLift.add(cyl(0.014, 0.034, M.joint).rotateZ(Math.PI/2));
+const upper = box(0.02, 0.11, 0.02, M.link); upper.position.y = 0.055; jLift.add(upper);
+const jElbow = new THREE.Group(); jElbow.position.y = 0.11; jLift.add(jElbow); jElbow.add(cyl(0.013, 0.032, M.joint).rotateZ(Math.PI/2));
+const fore = box(0.018, 0.108, 0.018, M.link); fore.position.y = 0.054; jElbow.add(fore);
+const jWristF = new THREE.Group(); jWristF.position.y = 0.108; jElbow.add(jWristF); jWristF.add(cyl(0.011, 0.028, M.joint).rotateZ(Math.PI/2));
+const wrist = box(0.016, 0.05, 0.016, M.link); wrist.position.y = 0.025; jWristF.add(wrist);
+const jWristR = new THREE.Group(); jWristR.position.y = 0.05; jWristF.add(jWristR); jWristR.add(cyl(0.012, 0.016, M.joint));
+const palm = box(0.034, 0.018, 0.02, M.grip); palm.position.y = 0.017; jWristR.add(palm);
+const fingerL = box(0.006, 0.045, 0.012, M.grip), fingerR = box(0.006, 0.045, 0.012, M.grip);
+fingerL.position.set(-0.012, 0.048, 0); fingerR.position.set(0.012, 0.048, 0); jWristR.add(fingerL, fingerR);
+const tip = new THREE.Object3D(); tip.position.set(0, 0.065, 0); jWristR.add(tip);   // 指先の中点
+
+// ───────── 仮想物体（机の上・分身の届く範囲に置く） ─────────
+const SPOTS = [[0.16, 0.0, 0.10], [-0.14, 0.0, 0.12], [0.02, 0.0, 0.22]];
+const objMeshes = OBJECTS.map((o, i) => {
+  const d = gapAt(o.width);
+  const geo = o.kind === 'sphere' ? new THREE.SphereGeometry(d/2, 24, 16) : new THREE.BoxGeometry(d, d*1.2, d);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color:o.color, roughness:.7, emissive:0x000000 }));
+  mesh.position.set(SPOTS[i][0], d/2 + 0.02, SPOTS[i][2]);   // 少し浮かせて置く(台座はロボ座標)
+  robot.add(mesh);
+  return mesh;
+});
+
+// ───────── /state ポーリング（テレオペ or --sim。途絶時は内蔵デモ） ─────────
+let st = null, lastOk = -1e9;
+async function poll(){
+  try { const r = await fetch('/state', { cache:'no-store' }); if (r.ok) { st = await r.json(); lastOk = performance.now(); } }
+  catch(e) { /* サーバなし=デモ継続 */ }
+}
+setInterval(poll, 50);
+
+// ───────── 接触判定 → /contact 送信（変化時＋キープアライブ） ─────────
+let forced = null, lastSent = null, lastSentAt = 0, sendStatus = '未送信', current = null;
+const tipW = new THREE.Vector3(), objW = new THREE.Vector3();
+function nearestObject(){
+  tip.getWorldPosition(tipW);
+  let best = null, bestD = Infinity;
+  objMeshes.forEach((m, i) => {
+    m.getWorldPosition(objW);
+    const r = gapAt(OBJECTS[i].width) / 2;
+    const d = tipW.distanceTo(objW) - r;
+    if (d < REACH_MARGIN && d < bestD) { best = OBJECTS[i]; bestD = d; }
+  });
+  return best;
+}
+async function sendContact(obj, force){
+  const payload = obj ? { name:obj.name, width:obj.width, p_gain:obj.p_gain, cap_ma:obj.cap_ma, release:obj.release } : null;
+  const key = JSON.stringify(payload);
+  const now = performance.now();
+  if (!force && key === lastSent && now - lastSentAt < KEEPALIVE_MS) return;
+  lastSent = key; lastSentAt = now;
+  try { const r = await fetch('/contact', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ vwall: payload }) });
+        sendStatus = r.ok ? `送信OK ${new Date().toLocaleTimeString()}` : `HTTP ${r.status}`; }
+  catch(e) { sendStatus = '送信失敗(サーバなし)'; }
+}
+
+const hudMode = document.getElementById('mode');
+function applyPose(tms){
+  let q, open, label, vwall = null, src = 'none';
+  if (st && performance.now() - lastOk < 2000) {
+    q = st.q; open = st.open ?? 100; vwall = st.vwall; src = st.src;
+    label = `ソース: <b>${src === 'teleop' ? 'テレオペ(リーダー実機)' : src === 'sim' ? 'シミュレータ' : '停止中'}</b>`;
+  } else {
+    const t = tms / 1000;
+    q = [ .6*Math.sin(t*.6), .45*Math.sin(t*.8)+.25, .7*Math.sin(t*.7+1), .5*Math.sin(t*.9+2), .8*Math.sin(t*.5) ];
+    open = 50 + 50*Math.sin(t*1.2);
+    label = 'ソース: <b>内蔵デモ</b>（/state 未接続）';
+  }
+  jPan.rotation.y = q[0]; jLift.rotation.x = q[1]; jElbow.rotation.x = q[2]; jWristF.rotation.x = q[3]; jWristR.rotation.y = q[4];
+  const half = gapAt(open) / 2;
+  fingerL.position.x = -half; fingerR.position.x = half;
+
+  // 接触候補: 手動強制 > 近接判定
+  current = forced ?? nearestObject();
+  sendContact(current, false);
+
+  // 見た目: 候補は光る、握られている(engaged)物体は指方向に潰れる
+  objMeshes.forEach((m, i) => {
+    const o = OBJECTS[i];
+    const engaged = vwall && vwall.engaged && vwall.name === o.name;
+    const cand = current && current.name === o.name;
+    m.material.emissive.setHex(engaged ? 0x7f1d1d : cand ? 0x3f3f00 : 0x000000);
+    const pen = engaged ? Math.min(0.5, Math.max(0, (o.width - open) / o.width)) : 0;
+    m.scale.set(1 - 0.6*pen, 1 + 0.3*pen, 1);
+  });
+  const objTxt = current ? `${current.label}(幅${current.width}・P${current.p_gain}・上限${current.cap_ma}mA)` : 'なし(自由空間)';
+  const engTxt = vwall ? (vwall.engaged ? '<b>握っている</b>' : '触れていない') : '—';
+  hudMode.innerHTML = `${label}<br>開き: ${open.toFixed(0)} / 物体: ${objTxt}<br>壁: ${engTxt} / 送信: ${sendStatus}`
+    + `<br>表示: ${renderer.xr.isPresenting ? (arActive ? 'AR(パススルー)' : 'VR') : 'インライン'}`
+    + (forced ? `<br><b>手動強制中</b>(0 で解除)` : '');
+}
+
+// ───────── インライン簡易オービット ─────────
+let yaw = 0.6, pitch = 0.35, dist = 0.9, dragging = false, px = 0, py = 0;
+function updateCam(){
+  const target = new THREE.Vector3(0, 0.85, -0.55);
+  camera.position.set(target.x + dist*Math.cos(pitch)*Math.sin(yaw), target.y + dist*Math.sin(pitch), target.z + dist*Math.cos(pitch)*Math.cos(yaw));
+  camera.lookAt(target);
+}
+addEventListener('pointerdown', e => { dragging = true; px = e.clientX; py = e.clientY; });
+addEventListener('pointerup', () => dragging = false);
+addEventListener('pointermove', e => {
+  if (!dragging || renderer.xr.isPresenting) return;
+  yaw -= (e.clientX - px) * 0.005; pitch = Math.min(1.4, Math.max(-0.2, pitch + (e.clientY - py) * 0.005));
+  px = e.clientX; py = e.clientY; updateCam();
+});
+addEventListener('wheel', e => { dist = Math.min(3, Math.max(0.3, dist + e.deltaY * 0.001)); updateCam(); });
+updateCam();
+
+// ───────── ボタン / キー: 物体の手動強制（腕を動かさずに壁だけ確かめる） ─────────
+const btns = document.getElementById('btns');
+const forceBtns = [];
+function addBtn(label, fn){ const b = document.createElement('button'); b.textContent = label; b.onclick = fn; btns.appendChild(b); return b; }
+function setForced(o){ forced = o; forceBtns.forEach((b, i) => b.classList.toggle('on', o === OBJECTS[i])); sendContact(forced ?? nearestObject(), true); }
+OBJECTS.forEach((o, i) => forceBtns.push(addBtn(`${i+1} ${o.label}`, () => setForced(forced === o ? null : o))));
+addBtn('0 解除', () => setForced(null));
+addEventListener('keydown', e => { if (e.key === '0') setForced(null); const i = parseInt(e.key, 10) - 1; if (i >= 0 && i < OBJECTS.length) setForced(OBJECTS[i]); });
+addEventListener('beforeunload', () => { navigator.sendBeacon && navigator.sendBeacon('/contact', new Blob([JSON.stringify({ vwall:null })], { type:'application/json' })); });
+
+// ───────── XR セッション（AR 優先・VR・非対応はインライン） ─────────
+let arActive = false;
+async function startXR(mode){
+  try {
+    const init = { optionalFeatures: ['local-floor', 'dom-overlay', 'hand-tracking'], domOverlay: { root: document.body } };
+    const s = await navigator.xr.requestSession(mode, init);
+    arActive = (mode === 'immersive-ar');
+    scene.background = arActive ? null : new THREE.Color(0x27364a);
+    grid.visible = !arActive;
+    renderer.xr.setReferenceSpaceType('local-floor');
+    await renderer.xr.setSession(s);
+    s.addEventListener('end', () => { arActive = false; scene.background = INLINE_BG; grid.visible = true; });
+  } catch(e) { hudMode.innerHTML = 'XR開始失敗: ' + e.message; }
+}
+(async () => {
+  scene.background = INLINE_BG;
+  if (navigator.xr) {
+    if (await navigator.xr.isSessionSupported('immersive-ar').catch(() => false)) addBtn('AR表示（パススルー）', () => startXR('immersive-ar'));
+    if (await navigator.xr.isSessionSupported('immersive-vr').catch(() => false)) addBtn('VR表示', () => startXR('immersive-vr'));
+  }
+})();
+addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+renderer.setAnimationLoop((t) => { applyPose(t); renderer.render(scene, camera); });
+</script>
+</body>
+</html>

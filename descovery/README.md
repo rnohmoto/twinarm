@@ -41,6 +41,16 @@ All scripts below live in [`mock/v0/`](mock/v0/). Risk classes:
 | `koch_live_plot.py` | matplotlib viewer for teleop telemetry: leader command, follower position, the L−F error, and currents. | network only | UDP in :8765 |
 | `koch_web_panel.py` | Stdlib-only browser control panel with Canvas graphs. Switches force-feedback mode, resyncs, or stops a running teleop session. | network only, but it commands a live teleop session | HTTP :8780 (SSE), UDP in :8765, control out :8766 |
 
+## koch4 — two pairs, dedicated config/work folders, VR virtual wall
+
+[`koch4/`](koch4/README.md) is the next generation of the v0 scripts for the four-arm
+(two-pair) setup: one merged teleop (`koch4_teleop.py`, the v0 script plus the
+2026-09-04 gripper fixes and the error-reflection style), a two-pair launcher, the web
+panel, and a VR bridge that lets the leader gripper "grasp" a virtual object rendered by
+the servo's own position loop. Calibration JSON, config and logs live under
+`koch4/config/` and `koch4/work/` instead of `~/.cache`. Its README lists every script
+with the same risk classes as the table above; the same hardware rules apply.
+
 ## UI mocks
 
 [`mock/v1/ui/`](mock/v1/ui/README.md) is a static HTML mock of a next-generation dual-arm

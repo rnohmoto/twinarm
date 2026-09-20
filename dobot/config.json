@@ -1,0 +1,241 @@
+{
+  "camera": {
+    "backend": "opencv",
+    "index": 0,
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "auto_exposure": false,
+    "exposure": -6.0,
+    "auto_wb": false,
+    "wb_temperature": 4500,
+    "rotation_deg": 0,
+    "warmup_frames": 10
+  },
+  "robot": {
+    "backend": "dry",
+    "port": null,
+    "end_effector": "suction",
+    "ee_settle_s": 0.6,
+    "z_safe": 40.0,
+    "z_pick": -30.0,
+    "z_place": -25.0,
+    "r": 0.0,
+    "velocity": 150.0,
+    "acceleration": 150.0,
+    "x_min": 150.0,
+    "x_max": 300.0,
+    "y_min": -150.0,
+    "y_max": 150.0,
+    "z_min": -60.0,
+    "z_max": 120.0,
+    "reach_max": 315.0,
+    "reach_min": 140.0,
+    "home_xyzr": [
+      200.0,
+      0.0,
+      50.0,
+      0.0
+    ]
+  },
+  "llm": {
+    "enabled": true,
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "low",
+    "max_tokens": 1024,
+    "max_turns": 6,
+    "history_turns": 4,
+    "timeout_s": 20.0
+  },
+  "asr": {
+    "engine": "faster_whisper",
+    "model": "small",
+    "device": "cpu",
+    "compute_type": "int8",
+    "language": "ja",
+    "sample_rate": 16000,
+    "max_record_s": 6.0,
+    "silence_rms": 0.01,
+    "silence_hold_s": 0.8
+  },
+  "tts": {
+    "engine": "auto",
+    "voicevox_url": "http://127.0.0.1:50021",
+    "voicevox_speaker": 3,
+    "blocking": false
+  },
+  "zones": [
+    {
+      "name": "tray_right",
+      "aliases": [
+        "右",
+        "みぎ",
+        "右のトレイ",
+        "右側",
+        "右のお皿",
+        "right"
+      ],
+      "x": 230.0,
+      "y": -110.0,
+      "z_place": null
+    },
+    {
+      "name": "tray_left",
+      "aliases": [
+        "左",
+        "ひだり",
+        "左のトレイ",
+        "左側",
+        "左のお皿",
+        "left"
+      ],
+      "x": 230.0,
+      "y": 110.0,
+      "z_place": null
+    },
+    {
+      "name": "box_front",
+      "aliases": [
+        "手前",
+        "てまえ",
+        "前",
+        "手前の箱",
+        "front"
+      ],
+      "x": 170.0,
+      "y": 0.0,
+      "z_place": null
+    },
+    {
+      "name": "box_back",
+      "aliases": [
+        "奥",
+        "おく",
+        "後ろ",
+        "奥の箱",
+        "back"
+      ],
+      "x": 280.0,
+      "y": 0.0,
+      "z_place": null
+    }
+  ],
+  "colors": [
+    {
+      "name": "red",
+      "aliases": [
+        "赤",
+        "あか",
+        "レッド",
+        "赤い",
+        "赤色"
+      ],
+      "ranges": [
+        [
+          [
+            0,
+            120,
+            70
+          ],
+          [
+            8,
+            255,
+            255
+          ]
+        ],
+        [
+          [
+            170,
+            120,
+            70
+          ],
+          [
+            179,
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "green",
+      "aliases": [
+        "緑",
+        "みどり",
+        "グリーン",
+        "緑の",
+        "緑色",
+        "青緑"
+      ],
+      "ranges": [
+        [
+          [
+            40,
+            80,
+            60
+          ],
+          [
+            85,
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "blue",
+      "aliases": [
+        "青",
+        "あお",
+        "ブルー",
+        "青い",
+        "青色",
+        "水色"
+      ],
+      "ranges": [
+        [
+          [
+            95,
+            120,
+            60
+          ],
+          [
+            130,
+            255,
+            255
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "yellow",
+      "aliases": [
+        "黄",
+        "きいろ",
+        "黄色",
+        "イエロー",
+        "黄色い"
+      ],
+      "ranges": [
+        [
+          [
+            20,
+            120,
+            100
+          ],
+          [
+            35,
+            255,
+            255
+          ]
+        ]
+      ]
+    }
+  ],
+  "homography_path": "assets/homography.json",
+  "min_area_px": 400,
+  "max_area_px": 60000,
+  "log_dir": "logs",
+  "panel_window": true
+}

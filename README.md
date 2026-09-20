@@ -17,6 +17,7 @@ example slice; it has no backend and runs against mocks.
 | ---- | ---------- |
 | [`twinarm/`](twinarm/README.md) | The installable Python library (src layout). |
 | [`descovery/`](descovery/README.md) | Hardware experiment sandbox: standalone Koch-arm scripts. |
+| [`dobot/`](dobot/README.md) | Dobot Magician pick-and-place sandbox: overhead camera → homography → pydobot, plus the first-time setup manual. |
 | [`twinarm-web-ui/`](twinarm-web-ui/README.md) | The web teleoperation UI: React and Vite, mock-backed. |
 | `docs/` | Reserved for documentation. Empty. |
 | `pyproject.toml` | Configuration-only root project. Holds the shared ruff configuration. |

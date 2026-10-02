@@ -1,0 +1,82 @@
+{
+  "joints": {
+    "shoulder_pan": {
+      "span_deg": 360.0,
+      "offset_deg": 3.1,
+      "sign": 1
+    },
+    "shoulder_lift": {
+      "span_deg": 128.2,
+      "offset_deg": 20.7,
+      "sign": 1
+    },
+    "elbow_flex": {
+      "span_deg": 194.9,
+      "offset_deg": -97.5,
+      "sign": -1
+    },
+    "wrist_flex": {
+      "span_deg": 225.0,
+      "offset_deg": -10.4,
+      "sign": -1
+    },
+    "wrist_roll": {
+      "span_deg": 360.0,
+      "offset_deg": -72.0,
+      "sign": 1
+    }
+  },
+  "base": {
+    "x": 0.0,
+    "y": 0.75,
+    "z": -0.6,
+    "yaw_deg": 0.0
+  },
+  "objects": {
+    "sponge": {
+      "label": "スポンジ",
+      "width": 60,
+      "p_gain": 250,
+      "cap_ma": 120,
+      "release": 2.0,
+      "mass_g": 10,
+      "color": "#facc15",
+      "kind": "box",
+      "spot": [
+        -0.155,
+        0.0,
+        0.221
+      ]
+    },
+    "ball": {
+      "label": "ボール",
+      "width": 45,
+      "p_gain": 900,
+      "cap_ma": 350,
+      "release": 1.5,
+      "mass_g": 45,
+      "color": "#ef4444",
+      "kind": "sphere",
+      "spot": [
+        0.0,
+        0.0,
+        0.27
+      ]
+    },
+    "block": {
+      "label": "鉄ブロック",
+      "width": 30,
+      "p_gain": 2000,
+      "cap_ma": 450,
+      "release": 1.0,
+      "mass_g": 300,
+      "color": "#94a3b8",
+      "kind": "box",
+      "spot": [
+        0.155,
+        0.0,
+        0.221
+      ]
+    }
+  }
+}

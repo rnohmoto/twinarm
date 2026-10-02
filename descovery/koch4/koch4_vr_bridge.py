@@ -69,18 +69,7 @@ DEFAULT_TWIN_CONFIG: dict[str, Any] = {
         "wrist_roll": {"span_deg": 180.0, "offset_deg": 0.0, "sign": 1},
     },
     "base": {"x": 0.0, "y": 0.75, "z": -0.6, "yaw_deg": 0.0},
-    "objects": {
-        "ball": {
-            "label": "硬いボール",
-            "width": 45,
-            "p_gain": 900,
-            "cap_ma": 350,
-            "release": 1.5,
-            "mass_g": 45,
-            "color": "#ef4444",
-            "kind": "sphere",
-            "spot": [0.16, 0.0, 0.10],
-        },
+    "objects": {  # この並び順がページのキー 1/2/3。軽い・柔らかい → 重い・硬い
         "sponge": {
             "label": "スポンジ",
             "width": 60,
@@ -90,18 +79,29 @@ DEFAULT_TWIN_CONFIG: dict[str, Any] = {
             "mass_g": 10,
             "color": "#facc15",
             "kind": "box",
-            "spot": [-0.14, 0.0, 0.12],
+            "spot": [-0.155, 0.0, 0.221],
+        },
+        "ball": {
+            "label": "ボール",
+            "width": 45,
+            "p_gain": 900,
+            "cap_ma": 350,
+            "release": 1.5,
+            "mass_g": 45,
+            "color": "#ef4444",
+            "kind": "sphere",
+            "spot": [0.0, 0.0, 0.27],
         },
         "block": {
-            "label": "ブロック",
+            "label": "鉄ブロック",
             "width": 30,
-            "p_gain": 1200,
-            "cap_ma": 400,
-            "release": 1.5,
-            "mass_g": 120,
-            "color": "#60a5fa",
+            "p_gain": 2000,
+            "cap_ma": 450,
+            "release": 1.0,
+            "mass_g": 300,
+            "color": "#94a3b8",
             "kind": "box",
-            "spot": [0.02, 0.0, 0.22],
+            "spot": [0.155, 0.0, 0.221],
         },
     },
 }
@@ -176,21 +176,35 @@ def merge_twin_config(payload):
         TWIN["base"]["yaw_deg"] = clamp(
             float(base.get("yaw_deg", TWIN["base"]["yaw_deg"])), -180.0, 180.0
         )
-    for name, obj in (payload.get("objects") or {}).items():
+    objects = payload.get("objects")
+    if not isinstance(objects, dict):
+        return
+    names = []
+    for name, obj in objects.items():
         if not isinstance(obj, dict):
             continue
+        key = str(name)[:32]
+        names.append(key)
         cur = TWIN["objects"].setdefault(
-            str(name)[:32], copy.deepcopy(DEFAULT_TWIN_CONFIG["objects"]["ball"])
+            key,
+            copy.deepcopy(
+                DEFAULT_TWIN_CONFIG["objects"].get(key)
+                or DEFAULT_TWIN_CONFIG["objects"]["ball"]
+            ),
         )
-        for key in ("width", "p_gain", "cap_ma", "release", "mass_g"):
-            if key in obj:
-                lo, hi = LIMITS[key]
-                cur[key] = type(lo)(clamp(float(obj[key]), lo, hi))
-        for key in ("label", "color", "kind"):
-            if key in obj:
-                cur[key] = str(obj[key])[:32]
+        for field in ("width", "p_gain", "cap_ma", "release", "mass_g"):
+            if field in obj:
+                lo, hi = LIMITS[field]
+                cur[field] = type(lo)(clamp(float(obj[field]), lo, hi))
+        for field in ("label", "color", "kind"):
+            if field in obj:
+                cur[field] = str(obj[field])[:32]
         if isinstance(obj.get("spot"), list) and len(obj["spot"]) == 3:
             cur["spot"] = [clamp(float(v), -1.0, 1.0) for v in obj["spot"]]
+    # 物体の並び順＝ページのキー 1/2/3。ファイルや「保存」のように全物体を含む
+    # ペイロードが来たときだけ、その並び順に揃える(部分更新では順序を変えない)。
+    if set(names) >= set(TWIN["objects"]):
+        TWIN["objects"] = {key: TWIN["objects"][key] for key in names}
 
 
 def save_twin_config(path):

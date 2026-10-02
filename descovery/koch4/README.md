@@ -116,7 +116,9 @@ hand; `koch4_teleop.py --selftest` checks the mirrored copy against the same vec
   error such as overload, temperature derate/stop, weight cap, bus dropout, wall released
   after a lost link) travel in the telemetry and appear as a red banner in the page and as
   red chips on the panel; CHECKLIST.md lists what to do for each.
-- Keys 1/2/3 force an object (test the wall without moving the arm), 0 clears.
+- Keys 1/2/3 force an object (test the wall without moving the arm), 0 clears. The keys follow
+  the order of the objects in `koch4_twin.json`; the defaults go light to heavy: sponge, ball,
+  iron block (hardest wall, mass that saturates the weight law).
 
 ## Graduating to `twinarm/`
 

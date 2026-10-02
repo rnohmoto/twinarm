@@ -39,10 +39,10 @@ const DEFAULTS = {
   joints: { shoulder_pan:{span_deg:180,offset_deg:0,sign:1}, shoulder_lift:{span_deg:100,offset_deg:0,sign:1},
             elbow_flex:{span_deg:100,offset_deg:0,sign:1}, wrist_flex:{span_deg:100,offset_deg:0,sign:1}, wrist_roll:{span_deg:180,offset_deg:0,sign:1} },
   base: { x:0, y:0.75, z:-0.6, yaw_deg:0 },
-  objects: {
-    ball:   { label:'硬いボール', width:45, p_gain:900,  cap_ma:350, release:1.5, mass_g:45,  color:'#ef4444', kind:'sphere', spot:[0.16,0,0.10] },
-    sponge: { label:'スポンジ',   width:60, p_gain:250,  cap_ma:120, release:2.0, mass_g:10,  color:'#facc15', kind:'box',    spot:[-0.14,0,0.12] },
-    block:  { label:'ブロック',   width:30, p_gain:1200, cap_ma:400, release:1.5, mass_g:120, color:'#60a5fa', kind:'box',    spot:[0.02,0,0.22] },
+  objects: {  // この並び順がキー 1/2/3。軽い・柔らかい → 重い・硬い
+    sponge: { label:'スポンジ',   width:60, p_gain:250,  cap_ma:120, release:2.0, mass_g:10,  color:'#facc15', kind:'box',    spot:[-0.155,0,0.221] },
+    ball:   { label:'ボール',     width:45, p_gain:900,  cap_ma:350, release:1.5, mass_g:45,  color:'#ef4444', kind:'sphere', spot:[0,0,0.27] },
+    block:  { label:'鉄ブロック', width:30, p_gain:2000, cap_ma:450, release:1.0, mass_g:300, color:'#94a3b8', kind:'box',    spot:[0.155,0,0.221] },
   },
 };
 let CONFIG = structuredClone(DEFAULTS);

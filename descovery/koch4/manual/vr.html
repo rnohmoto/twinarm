@@ -9,7 +9,7 @@
 </head>
 <body>
 <nav class="nav-top">
-  <a href="index.html">入口</a><a href="handshake.html">握手（2 ペア）</a><a href="vr.html"><strong>VR（一人称・2 人）</strong></a><span class="sep">｜</span>
+  <a href="index.html">入口</a><a href="handshake.html">握手（2 ペア）</a><a href="vr.html"><strong>VR（一人称・2 人）</strong></a><a href="quest_setup.html">Quest の準備</a><span class="sep">｜</span>
   <a href="#s0">全体</a><a href="#s1">用意</a><a href="#s2">Quest の準備</a><a href="#s3">起動</a><a href="#s4">位置合わせ</a><a href="#s5">遊び方</a><a href="#s6">2 人</a><a href="#s7">観客の画面</a><a href="#s8">電源</a><a href="#s9">Wi-Fi</a><a href="#s10">調整</a><a href="#s11">困ったとき</a><a href="#s12">安全</a><a href="#s13">参考資料</a>
 </nav>
 <div class="container py-4">
@@ -66,28 +66,27 @@
 <tr><td>Koch フォロワー（ペア B）</td><td>1</td><td>2 人で遊ぶときだけ。12V の AC アダプタ。較正済み</td></tr>
 <tr><td>Meta Quest Pro とコントローラ</td><td>1 組</td><td>開発者モードを有効にしたもの（§2）。コントローラは位置合わせに 1 本使う</td></tr>
 <tr><td>USB-C ケーブル（データ対応）</td><td>1</td><td>3 m 程度。充電専用のケーブルは使えない</td></tr>
-<tr><td>45W の USB-C 充電器</td><td>1</td><td>ゴーグルの給電用（§8）。付属の充電ドックでも可</td></tr>
+<tr><td>45W 電源アダプターと充電ケーブル</td><td>1 組</td><td>Quest Pro の箱に同梱。ゴーグルの給電用（§8）</td></tr>
+<tr><td>5 GHz のルータ</td><td>1</td><td>充電しながら使うとき（§8 の B）と、USB を使えないとき（§9）</td></tr>
 <tr><td>モニタ</td><td>1</td><td>観客用（§7）。無くても体験はできる</td></tr>
 </tbody>
 </table>
 
 <!-- ===================================================== -->
 <h2 id="s2">2. 最初の 1 回だけ（Quest と Mac の準備）</h2>
-<p>ゴーグルを USB で Mac に繋いでページを開くには、ゴーグルの「開発者モード」が要ります。アカウントの確認に日数がかかることがあるので、本番の 1〜2 週間前に済ませます。</p>
-<div class="step">
-<ol class="mb-0">
-  <li><strong>Meta アカウントを用意する</strong>。ゴーグルの初期設定には Meta アカウントが必須です（メールアドレスで作れます。Facebook は不要）。展示用には、会社のメールアドレスで展示専用のアカウントを 1 つ作ると、担当が替わっても引き継げます。</li>
-  <li><strong>開発者の登録をする</strong>。<a href="https://developers.meta.com/horizon/">Meta の開発者サイト</a>で組織（チーム）を作り、アカウントを確認します（電話番号の SMS か、支払い方法の登録。18 歳以上）。組織の確認（身分証の提出）を求められたら、それも済ませます。</li>
-  <li><strong>開発者モードを入れる</strong>。スマートフォンの Meta Horizon アプリ → ヘッドセットのアイコン → ヘッドセット設定 → 開発者モード → オン。</li>
-  <li><strong>Mac に adb を入れる</strong>。
-<pre>brew install --cask android-platform-tools</pre></li>
-  <li><strong>USB の許可を出す</strong>。ゴーグルを USB-C ケーブルで Mac に繋ぎ、ゴーグルを被ると「USB デバッグを許可しますか」と出るので、「このコンピュータから常に許可」を選びます。</li>
-  <li><strong>確認する</strong>。
-<pre>./koch4/start.sh check</pre>
-  最後に <code>✓ ＜番号＞: 接続済み（adb 可・USB）</code> とバッテリー残量が出れば完了です。</li>
-</ol>
-</div>
-<div class="gate"><strong>関門 2</strong>: <code>./koch4/start.sh check</code> に「接続済み」が出る。出ないときは <a href="#s11">§11</a> の「Quest が見えない」。</div>
+<p>ゴーグルを USB で Mac に繋いでページを開くには、ゴーグルの「開発者モード」が要ります。アカウントの確認に日数がかかることがあるので、本番の 1〜2 週間前に済ませます。手順は <a href="quest_setup.html"><strong>Quest の準備のページ</strong></a>にまとめました。</p>
+<table class="table table-striped">
+<thead><tr><th style="width:8%">順</th><th style="width:30%">やること</th><th>どこで</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><a href="quest_setup.html#s2">Meta アカウントを作る</a>（展示専用・会社のメールアドレス）</td><td>パソコンかスマートフォン</td></tr>
+<tr><td>2</td><td><a href="quest_setup.html#s3">Meta Horizon アプリを入れる</a></td><td>スマートフォン</td></tr>
+<tr><td>3</td><td><a href="quest_setup.html#s4">ゴーグルの初期設定とペアリング</a></td><td>ゴーグルとスマートフォン</td></tr>
+<tr><td>4</td><td><a href="quest_setup.html#s5">開発者の登録</a>（組織を作り、SMS か支払い方法で確認）</td><td>パソコン</td></tr>
+<tr><td>5</td><td><a href="quest_setup.html#s6">開発者モードをオン</a></td><td>スマートフォン</td></tr>
+<tr><td>6</td><td><a href="quest_setup.html#s7">Mac に adb を入れ、USB で繋いで許可</a></td><td>Mac とゴーグル</td></tr>
+</tbody>
+</table>
+<div class="gate"><strong>関門 2</strong>: <code>./koch4/start.sh check</code> に「接続済み」とバッテリー残量が出る。出ないときは <a href="quest_setup.html#s9">Quest の準備 §9</a>。</div>
 
 <!-- ===================================================== -->
 <h2 id="s3">3. 起動（毎回）</h2>
@@ -231,49 +230,77 @@
 
 <!-- ===================================================== -->
 <h2 id="s8">8. 電源（ゴーグルのバッテリー）</h2>
-<p><strong>バッテリーだけでは 1 日もちません。</strong>Quest Pro のバッテリーは公称 1〜2 時間で、付属の 45W 充電ドックでの満充電に約 2 時間かかります。展示では給電しながら使う前提で組みます。</p>
+<p><strong>バッテリーだけでは 1 日もちません。</strong>Quest Pro のバッテリーは公称 1〜2 時間で、満充電に約 2 時間かかります。展示では、箱に入っている 45W 電源アダプターで給電しながら使います。</p>
+<div class="note">
+<p class="mb-1"><strong>Mac からゴーグルへ映像は送っていません</strong></p>
+<ul class="mb-0">
+  <li>3D の絵はゴーグルが自分で描きます。Mac から届くのは関節の角度などの数字だけで、腕 2 本でも毎秒約 40 キロバイト（0.3 Mbps）です。</li>
+  <li>このため、ゴーグルの USB の口を充電に回し、通信を Wi-Fi にしても体験は変わりません。量としては 2.4 GHz でも足ります。5 GHz のルータを使うのは、会場では 2.4 GHz が混んで途切れやすいからです。</li>
+  <li>映像が電波を通るのは、ゴーグルの中の画面を観客用に映す（Cast）ときだけです。観客ページ（Mac が自分で描く画面）なら映像の転送は要りません。</li>
+</ul>
+</div>
 <figure class="diagram">
 <svg viewBox="0 0 940 300" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
   <!-- A -->
-  <rect x="20" y="20" width="290" height="260" rx="10" fill="#f8f9fa" stroke="#adb5bd"/>
-  <text x="165" y="46" text-anchor="middle" font-weight="bold">A. USB のまま使う</text>
-  <rect x="50" y="70" width="90" height="44" rx="6" fill="#eaf2fb" stroke="#3498db"/><text x="95" y="97" text-anchor="middle">Mac</text>
-  <rect x="190" y="70" width="90" height="44" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="235" y="97" text-anchor="middle">Quest</text>
-  <line x1="140" y1="92" x2="190" y2="92" stroke="#2c3e50" stroke-width="2.5"/>
-  <text x="165" y="140" text-anchor="middle" font-size="12">データと給電を 1 本で</text>
-  <text x="165" y="176" text-anchor="middle" font-size="12">Mac の USB は充電器より弱い。</text>
-  <text x="165" y="194" text-anchor="middle" font-size="12">減り方が遅くなるだけのことがある</text>
-  <text x="165" y="232" text-anchor="middle" font-size="12" fill="#495057">まずこれで 30 分測る</text>
+  <rect x="10" y="20" width="222" height="262" rx="10" fill="#f8f9fa" stroke="#adb5bd"/>
+  <text x="121" y="46" text-anchor="middle" font-weight="bold">A. USB のまま</text>
+  <rect x="28" y="66" width="74" height="40" rx="6" fill="#eaf2fb" stroke="#3498db"/><text x="65" y="91" text-anchor="middle">Mac</text>
+  <rect x="140" y="66" width="74" height="40" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="177" y="91" text-anchor="middle">Quest</text>
+  <line x1="102" y1="86" x2="140" y2="86" stroke="#2c3e50" stroke-width="2.5"/>
+  <text x="121" y="140" text-anchor="middle" font-size="12">データと電気を 1 本で</text>
+  <text x="121" y="166" text-anchor="middle" font-size="12">Mac の USB は 15W まで</text>
+  <text x="121" y="186" text-anchor="middle" font-size="12">減りが遅くなるだけの</text>
+  <text x="121" y="206" text-anchor="middle" font-size="12">ことがある</text>
+  <text x="121" y="254" text-anchor="middle" font-size="12" fill="#495057">まず 30 分測る</text>
+  <!-- A+ -->
+  <rect x="244" y="20" width="222" height="262" rx="10" fill="#f8f9fa" stroke="#adb5bd"/>
+  <text x="355" y="46" text-anchor="middle" font-weight="bold">A+. 充電口つきケーブル</text>
+  <rect x="262" y="66" width="74" height="40" rx="6" fill="#eaf2fb" stroke="#3498db"/><text x="299" y="91" text-anchor="middle">Mac</text>
+  <rect x="374" y="66" width="74" height="40" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="411" y="91" text-anchor="middle">Quest</text>
+  <line x1="336" y1="86" x2="374" y2="86" stroke="#2c3e50" stroke-width="2.5"/>
+  <rect x="310" y="126" width="92" height="30" rx="6" fill="#fff8f0" stroke="#e67e22"/><text x="356" y="146" text-anchor="middle" font-size="12">45W アダプター</text>
+  <line x1="356" y1="126" x2="356" y2="88" stroke="#e67e22" stroke-width="2.5"/>
+  <text x="355" y="186" text-anchor="middle" font-size="12">データは Mac から</text>
+  <text x="355" y="206" text-anchor="middle" font-size="12">電気はアダプターから</text>
+  <text x="355" y="254" text-anchor="middle" font-size="12" fill="#495057">ケーブルを 1 本買って試す</text>
   <!-- B -->
-  <rect x="325" y="20" width="290" height="260" rx="10" fill="#f1f9f4" stroke="#27ae60"/>
-  <text x="470" y="46" text-anchor="middle" font-weight="bold">B. Wi-Fi 接続＋充電器</text>
-  <rect x="345" y="70" width="80" height="44" rx="6" fill="#eaf2fb" stroke="#3498db"/><text x="385" y="97" text-anchor="middle">Mac</text>
-  <rect x="515" y="70" width="80" height="44" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="555" y="97" text-anchor="middle">Quest</text>
-  <path d="M425 92 L515 92" stroke="#8e44ad" stroke-width="2.5" stroke-dasharray="7 5"/>
-  <text x="470" y="84" text-anchor="middle" font-size="11">5 GHz ルータ</text>
-  <rect x="505" y="140" width="100" height="34" rx="6" fill="#fff8f0" stroke="#e67e22"/><text x="555" y="162" text-anchor="middle" font-size="12">45W 充電器</text>
-  <line x1="555" y1="114" x2="555" y2="140" stroke="#e67e22" stroke-width="2.5"/>
-  <text x="470" y="204" text-anchor="middle" font-size="12">./koch4/start.sh wifi の後、</text>
-  <text x="470" y="222" text-anchor="middle" font-size="12">USB を抜いて充電器に差し替える</text>
-  <text x="470" y="256" text-anchor="middle" font-size="12" fill="#495057">長時間向き。ルータが要る</text>
+  <rect x="478" y="20" width="222" height="262" rx="10" fill="#f1f9f4" stroke="#27ae60"/>
+  <text x="589" y="46" text-anchor="middle" font-weight="bold">B. Wi-Fi 接続＋充電</text>
+  <rect x="496" y="66" width="74" height="40" rx="6" fill="#eaf2fb" stroke="#3498db"/><text x="533" y="91" text-anchor="middle">Mac</text>
+  <rect x="608" y="66" width="74" height="40" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="645" y="91" text-anchor="middle">Quest</text>
+  <path d="M570 86 L608 86" stroke="#8e44ad" stroke-width="2.5" stroke-dasharray="6 4"/>
+  <rect x="599" y="126" width="92" height="30" rx="6" fill="#fff8f0" stroke="#e67e22"/><text x="645" y="146" text-anchor="middle" font-size="12">45W アダプター</text>
+  <line x1="645" y1="106" x2="645" y2="126" stroke="#e67e22" stroke-width="2.5"/>
+  <text x="589" y="186" text-anchor="middle" font-size="12">./koch4/start.sh wifi の後</text>
+  <text x="589" y="206" text-anchor="middle" font-size="12">USB を抜いて充電に差し替える</text>
+  <text x="589" y="254" text-anchor="middle" font-size="12" fill="#495057">電気は確実。ルータが要る</text>
   <!-- C -->
-  <rect x="630" y="20" width="290" height="260" rx="10" fill="#f8f9fa" stroke="#adb5bd"/>
-  <text x="775" y="46" text-anchor="middle" font-weight="bold">C. 休憩ごとにドックで充電</text>
-  <rect x="730" y="70" width="90" height="44" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="775" y="97" text-anchor="middle">Quest</text>
-  <rect x="715" y="130" width="120" height="30" rx="6" fill="#fff8f0" stroke="#e67e22"/><text x="775" y="150" text-anchor="middle" font-size="12">充電ドック（45W）</text>
-  <line x1="775" y1="114" x2="775" y2="130" stroke="#e67e22" stroke-width="2.5"/>
-  <text x="775" y="194" text-anchor="middle" font-size="12">1 時間の充電で約半分回復。</text>
-  <text x="775" y="212" text-anchor="middle" font-size="12">体験を止める時間が要る</text>
-  <text x="775" y="246" text-anchor="middle" font-size="12" fill="#495057">A・B の補助として</text>
+  <rect x="712" y="20" width="218" height="262" rx="10" fill="#f8f9fa" stroke="#adb5bd"/>
+  <text x="821" y="46" text-anchor="middle" font-weight="bold">C. 休憩ごとにドック</text>
+  <rect x="784" y="66" width="74" height="40" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="821" y="91" text-anchor="middle">Quest</text>
+  <rect x="757" y="126" width="128" height="30" rx="6" fill="#fff8f0" stroke="#e67e22"/><text x="821" y="146" text-anchor="middle" font-size="12">充電ドック（45W）</text>
+  <line x1="821" y1="106" x2="821" y2="126" stroke="#e67e22" stroke-width="2.5"/>
+  <text x="821" y="186" text-anchor="middle" font-size="12">1 時間で約半分回復</text>
+  <text x="821" y="206" text-anchor="middle" font-size="12">体験を止める時間が要る</text>
+  <text x="821" y="254" text-anchor="middle" font-size="12" fill="#495057">補助として</text>
 </svg>
-<figcaption>図 8-1: 給電の 3 つの組み方。A は配線が最も少なく、B は電池の心配が無く、C は道具が要りません。</figcaption>
+<figcaption>図 8-1: 給電の 4 つの組み方。ゴーグルの USB の口は 1 つなので、データと電気をどう分けるかの違いです。</figcaption>
 </figure>
+<table class="table table-striped">
+<thead><tr><th style="width:22%">組み方</th><th style="width:30%">要る物</th><th>注意</th></tr></thead>
+<tbody>
+<tr><td>A. USB のまま</td><td>データ対応の USB-C ケーブル</td><td>Mac の USB から出せる電気は 15W までで、ゴーグルの指定（45W）に届かない。減りが遅くなるだけのことがあるので、30 分測って決める</td></tr>
+<tr><td>A+. 充電口つきケーブル</td><td>充電ポート付きの Link 用ケーブル（5 m）と、付属の 45W 電源アダプター</td><td>市販品はパソコン側が USB-A のものが多く、Mac には変換アダプタが要る。対応機種に Quest Pro と書かれていない製品が多いので、買ったら最初に <code>./koch4/start.sh check</code> で「接続済み」と「充電中」が両方出ることを確かめる</td></tr>
+<tr><td>B. Wi-Fi 接続＋充電</td><td>自前の 5 GHz ルータと、付属の 45W 電源アダプター・充電ケーブル</td><td>電気は確実に足りる。Wi-Fi への切り替えが通るかを先に 1 回確かめる。ゴーグルを再起動したら切り替えをやり直す</td></tr>
+<tr><td>C. 休憩ごとにドック</td><td>付属の充電ドック</td><td>体験を止める時間が要るので、A や B の補助にする</td></tr>
+</tbody>
+</table>
 <div class="step">
 <p class="mb-1"><strong>減り方を測る（本番の前に 1 回）</strong></p>
 <ol class="mb-0">
   <li>満充電にして <code>./koch4/start.sh vr</code> で AR 表示のまま 30 分使う。</li>
-  <li><code>./koch4/start.sh check</code> でバッテリー残量（%）を読む。30 分で減った分から、何時間もつかを計算する。</li>
-  <li>1 日分に足りなければ B に切り替える。Mac とゴーグルを同じ自前ルータに繋ぎ、USB を挿した状態で <code>./koch4/start.sh wifi</code> を実行し、表示が出たら USB を抜いて 45W の充電器（またはモバイルバッテリー）に差し替える。</li>
+  <li><code>./koch4/start.sh check</code> でバッテリー残量（%）と「充電中／放電中」を読む。30 分で減った分から、何時間もつかを計算する。</li>
+  <li>1 日分に足りなければ B に切り替える。Mac とゴーグルを同じ自前ルータに繋ぎ、USB を挿した状態で <code>./koch4/start.sh wifi</code> を実行し、表示が出たら USB を抜いて、付属の 45W 電源アダプターに繋いだ充電ケーブルに差し替える。</li>
 </ol>
 </div>
 <p>ゴーグルは顔から外すとしばらくして休止し、消費が下がります。来場者の入れ替えの間は外して置くだけでも持ちが延びます。</p>
@@ -357,6 +384,8 @@
 <tr><td><a href="https://developers.meta.com/horizon/documentation/web/webxr-mixed-reality/">Meta: Mixed Reality Support in Browser</a></td><td>§3 Quest Pro のブラウザで現実を映したまま 3D を重ねる表示</td></tr>
 <tr><td><a href="https://developers.meta.com/horizon/documentation/native/android/ts-mqdh-media/">Meta Quest Developer Hub: Cast</a></td><td>§7 ゴーグルの画面を Mac に映す</td></tr>
 <tr><td><a href="https://www.meta.com/help/quest/3482884435359892/">Meta ヘルプ: ヘッドセットの充電</a></td><td>§8 Quest Pro に必要な電源は 45W・PC の USB では充電が遅い</td></tr>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/430804835708882/">Meta ヘルプ: Meta Quest Pro のセット内容</a></td><td>§1・§8 45W 電源アダプターと充電ケーブルが同梱</td></tr>
+<tr><td><a href="https://en.wikipedia.org/wiki/USB-C">USB-C（Wikipedia）</a></td><td>§8 給電の取り決めが無い USB-C は 5V で 1.5A か 3A まで</td></tr>
 <tr><td><a href="https://www.roadtovr.com/quest-pro-battery-life-included-dock/">Road to VR: Quest Pro のバッテリー</a></td><td>§8 公称 1〜2 時間・ドックで約 2 時間で満充電</td></tr>
 <tr><td><a href="https://developer.android.com/tools/releases/platform-tools">Android SDK Platform-Tools</a></td><td>§2 adb</td></tr>
 <tr><td><a href="https://github.com/Genymobile/scrcpy">scrcpy</a></td><td>§7 画面の映し出し</td></tr>

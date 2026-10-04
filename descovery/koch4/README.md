@@ -16,7 +16,7 @@ hardware safety rules apply to every script here.
 ```
 koch4/
 ├── start.sh               one entry point: check / handshake / vr / vr2 / sim / quest / wifi / manual
-├── manual/                HTML manuals for the fest: index.html (entry), handshake.html, vr.html
+├── manual/                HTML manuals for the fest: index.html (entry), handshake.html, vr.html, quest_setup.html (Meta account → developer mode → adb)
 ├── koch4_teleop.py        one pair: teleop + telemetry + leader force feedback (3 styles + virtual wall/weight)
 ├── koch4_dual_launch.py   both pairs by default (--pair A|B for staging), one panel, fixed ports, logs
 ├── koch4_web_panel.py     one browser panel for every pair: shared sliders broadcast to all pairs

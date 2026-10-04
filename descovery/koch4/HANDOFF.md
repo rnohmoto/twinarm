@@ -45,7 +45,7 @@ Mac 側から来た分（branch `rn/feat/koch4-vr-objects`・9/20 以降）: A/B
 - **反力の設計**: 壁はサーボ内部ループ（Mode 5: Goal_Position=壁・Goal_Current=上限・P ゲイン=硬さ）に置き、ホストは接触の ON/OFF だけ。重さは握っている間だけ肩・肘に電流。完全モーター模倣は不要
 - **一人称**: パススルー AR で実機を見ながら、分身は半透明か指先だけ。位置合わせは VR 内のコントローラ（C）で、数値の微調整だけ編集モード（E）。配置リセットは VR 内のボタン（R）
 - **Quest の接続**: 本命 USB＋adb reverse（開発者モードが前提）・退路 自前 5 GHz ルータ＋自己署名 https の警告承諾
-- **Quest の電源**: バッテリーは公称 1〜2 時間（45W ドックで満充電 約 2 時間）なので、バッテリーだけでは 1 日もたない。USB のまま 30 分測り、足りなければ `start.sh wifi`（adb over Wi-Fi）＋45W 充電器、補助にドック
+- **Quest の電源**: バッテリーは公称 1〜2 時間（45W ドックで満充電 約 2 時間）なので、バッテリーだけでは 1 日もたない。45W 電源アダプターと充電ケーブルは箱に同梱。Mac からは映像を送っておらず（関節角度だけ・腕 2 本で毎秒約 40 kB）、USB の口を充電に回して Wi-Fi で繋いでも体験は変わらない。A: USB のまま 30 分測る／A+: 充電ポート付き Link ケーブル／B: `start.sh wifi`（adb over Wi-Fi）＋45W アダプター／C: ドック補助
 - **実機の事実（ユーザー報告 9/20）**: ゴルフボールは超ぎりぎり持てる。摩擦不足で落ちる／角度と加速度によっては過負荷停止して落ちる → `--grip-ma`・摩擦材・`--max-rel` 低め。卓球ボール 40 mm が安全側
 
 ## 4. 決めどころ（未裁定）
@@ -61,7 +61,7 @@ Mac 側から来た分（branch `rn/feat/koch4-vr-objects`・9/20 以降）: A/B
 
 | 見たいこと | ファイル |
 |---|---|
-| まず起動したい・図で見たい | `start.sh`・`manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`） |
+| まず起動したい・図で見たい | `start.sh`・`manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`・Meta アカウントの作り方から USB 接続まで＝`quest_setup.html`） |
 | 何がどう動くか（一覧・危険度・流れ） | `README.md` |
 | 実機での手順と記録欄 | `CHECKLIST.md`（TEST／W／U／V の各節・運用メモ＝経路表・接続手順・ブラウザ・アラート表） |
 | 1 ペアの制御（力覚・壁・重さ・無線フォロワー・2 人目の `--leader-type koch_follower`） | `koch4_teleop.py`（冒頭 docstring が仕様） |

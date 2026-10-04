@@ -194,6 +194,7 @@ uv run python koch4/koch4_dual_launch.py --follower wired --ff gripper    # USB 
 会場（有明 GYM-EX）のゲスト Wi-Fi は端末間が通らず、会場資料も AP の干渉を警告している → **本命は USB ケーブル＋adb reverse**（電波を使わない・証明書警告なし。`http://localhost` は WebXR の安全なコンテキストなので https が要らない）。退路は自前 5 GHz ルータ＋自己署名 https（Quest Browser で証明書警告を「続行」）。
 
 ### U0 — 開発者モードと adb（展示の 1〜2 週間前に）
+図解の手順は `manual/quest_setup.html`（Meta アカウントの作り方 → アプリ → 初期設定 → 開発者の登録 → 開発者モード → Mac と接続）。
 1. 展示専用の Meta アカウント（会社メール）でヘッドセットを初期設定（Meta アカウントは必須・Facebook は不要）
 2. developers.meta.com で開発者組織（チーム）を作り、アカウントを検証（SMS の 2 段階認証か支払い方法。PayPal 不可・18 歳以上）。2026 年は Meta の回答で「組織の検証（Admin Verification＝身分証・2 分）」まで求められた例があるので、そこまで済ませる
 3. Meta Horizon アプリ → ヘッドセット → ヘッドセット設定 → 開発者モード ON
@@ -203,7 +204,9 @@ uv run python koch4/koch4_dual_launch.py --follower wired --ff gripper    # USB 
 7. 給電: Quest Pro のバッテリーは公称 1〜2 時間・付属の 45W ドックで満充電に約 2 時間 → **バッテリーだけでは 1 日もたない**。構成は 3 つ:
    A. USB のまま（Mac から給電。Mac の USB は 45W 充電器より弱く、減りが遅くなるだけのことがある）→ まず 30 分測る（`./koch4/start.sh check` が残量 % を出す）
    B. `./koch4/start.sh wifi`（adb を Wi-Fi に切替・Mac と Quest は同じ自前 5 GHz ルータ）→ USB を抜いて 45W 充電器かモバイルバッテリーに差し替える。ヘッドセットを再起動したらやり直す
+   A+. 充電ポート付きの Link 用ケーブル（データは Mac・電気は付属の 45W アダプター。Quest Pro 対応と書かれていない製品が多いので `check` で「接続済み」と「充電中」を確認）
    C. 休憩ごとにドックで充電（1 時間で約半分）
+   補足: Mac からゴーグルへ映像は送っていない（関節角度だけ・腕 2 本で毎秒約 40 kB）。2.4 GHz でも量は足りるが、会場の混雑を避けるため 5 GHz を使う
 
 ```
 Meta アカウント [ ]  組織の検証 [ ]  開発者モード [ ]  adb --check [ ]

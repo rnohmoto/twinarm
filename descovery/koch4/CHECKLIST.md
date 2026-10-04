@@ -219,7 +219,7 @@ uv run python koch4/koch4_dual_launch.py --follower wired --ff gripper    # USB 
 6. `uv run python koch4/koch4_quest_usb.py --check` → `✓ <serial>: 接続済み`
 7. 給電: Quest Pro のバッテリーは公称 1〜2 時間・付属の 45W ドックで満充電に約 2 時間 → **バッテリーだけでは 1 日もたない**。構成は 4 つ:
    A. USB のまま（Mac から給電。Mac の USB は 45W 充電器より弱く、減りが遅くなるだけのことがある）→ まず 30 分測る（`./koch4/start.sh check` が残量 % を出す）
-   B. `./koch4/start.sh wifi`（adb を Wi-Fi に切替・Mac と Quest は同じ自前 5 GHz ルータ）→ USB を抜いて 45W 充電器かモバイルバッテリーに差し替える。ヘッドセットを再起動したらやり直す
+   B. `./koch4/start.sh wifi`（adb を Wi-Fi に切替・Mac と Quest は同じ自前 5 GHz ルータ）→ `✓ adb reverse` が出たら USB を抜いて 45W 充電器かモバイルバッテリーに差し替える。`✗ adb reverse を張れません` なら、この機体では Wi-Fi 越しの reverse が通らない（古い Quest で報告あり。Meta の文書は USB の手順だけ）→ https の経路（`manual/vr.html` §9）で繋ぐ。ヘッドセットを再起動したらやり直す
    A+. 充電ポート付きの Link 用ケーブル（データは Mac・電気は付属の 45W アダプター。Quest Pro 対応と書かれていない製品が多いので `check` で「接続済み」と「充電中」を確認）
    C. 休憩ごとにドックで充電（満充電まで約 2 時間）
    補足: Mac からゴーグルへ映像は送っていない（関節角度だけ・腕 2 本で毎秒約 40 kB）。2.4 GHz でも量は足りるが、会場の混雑を避けるため 5 GHz を使う

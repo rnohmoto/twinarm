@@ -92,7 +92,7 @@
   <thead><tr><th>場所</th><th>端子</th><th>電圧・電流</th><th>この構成での用途</th><th>注意</th></tr></thead>
   <tbody>
     <tr><td>背面</td><td>電源ジャック</td><td>12V DC（公式仕様は 6.5A）</td><td>付属 AC アダプタ</td><td>電源を切るときは LED が消えるまで待つ</td></tr>
-    <tr><td>背面</td><td>USB</td><td>USB シリアル（CP210x）</td><td>PC へ</td><td>付属ケーブルを使う</td></tr>
+    <tr><td>背面</td><td>USB（Type-B の四角い口）</td><td>USB シリアル（CP210x）</td><td>PC へ</td><td>付属の USB ケーブル（A–B）を使う。延ばすなら PC 側に USB-A のアクティブ延長</td></tr>
     <tr><td>背面</td><td>電源スイッチ／キー／リセット</td><td>—</td><td>キー 2 秒長押しでホーミング、リセットは制御器の再起動</td><td>ホーミングは電源投入のたびに必要</td></tr>
     <tr><td>背面</td><td>SW1・SW2</td><td>12V / 1A 出力</td><td>SW1 にポンプボックスの電源線</td><td>通電中に抜き挿ししない</td></tr>
     <tr><td>背面</td><td>GP1・GP2</td><td>3.3V または 5V・20mA。入力（ADC）と出力（PWM）を切替</td><td>GP1 にポンプボックスの信号線（吸着の ON/OFF）</td><td>GP2 は空き。センサ入力に使える</td></tr>
@@ -104,7 +104,7 @@
   </tbody>
 </table>
 <div class="note step">
-  <strong>現物で確かめる項目</strong>: ① USB コネクタの形状（公式文書に記載なし。付属ケーブルが合えばよい）② AC アダプタの銘板の電流値（公式サイトは 12V/6.5A。販売店の表記に 7A もある）③ Temp ピンの位置とコネクタ形状（前腕側と推定）。
+  <strong>現物で確かめる項目</strong>: ① AC アダプタの銘板の電流値（公式サイトは 12V/6.5A。販売店の表記に 7A もある）② Temp ピンの位置とコネクタ形状（前腕側と推定）③ 付属の USB ケーブルの有無と長さ。
 </div>
 <div class="row g-3">
   <div class="col-md-6"><figure class="photo"><img src="img/02_rear_ports.jpg" alt="背面の端子" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 02: 背面の端子（電源・USB・SW1/GP1 にケーブルを挿した状態）</div><figcaption>写真 1-1: 背面インタフェース。</figcaption></figure></div>
@@ -232,7 +232,8 @@ uv run python check_camera.py --list ; uv run python check_camera.py --index 0</
     <tr><td><a href="https://download.dobot.cc/product-manual/dobot-magician/pdf/en/Dobot-Magician-ALARM-Description.pdf">Dobot Magician ALARM Description</a></td><td>§6・§7 アラームの種類</td></tr>
     <tr><td><a href="https://www.dobot-robots.com/products/education/magician.html">Dobot Magician 製品ページ</a></td><td>電源仕様 12V/6.5A、吸盤・グリッパの仕様</td></tr>
     <tr><td><a href="https://docs.trossenrobotics.com/dobot_cr_cobots_docs/tcpip_protocol/functions.html">Dobot CR TCP/IP プロトコル（Trossen Robotics 転載）</a></td><td>§6 サーボ機のフィードバック項目（参考）</td></tr>
-  </tbody>
+  <tr><td><a href="https://mm.digikey.com/Volume0/opasdata/d220001/medias/docus/2581/Magician%20Interface.pdf">Dobot Magician Interface Description (V2)</a></td><td>§1 背面の端子の並びと、USB の口の形（Type-B）</td></tr>
+</tbody>
 </table>
 
 <footer>作成 2026年9月20日。TwinArm <code>dobot/manual/connection.html</code>。</footer>

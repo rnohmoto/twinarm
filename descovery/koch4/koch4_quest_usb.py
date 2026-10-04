@@ -137,9 +137,7 @@ def switch_to_wifi(adb, serial):
     if "connected" not in out:
         print(f"⚠ Wi-Fi の adb に繋がりません: {out.strip()}（同じネットワークか確認）")
         return None
-    print(
-        f"✓ adb over Wi-Fi: {wifi_serial}。USB ケーブルを抜いて充電器（45W）に差し替えられます"
-    )
+    print(f"✓ adb over Wi-Fi: {wifi_serial}")
     return wifi_serial
 
 
@@ -196,12 +194,28 @@ def main():
         return
     if args.wifi and ":" not in serial:
         serial = switch_to_wifi(adb, serial) or serial
-    run(
-        [adb, "-s", serial, "reverse", f"tcp:{args.port}", f"tcp:{args.port}"],
-        check=True,
+    code, out = run(
+        [adb, "-s", serial, "reverse", f"tcp:{args.port}", f"tcp:{args.port}"]
     )
     _, rev = run([adb, "-s", serial, "reverse", "--list"])
-    print(f"✓ adb reverse: {rev.strip() or f'tcp:{args.port}'}")
+    if code != 0 or f"tcp:{args.port}" not in rev:
+        # 張れたことを一覧で確かめる（返事だけ成功して張れていない場合を ✓ にしない）
+        print(f"✗ adb reverse を張れません: {(out or rev).strip() or '一覧に出ません'}")
+        if ":" in serial:
+            print(
+                "  Wi-Fi 越しの adb では reverse が通らない機体・OS の報告があります。"
+                "USB を挿し直して --wifi なしで実行すると元に戻ります。"
+            )
+            print(
+                "  充電しながら使うなら https の経路へ: ブリッジを --vr-http なしで起動し、"
+                f"ゴーグルのブラウザで https://<この PC の IP>:{args.port}/ を開く（manual/vr.html §9）"
+            )
+        sys.exit(1)
+    print(f"✓ adb reverse: {rev.strip()}")
+    if ":" in serial:
+        print(
+            "  Wi-Fi 越しに張れました。USB ケーブルを抜いて、付属の 45W 電源アダプターに差し替えられます"
+        )
     url = f"http://localhost:{args.port}/" + ("?spectator=1" if args.spectator else "")
     if not args.no_open:
         code, out = run(

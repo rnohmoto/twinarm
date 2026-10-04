@@ -136,7 +136,8 @@ VR（2 人）: `./koch4/start.sh vr2`（`--vr2` を足す。フォロワー機�
 - `TacitCapture/94_Koch×VR仮想反力_構成調査と実装計画_v1.md`（VR の答えと設計・§8 に第 2 版と会場ネットワーク）
 - `TacitCapture/95_フォロワー無線化_構成設計_v1.md`（無線の設計・エラー耐性・機材比較）
 - `web_research/koch4_2609/A_ B_ C_`・`web_research/koch4_2610/`（lerobot／XL330 レジスタ・Quest Pro 接続・ハプティクス理論・WebXR 物理と位置合わせ・Mac カメラの一次情報）
-- `.claude/cases/koch-4arm-dual.md`・`koch-vr-haptics.md`（裁定の履歴）・`.claude/handoff/261004_T6_*.md`（最新の引き継ぎ）
+- `TacitCapture/112_`（10/4 夜の通し稽古の記録: 方法・69 項目・見つけて直した 5 点）・`111_` v2（買い物と USB ケーブル）・`web_research/koch4_2610/F_`（Koch 基板の USB は USB 2.0・adb の Wi-Fi 接続ほかの裏取り）
+- `.claude/cases/koch-4arm-dual.md`・`koch-vr-haptics.md`（裁定の履歴）・`.claude/handoff/261005_INDEX.md`（最新の引き継ぎ: 握手 T7・VR T8・裏取り T9・資料追加 T10）
 - `TacitCapture/76_`（2 ペアのテスト設計）・`58_`／`61_`／`62_`（受入・実機ログ・運用）・`87_`／`85_`（握手アタッチメントの印刷）・`output/cad/print_kit_fest2610/`（印刷キット）
 
 ## 8. 安全（AGENTS.md の要約）

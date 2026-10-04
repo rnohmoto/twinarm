@@ -29,6 +29,9 @@ class CameraConfig:
     wb_temperature: int = 4500       # CAP_PROP_WB_TEMPERATURE
     rotation_deg: int = 0            # 0/90/180/270（俯瞰の向き合わせ）
     warmup_frames: int = 10          # 露出安定待ち
+    mirror: bool = False             # 鏡越しに撮る（内蔵カメラ＋ミラークリップ）→ 左右反転して鏡像を戻す
+    reference_roi: list[int] | None = None  # [x,y,w,h] 画素。グレーカードの範囲。露出/WB を固定できないカメラ（Mac 内蔵・iPhone）で毎フレーム補正
+    reference_gray: int = 170        # 補正後にグレーカードが取る明るさ（0-255・各チャンネル）
 
 
 @dataclass

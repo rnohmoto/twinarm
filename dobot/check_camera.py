@@ -70,8 +70,14 @@ def main(argv=None) -> int:
     ap.add_argument("--seconds", type=float, default=3.0, help="明るさの揺れを見る秒数")
     ap.add_argument("--auto", action="store_true", help="自動露出のまま開く（比較用）")
     ap.add_argument("--exposure", type=float, default=-6.0, help="手動露出値（Windows: 2^n 秒。-6=1/64 秒）")
+    ap.add_argument("--mirror", action="store_true", help="鏡越し（ミラークリップ）: 左右反転して鏡像を戻す")
+    ap.add_argument("--ref", default="", help="グレーカードの画素範囲 x,y,w,h（露出を固定できないカメラの補正を試す）")
     ap.add_argument("--no-snapshot", action="store_true")
     args = ap.parse_args(argv)
+    ref = [int(p) for p in args.ref.replace(" ", "").split(",") if p.lstrip("-").isdigit()]
+    if args.ref and len(ref) != 4:
+        print("--ref は x,y,w,h の 4 つの整数で")
+        return 2
 
     if args.list:
         cams = list_opencv_cameras()
@@ -83,7 +89,13 @@ def main(argv=None) -> int:
         return 0
 
     cfg = CameraConfig(index=args.index, width=args.width, height=args.height, fps=args.fps,
-                       auto_exposure=args.auto, exposure=args.exposure)
+                       auto_exposure=args.auto, exposure=args.exposure, mirror=args.mirror,
+                       reference_roi=ref if len(ref) == 4 else None)
+    if cfg.reference_roi:
+        print(f"グレーカード補正 ON: roi={cfg.reference_roi}（補正後の明るさの揺れを報告します。"
+              "補正なしと比べるには --ref を外して再実行）")
+    if cfg.mirror:
+        print("左右反転 ON（鏡越し）")
     cam = OpenCVCamera(cfg)
     cam.open()
     try:

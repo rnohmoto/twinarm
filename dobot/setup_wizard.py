@@ -104,6 +104,11 @@ class Wizard:
         idx = ask("使うカメラ番号", str(self.cfg.camera.index if cams else 0))
         self.cfg.camera.index = int(idx) if idx.isdigit() else idx
         self.cfg.camera.auto_exposure = False
+        self.cfg.camera.mirror = ask("鏡（ミラークリップ）越しに撮りますか y/n", "y" if self.cfg.camera.mirror else "n").strip().lower().startswith("y")
+        cur_ref = ",".join(str(v) for v in self.cfg.camera.reference_roi) if self.cfg.camera.reference_roi else ""
+        ref = ask("露出を固定できないカメラ（Mac 内蔵・iPhone）ならグレーカードの画素範囲 x,y,w,h（空=使わない）", cur_ref)
+        parts = [p for p in ref.replace(" ", "").split(",") if p]
+        self.cfg.camera.reference_roi = [int(p) for p in parts] if len(parts) == 4 and all(p.lstrip("-").isdigit() for p in parts) else None
         self.camera = None
         cam = self.open_camera()
         frames = [cam.read() for _ in range(15)]
@@ -118,6 +123,10 @@ class Wizard:
             cv2.line(f, (w // 2, 0), (w // 2, h), (0, 255, 255), 1)
             cv2.line(f, (0, h // 2), (w, h // 2), (0, 255, 255), 1)
             cv2.rectangle(f, (int(w * .1), int(h * .1)), (int(w * .9), int(h * .9)), (0, 200, 0), 1)
+            if self.cfg.camera.reference_roi:
+                rx, ry, rw, rh = self.cfg.camera.reference_roi
+                cv2.rectangle(f, (rx, ry), (rx + rw, ry + rh), (255, 0, 255), 2)
+                cv2.putText(f, "gray card", (rx, max(12, ry - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
             cv2.putText(f, "aim: workspace inside green box / q=next s=snapshot", (10, 24),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             cv2.imshow("wizard: camera", f)

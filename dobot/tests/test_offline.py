@@ -226,3 +226,24 @@ if __name__ == "__main__":
             traceback.print_exc()
     print(f"\n{len(fns)-failed}/{len(fns)} passed")
     raise SystemExit(1 if failed else 0)
+
+
+def test_camera_postprocess_mirror_and_gray_card():
+    from camera import _postprocess
+    frame = np.zeros((20, 40, 3), np.uint8)
+    frame[:, :] = (80, 100, 130)         # 暗く青みがかった一様な机（自動露出・自動 WB の結果を想定）
+    frame[:, 38:] = (255, 255, 255)      # 右端に白い帯（鏡像の確認用）
+    cfg = CameraConfig(backend="file", mirror=True, reference_roi=[15, 5, 10, 10], reference_gray=170)
+    out = _postprocess(frame, cfg)
+    assert out.shape == frame.shape and out.flags["C_CONTIGUOUS"]
+    # 鏡像: 右端の白帯が左端へ移る
+    assert out[10, 0].min() > out[10, 20].max()
+    # グレーカード（ROI）は各チャンネル 170 前後に揃う（露出と WB の揺れを吸収）
+    patch = out[5:15, 15:25].reshape(-1, 3).astype(float).mean(axis=0)
+    assert all(abs(v - 170) <= 1.5 for v in patch), patch
+    # 補正も反転も無し（既定）なら画素はそのまま
+    plain = _postprocess(frame, CameraConfig(backend="file"))
+    assert plain[10, 20].tolist() == [80, 100, 130] and plain[10, 39].tolist() == [255, 255, 255]
+    # カードが真っ黒（見えていない）なら補正しない
+    dark = np.zeros((20, 40, 3), np.uint8)
+    assert _postprocess(dark, CameraConfig(backend="file", reference_roi=[0, 0, 5, 5])).max() == 0

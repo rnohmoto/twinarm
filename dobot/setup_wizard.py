@@ -106,11 +106,16 @@ class Wizard:
         self.cfg.camera.auto_exposure = False
         self.cfg.camera.mirror = ask("鏡（ミラークリップ）越しに撮りますか y/n", "y" if self.cfg.camera.mirror else "n").strip().lower().startswith("y")
         cur_ref = ",".join(str(v) for v in self.cfg.camera.reference_roi) if self.cfg.camera.reference_roi else ""
-        ref = ask("露出を固定できないカメラ（Mac 内蔵・iPhone）ならグレーカードの画素範囲 x,y,w,h（空=使わない）", cur_ref)
+        ref = ask("露出を固定できないカメラ（Mac 内蔵・iPhone）ならグレーカードの範囲: p=画面でドラッグして選ぶ／x,y,w,h／空=使わない", cur_ref)
+        pick = ref.strip().lower() == "p"
         parts = [p for p in ref.replace(" ", "").split(",") if p]
         self.cfg.camera.reference_roi = [int(p) for p in parts] if len(parts) == 4 and all(p.lstrip("-").isdigit() for p in parts) else None
         self.camera = None
         cam = self.open_camera()
+        if pick:
+            from check_camera import pick_reference_roi
+            self.cfg.camera.reference_roi = pick_reference_roi(cam.read())
+            print(f"  グレーカードの範囲: {self.cfg.camera.reference_roi}")
         frames = [cam.read() for _ in range(15)]
         props = cam.actual_props()
         for line in judge(brightness_stats([f.mean(axis=2) for f in frames]), props, cam.auto_exposure_applied):

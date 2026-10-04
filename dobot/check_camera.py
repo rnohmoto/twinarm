@@ -60,6 +60,14 @@ def judge(stats: dict, props: dict, applied) -> list[str]:
     return notes
 
 
+def pick_reference_roi(frame) -> list[int] | None:
+    """窓の上でグレーカードをドラッグして選ぶ（Enter か Space で確定・c で取消）。[x, y, w, h] を返す。"""
+    import cv2
+    x, y, w, h = cv2.selectROI("gray card: drag over it, then Enter", frame, showCrosshair=True, fromCenter=False)
+    cv2.destroyAllWindows()
+    return [int(x), int(y), int(w), int(h)] if w > 0 and h > 0 else None
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="camera check (read-only)")
     ap.add_argument("--list", action="store_true", help="カメラを列挙して終了")
@@ -72,6 +80,7 @@ def main(argv=None) -> int:
     ap.add_argument("--exposure", type=float, default=-6.0, help="手動露出値（Windows: 2^n 秒。-6=1/64 秒）")
     ap.add_argument("--mirror", action="store_true", help="鏡越し（ミラークリップ）: 左右反転して鏡像を戻す")
     ap.add_argument("--ref", default="", help="グレーカードの画素範囲 x,y,w,h（露出を固定できないカメラの補正を試す）")
+    ap.add_argument("--pick-ref", action="store_true", help="窓でグレーカードをドラッグして範囲を選ぶ（x,y,w,h を表示して終了）")
     ap.add_argument("--no-snapshot", action="store_true")
     args = ap.parse_args(argv)
     ref = [int(p) for p in args.ref.replace(" ", "").split(",") if p.lstrip("-").isdigit()]
@@ -99,6 +108,14 @@ def main(argv=None) -> int:
     cam = OpenCVCamera(cfg)
     cam.open()
     try:
+        if args.pick_ref:
+            roi = pick_reference_roi(cam.read())
+            if roi is None:
+                print("範囲が選ばれませんでした（カードの上をドラッグしてから Enter）")
+                return 1
+            print("グレーカードの範囲: --ref " + ",".join(str(v) for v in roi))
+            print(f'config.json の "camera" に書く値: "reference_roi": {roi}')
+            return 0
         frames = []
         t_end = time.time() + args.seconds
         while time.time() < t_end:

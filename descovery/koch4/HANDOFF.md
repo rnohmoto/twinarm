@@ -75,8 +75,8 @@ Mac 側から来た分（branch `rn/feat/koch4-vr-objects`・9/20 以降）: A/B
 ## 6. Mac 側の準備（両方の Mac）
 
 ```bash
-git clone https://github.com/rnohmoto/twinarm.git && cd twinarm && git checkout rn/feat/koch4-vr-fps && cd descovery && uv sync
-# 既に rn/feat/koch4-vr-objects で作業している Mac は git pull だけでよい（同じ内容を入れてある）
+git clone https://github.com/rnohmoto/twinarm.git && cd twinarm/descovery && uv sync
+# main に入っている（2026-10-04 マージ）。rn/feat/koch4-vr-fps と rn/feat/koch4-vr-objects も同じ内容なので、どのブランチにいても git pull で届く
 ./koch4/start.sh check                                # 自己診断・ポート・Quest の接続と電池（腕は動かない）
 ./koch4/start.sh manual                               # 図解マニュアルを開く
 python koch4/webxr/setup_assets.py                    # three.js を取得（VR を使う Mac だけ）

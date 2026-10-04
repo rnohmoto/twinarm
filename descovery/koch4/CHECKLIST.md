@@ -5,6 +5,8 @@
 koch4 のコマンドに置き換えて 1 枚にしたもの。**合格は、ユーザーが実行して報告した結果だけを事実とする。**
 実機を動かす・トルクを抜くコマンドは、その会話でユーザーが明示的に頼んだときだけ実行する。
 
+入口: `./koch4/start.sh`（check／handshake／vr／vr2／sim／quest／wifi／manual）。図解つきの手引きは `manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`）。
+
 方針（2026-09-20 裁定）: **2ペアが原則**（`--pair both` 既定・パネル 1 枚・ゲインは全ペア同じ値）。
 **VR は別枠**（リーダー 1 本で `--vr`。握手ペアと混ぜない）。
 
@@ -187,7 +189,41 @@ uv run python koch4/koch4_dual_launch.py --follower wired --ff gripper    # USB 
 切替所要:   分   動作 [ ]
 ```
 
-## VR — 仮想物体の反力（別枠。リーダー 1 本）
+## U — Quest の USB 接続（1 回だけ・ヘッドセットと Mac の準備）
+
+会場（有明 GYM-EX）のゲスト Wi-Fi は端末間が通らず、会場資料も AP の干渉を警告している → **本命は USB ケーブル＋adb reverse**（電波を使わない・証明書警告なし。`http://localhost` は WebXR の安全なコンテキストなので https が要らない）。退路は自前 5 GHz ルータ＋自己署名 https（Quest Browser で証明書警告を「続行」）。
+
+### U0 — 開発者モードと adb（展示の 1〜2 週間前に）
+図解の手順は `manual/quest_setup.html`（Meta アカウントの作り方 → アプリ → 初期設定 → 開発者の登録 → 開発者モード → Mac と接続）。
+1. 展示専用の Meta アカウント（会社メール）でヘッドセットを初期設定（Meta アカウントは必須・Facebook は不要）
+2. developers.meta.com で開発者組織（チーム）を作り、アカウントを検証（SMS の 2 段階認証か支払い方法。PayPal 不可・18 歳以上）。2026 年は Meta の回答で「組織の検証（Admin Verification＝身分証・2 分）」まで求められた例があるので、そこまで済ませる
+3. Meta Horizon アプリ → ヘッドセット → ヘッドセット設定 → 開発者モード ON
+4. Mac: `brew install --cask android-platform-tools`（または Meta Quest Developer Hub）
+5. データ対応の USB-C ケーブルで Quest を Mac に挿し、ヘッドセットを被って「USB デバッグを許可」→「常に許可」（予備の Mac でも）
+6. `uv run python koch4/koch4_quest_usb.py --check` → `✓ <serial>: 接続済み`
+7. 給電: Quest Pro のバッテリーは公称 1〜2 時間・付属の 45W ドックで満充電に約 2 時間 → **バッテリーだけでは 1 日もたない**。構成は 3 つ:
+   A. USB のまま（Mac から給電。Mac の USB は 45W 充電器より弱く、減りが遅くなるだけのことがある）→ まず 30 分測る（`./koch4/start.sh check` が残量 % を出す）
+   B. `./koch4/start.sh wifi`（adb を Wi-Fi に切替・Mac と Quest は同じ自前 5 GHz ルータ）→ USB を抜いて 45W 充電器かモバイルバッテリーに差し替える。ヘッドセットを再起動したらやり直す
+   A+. 充電ポート付きの Link 用ケーブル（データは Mac・電気は付属の 45W アダプター。Quest Pro 対応と書かれていない製品が多いので `check` で「接続済み」と「充電中」を確認）
+   C. 休憩ごとにドックで充電（1 時間で約半分）
+   補足: Mac からゴーグルへ映像は送っていない（関節角度だけ・腕 2 本で毎秒約 40 kB）。2.4 GHz でも量は足りるが、会場の混雑を避けるため 5 GHz を使う
+
+```
+Meta アカウント [ ]  組織の検証 [ ]  開発者モード [ ]  adb --check [ ]
+30 分の減り: A(USB)   %  B(Wi-Fi＋充電器)   %   採用: A / B / C     adb over Wi-Fi で reverse が張れる [ ]
+```
+
+### U1 — 観客用の画面（ヘッドセットの中を見せる）
+- MQDH（Meta Quest Developer Hub・macOS 版あり）の Cast を USB で → Cinematic 16:9 を全画面にして HDMI で観客用モニタへ。予備は `koch4_quest_usb.py --port 8444 --mirror`（scrcpy。片目だけ切り出すなら `--scrcpy-args "--crop …"`）
+- 代わりに Mac のブラウザで `http://localhost:8444/?spectator=1`（観客ページ＝分身の一人称プレビュー。接触は送らない）
+
+```
+Cast [ ]  scrcpy [ ]  観客ページ [ ]  採用:
+```
+
+---
+
+## VR — 仮想物体の反力（別枠。リーダー 1 本・2 人目はフォロワー機を手で）
 
 ### V0 — 壁だけ（ヘッドセットなし・10 分）
 
@@ -219,51 +255,90 @@ uv run python koch4/koch4_teleop.py --leader-port <L> --leader-id koch_leader_B 
 向き: 肩 正/逆  肘 正/逆   invert=              cap=      scale=      体感: 軽/ちょうど/重   発熱=   °C
 ```
 
-### V1 — 分身の空間投影（84_ Step 0〜1 と同じ・Quest Pro）
+### V1 — 分身の空間投影（Quest Pro・USB）
 
 ```bash
-python koch4/webxr/setup_assets.py                         # 初回のみ(three.js 取得)
-uv run python koch4/koch4_vr_bridge.py --sim               # Quest ブラウザで https://<Mac IP>:8443/
+python koch4/webxr/setup_assets.py                              # 初回のみ(three.js 取得)
+uv run python koch4/koch4_vr_bridge.py --sim --http --port 8444  # まずテレオペなし
+uv run python koch4/koch4_quest_usb.py --port 8444               # 別ターミナル: reverse を張り Quest Browser で http://localhost:8444/ を開く
 ```
-- 合格: 分身が動き、3 物体が机上に見え、「AR表示」でパススルーに浮かぶ。HUD の「送信: 送信OK」
-- ネット: 会場 Wi-Fi はクライアント隔離が濃厚 → **自前ルータかスマホのテザリング**（ゲスト Wi-Fi は使わない）。
-  開発者モードなら USB ケーブル＋`--http --port 8080`＋`adb reverse tcp:8080 tcp:8080` で Wi-Fi なしでも動く
-- 観客用: Mac のブラウザで `https://<Mac IP>:8443/?spectator=1`（接触を送らない）。ヘッドセットの実画面は
-  Meta のキャスト（meta.com/casting・同一 Wi-Fi・同一アカウント）か scrcpy（開発者モード）
+- 合格: 分身 1 体と 3 物体（スポンジ・ボール・鉄ブロック）が机上に見え、「AR表示（パススルー）」でパススルーに浮かぶ。HUD の「送信OK」。
+  Mac のブラウザで同じ URL を開くと一人称プレビュー（V で俯瞰に切替）
+- 退路（Wi-Fi）: `--http` を外して https で起動し、自前ルータ経由で `https://<Mac の IP>:8444/` → 証明書警告を「続行」
 
 ```
-URL 到達 [ ]  分身が動く [ ]  AR 表示 [ ]  送信OK [ ]  観客ページ [ ]  遅延の体感:
+URL 到達 [ ]  AR 表示 [ ]  送信OK [ ]  観客ページ [ ]  遅延の体感:
 ```
 
-### V-e — 編集モード（分身の位置合わせ・物体の置き場所）
+### V-c — 位置合わせ（一人称: 分身を実機のリーダーに重ねる）
 
-- ページで **E**（または「E 編集」）→ 分身が実機とずれている関節の offset/sign、台の位置・向き、
-  物体の幅・硬さ・上限・重さを直し、「ここに置く」で指先の位置に物体を置く → **保存**
-  （`config/koch4_twin.json` に書かれ、関節の写像は teleop にも送られて重さの計算に使われる）
+```bash
+uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --vr-http --no-panel   # 実機リーダー（テレオペ）＋ブリッジ
+uv run python koch4/koch4_quest_usb.py --port 8444
+```
+- AR 表示にして **C 位置合わせ**（画面下のボタンかキー C）→ 画面中央の案内どおり、コントローラの先端（ハンドトラッキングなら人差し指の先）を実機の**指先の中点**に当ててトリガー。
+  腕の姿勢を変えて 2〜3 点（1 点目は位置・2 点目以降で向き。点どうしは 25 cm 以上離す）→ 表示される残差（cm）を見て **確定(保存)**（`config/koch4_twin.json` の台 x/y/z/yaw に入る）
+- ずれが残るときは E 編集で台の x/y/z/yaw を 1 cm 刻みに。**G** で分身の見せ方を 実体／半透明／指先だけ に切替（パススルーで実機が見えるので半透明か指先だけが見やすい）
+- 境界（ガーディアン）を引き直すと座標が変わるのでやり直す（10 秒）。ずれの目安 ☆: 静止で約 1 cm・動かすと 1〜4 cm（パススルーの遅延 35〜40 ms とテレオペ 30 fps のため）
+
+```
+点数:    残差:    cm   見せ方: 実体/半透明/指先   ずれの体感:          ガーディアン引き直し後の再現:
+```
+
+### V-e — 編集モード（数値の微調整・物体の置き場所・机）
+
+- ページで **E**（または「E 編集」）→ 腕（B／F）を選び、分身が実機とずれている関節の offset/sign、台の位置・向き、
+  物体の幅・硬さ・上限・重さ・**反発（0〜1）**、机の大きさ・AR の分身の見せ方・音 → 「ここに置く」で指先の位置に物体を置く → **保存**
+  （`config/koch4_twin.json` に書かれ、関節の写像は各 teleop にも送られて重さの計算に使われる）
 - **R**（「R 配置リセット」）で物体を置き場所へ戻す（AR/VR 中も画面内のボタンで可）
 
 ```
-offset: pan    lift    elbow    wrist    roll     台: x     z     yaw     保存 [ ]  リセット動作 [ ]
+offset: pan    lift    elbow    wrist    roll     台: x     y     z     yaw     反発: sponge    ball    block    保存 [ ]
 ```
 
 ### V2 — 実機リーダー × VR（本題）
 
-```bash
-uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --no-panel
-```
-- 分身がリーダーに追従 → 分身の指先を机上の物体に寄せる（HUD「物体: 硬いボール」）→ 握る →
-  トリガーが押し返し、腕に重さが乗る。物体は指先に付いて動き、放すと机へ落ちる。ページを閉じると 3 秒で壁が消える
+- V-c の起動のまま、分身の指先を机上の物体に寄せる（HUD「物体: ボール」・物体が黄色く光る）→ 握る →
+  トリガーが押し返し、腕に重さが乗る。物体は指先に付いて動き、放すと落ちる（上から落とせば跳ねる）。ページを閉じると 3 秒で壁が消える
 - ボタン「1/2/3」で物体を手動強制できる（腕を動かさずに壁だけ試す）
 
 ```
 追従 [ ]  近接で物体が光る [ ]  握って反力 [ ]  重さ [ ]  物体が付いてくる [ ]  放すと落ちる [ ]  解放 [ ]  ページ閉で解除 [ ]
 ```
 
+### V4 — 投げる・落とす（物理）
+
+- 握ったまま腕を振って放す → 放す直前 0.1 秒の指先速度で飛ぶ（上限 5 m/s）。机に落ちると反発（既定: スポンジ 0.15・ボール 0.65・鉄 0.05）して滑って止まる。机の外へ出れば床（world y=0）まで落ちる。物体同士もぶつかる。当たると音（S で切替）。R で配置に戻す
+- 体感で反発・重さを E で調整して保存
+
+```
+投げられる [ ]  飛距離の体感:        跳ね方の違い（3 種） [ ]  机から落ちる [ ]  音 [ ]  R で戻る [ ]
+```
+
+### V5 — 2 人（同じペアのフォロワー機を手で握る 2 人目）
+
+```bash
+uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --vr-http --vr2 --no-panel
+```
+- ⚠ 2 人目のフォロワー機は接続直後に腕 5 軸のトルクが抜ける（**手で支えて起動**）。gripper だけ壁（M288 用に電流上限 ×0.45・Kt 0.354）
+- 重さ: 肘（M288）は電流制御、**肩（XL430）は PWM＝電圧制御モード**（電流制御が無いため）。握っている間だけ肩のトルクが入る。
+  初回は `--extra "--vw-cap 60 --vw-pwm-cap 80"` で起動し、ログ `work/logs/dual_B_hand.log` の
+  `[vw] shoulder_lift(XL430) PWM モード: Operating_Mode=16(期待16) / Goal_PWM=0(期待0)` を確認 → 鉄ブロックを握って腕を前に伸ばし、
+  肩が下に引かれれば正しい。上に押されるなら `--vw-invert shoulder_lift`。弱ければ `--vw-pwm-cap` を 80→150→250、`--vw-pwm-scale` を 0.5→1.0
+- 終了後、フォロワー機を握手に戻す前に `[vw]` の解放（Ctrl+C で自動: Goal_PWM を上限へ戻し Mode 4）を確認。気になるときは AC アダプタを抜き差しすれば初期値に戻る
+- ページに分身が 2 体（B＝橙・F＝青）。**Tab** で選択を切替え、F も C 位置合わせ。同じ物体は先に握った腕のもの（もう片方は候補にならない）。ヘッドセットの人が B、2 人目はモニタ（一人称プレビュー／観客ページ）で見る
+- 2 人目の壁が硬すぎる／柔らかすぎるときは `--extra "--wall-scale 0.3"` のように倍率を変える（F の teleop にも同じ `--extra` が渡る）
+
+```
+F の壁 [ ]  F の重さ 肘 [ ] 肩(PWM) [ ] 向き: 正/逆  pwm-cap=     pwm-scale=     Mode16/Goal_PWM=0 の読み戻し [ ]
+2 体の位置合わせ [ ]  受け渡し [ ]  発熱(F gripper／肩):   °C   wall-scale=      握手に戻して肩が保持できる [ ]
+```
+
 ### V3 — フェス形態の判断（84_ Step 3）
 
-案A=実機の隣に分身をモニタ表示（観客ページ or キャスト）／案B=来場者に Quest を被せて AR（衛生・回転率・補助員 1 名）。
+案A=実機の隣に分身をモニタ表示（観客ページ or キャスト）／案B=来場者に Quest を被せて AR（衛生・回転率・補助員 1 名）／案C=2 人（1 人は Quest・1 人はモニタ）。
 ```
-判断: A / B / 見送り   理由:
+判断: A / B / C / 見送り   理由:
 ```
 
 ---
@@ -283,11 +358,11 @@ VR 内のボタン（配置リセット・強制・編集）はページの DOM 
 リーダー実機そのものが入力装置なので、Quest のコントローラやハンドトラッキングは制御には使わない。
 
 ### 接続設定（当日）
-1. ネットワークは自前（モバイルルータかスマホのテザリング）に Mac と Quest を入れる。会場のゲスト Wi-Fi は使わない（クライアント隔離で届かない）。
-   代替: USB ケーブルで Quest を Mac に繋ぎ、開発者モードで `adb reverse tcp:8443 tcp:8443` → Quest で `http://localhost:8443/`（`--vr-http`）
-2. `koch4_dual_launch.py --pair B --vr B --vw` → ブリッジが URL（`https://<Mac の IP>:8443/`）を表示
-3. Quest の Meta Quest Browser で URL を開く → 初回だけ証明書警告を「続行」 → 「AR表示（パススルー）」
-4. Mac 側: パネルは `http://127.0.0.1:8780`、観客用は `https://<Mac の IP>:8443/?spectator=1`（同じ証明書警告を一度だけ）
+1. 本命は USB: Quest を Mac に USB で繋ぎ（開発者モード済み・U0）、`koch4_dual_launch.py … --vr-http` で起動 → `koch4_quest_usb.py --port 8444` が `adb reverse` を張って Quest Browser で `http://localhost:8444/` を開く。会場のゲスト Wi-Fi は使わない（クライアント隔離で届かない）。
+   退路: 自前の 5 GHz ルータ（かスマホのテザリング）に Mac と Quest を入れ、`--vr-http` を外して https で起動 → 証明書警告を「続行」
+2. `koch4_dual_launch.py --pair B --vr B --vw --vr-http`（2 人なら `--vr2`）→ ブリッジが URL を表示（ペア B は 8444）
+3. Quest Browser でページが開いたら「AR表示（パススルー）」→ 初回は C 位置合わせ（V-c）→ G で分身を半透明か指先だけに
+4. Mac 側: パネルは `http://127.0.0.1:8780`、観客用は `http://localhost:8444/?spectator=1`（一人称プレビュー）か MQDH の Cast（U1）
 
 ### ブラウザ
 - パネル・観客ページとも標準の Web 機能だけ（fetch・SSE・Canvas・ES modules・WebGL）。Windows の Chrome と Mac の Safari で動く。
@@ -307,6 +382,6 @@ VR 内のボタン（配置リセット・強制・編集）はページの DOM 
 | テレオペ／ブリッジと未接続 | ページに状態が来ていない | プロセスとネットワークを確認 |
 
 ## 記録の置き場
-- 実機ログ md: robotics `TacitCapture/61_` と同じ型で新番号（TEST の結果・つまずき・解決）
+- 実機ログ md: robotics `TacitCapture/61_` と同じ型で新番号（TEST／U／V の結果・つまずき・解決）
 - 本書の記入済みコピー: `koch4/work/` は git 管理外なので、robotics 側に写す
 - 裁定（決めどころ・VR 形態）: robotics `.claude/cases/koch-4arm-dual.md`・`koch-vr-haptics.md`

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Koch 握手マニュアル（2 ペア）</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="manual.css" rel="stylesheet">
+</head>
+<body>
+<nav class="nav-top">
+  <a href="index.html">入口</a><a href="handshake.html"><strong>握手（2 ペア）</strong></a><a href="vr.html">VR（一人称・2 人）</a><a href="quest_setup.html">Quest の準備</a><span class="sep">｜</span>
+  <a href="#s0">全体</a><a href="#s1">用意</a><a href="#s2">設定</a><a href="#s3">起動</a><a href="#s4">パネル</a><a href="#s5">無線と有線</a><a href="#s6">握る物と握力</a><a href="#s7">困ったとき</a><a href="#s8">安全</a><a href="#s9">参考資料</a>
+</nav>
+<div class="container py-4">
+
+<header class="mb-4">
+  <h1 class="h2">Koch 握手マニュアル（2 ペア）</h1>
+  <p class="text-muted mb-1">説明員がリーダーを握ると、離れた机のフォロワーが同じ動きをし、来場者がフォロワーの手を握ると、その力がリーダーの指に返ります。2 組を同時に動かします。</p>
+  <p class="mb-0">リーダーは操作する机の Mac に USB で繋ぎ、フォロワーは握手の机の Mac に繋いで、2 台の Mac の間を自前の 5 GHz ルータで結びます。フォロワー側にケーブルを這わせないための構成です。</p>
+</header>
+
+<!-- ===================================================== -->
+<h2 id="s0">0. 全体（何が何に繋がるか）</h2>
+<figure class="diagram">
+<svg viewBox="0 0 940 340" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
+  <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#8e44ad"/></marker></defs>
+  <rect x="20" y="20" width="400" height="300" rx="10" fill="#f8f9fa" stroke="#adb5bd"/>
+  <text x="36" y="44" font-weight="bold">操作する机（説明員）</text>
+  <rect x="130" y="64" width="180" height="64" rx="8" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+  <text x="220" y="92" text-anchor="middle" font-weight="bold">Mac（操作者側）</text>
+  <text x="220" y="112" text-anchor="middle" font-size="12">./koch4/start.sh handshake</text>
+  <rect x="50" y="190" width="140" height="56" rx="8" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
+  <text x="120" y="214" text-anchor="middle">リーダー A</text><text x="120" y="232" text-anchor="middle" font-size="12">5V</text>
+  <rect x="250" y="190" width="140" height="56" rx="8" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
+  <text x="320" y="214" text-anchor="middle">リーダー B</text><text x="320" y="232" text-anchor="middle" font-size="12">5V</text>
+  <line x1="190" y1="128" x2="130" y2="190" stroke="#2c3e50" stroke-width="2.5"/>
+  <line x1="250" y1="128" x2="310" y2="190" stroke="#2c3e50" stroke-width="2.5"/>
+  <text x="128" y="164" font-size="12">USB</text><text x="290" y="164" font-size="12">USB</text>
+  <text x="220" y="290" text-anchor="middle" font-size="12" fill="#495057">パネル http://127.0.0.1:8780（握り返しの強さ・状態）</text>
+
+  <rect x="520" y="20" width="400" height="300" rx="10" fill="#f8f9fa" stroke="#adb5bd"/>
+  <text x="536" y="44" font-weight="bold">握手の机（来場者）</text>
+  <rect x="630" y="64" width="180" height="64" rx="8" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+  <text x="720" y="92" text-anchor="middle" font-weight="bold">Mac（握手用）</text>
+  <text x="720" y="112" text-anchor="middle" font-size="12">koch4_follower_host.py ×2</text>
+  <rect x="550" y="190" width="140" height="56" rx="8" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
+  <text x="620" y="214" text-anchor="middle">フォロワー A</text><text x="620" y="232" text-anchor="middle" font-size="12">12V</text>
+  <rect x="750" y="190" width="140" height="56" rx="8" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
+  <text x="820" y="214" text-anchor="middle">フォロワー B</text><text x="820" y="232" text-anchor="middle" font-size="12">12V</text>
+  <line x1="690" y1="128" x2="630" y2="190" stroke="#2c3e50" stroke-width="2.5"/>
+  <line x1="750" y1="128" x2="810" y2="190" stroke="#2c3e50" stroke-width="2.5"/>
+  <text x="628" y="164" font-size="12">USB</text><text x="790" y="164" font-size="12">USB</text>
+  <text x="720" y="290" text-anchor="middle" font-size="12" fill="#495057">来場者はフォロワーの手を握る</text>
+
+  <path d="M310 84 L630 84" stroke="#8e44ad" stroke-width="2.5" stroke-dasharray="8 5" marker-end="url(#ar2)"/>
+  <path d="M630 108 L310 108" stroke="#8e44ad" stroke-width="2.5" stroke-dasharray="8 5" marker-end="url(#ar2)"/>
+  <text x="470" y="76" text-anchor="middle" font-size="11" fill="#6c3483">目標の角度（毎秒 30 回）→</text>
+  <text x="470" y="126" text-anchor="middle" font-size="11" fill="#6c3483">← 握った力・位置・温度</text>
+  <rect x="395" y="140" width="150" height="26" rx="6" fill="#f4ecf7" stroke="#8e44ad"/>
+  <text x="470" y="158" text-anchor="middle" font-size="12">自前の 5 GHz ルータ</text>
+</svg>
+<figcaption>図 0-1: サーボとの通信は各 Mac の USB の中で完結し、Mac どうしの間は目標の角度と状態だけを送ります。会場のゲスト Wi-Fi は使いません。</figcaption>
+</figure>
+
+<!-- ===================================================== -->
+<h2 id="s1">1. 用意する物</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:30%">物</th><th style="width:12%">数</th><th>条件</th></tr></thead>
+<tbody>
+<tr><td>Mac（操作者側）</td><td>1</td><td><a href="index.html#s2">入口のページ §2</a> の準備が済んでいること</td></tr>
+<tr><td>Mac（握手用）</td><td>1</td><td>同じ準備。バッテリーで動かせるので、握手の机の電源はアームの 12V だけで済む</td></tr>
+<tr><td>Koch リーダー</td><td>2</td><td>5V の AC アダプタ。較正済み</td></tr>
+<tr><td>Koch フォロワー</td><td>2</td><td>12V の AC アダプタ。較正済み。握手用の手の部品を付ける</td></tr>
+<tr><td>5 GHz のルータ</td><td>1</td><td>2 台の Mac だけを繋ぐ。インターネットは不要</td></tr>
+<tr><td>USB ケーブル（データ対応）</td><td>4</td><td>ハブを使うなら電源付き。4 口ともデータ対応のもの</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s2">2. 設定（最初の 1 回）</h2>
+<div class="step">
+<ol class="mb-0">
+  <li><strong>握手用の Mac</strong>: フォロワー 2 本を USB で挿し、ポートを確かめる。
+<pre>uv run python koch4/koch4_dual_launch.py --list</pre></li>
+  <li><strong>握手用の Mac</strong>: ルータに繋ぎ、IP アドレスを確かめる。
+<pre>ipconfig getifaddr en0</pre></li>
+  <li><strong>操作者側の Mac</strong>: 設定ファイルを作り、リーダーのポートと、握手用の Mac の宛先を書く。
+<pre>uv run python koch4/koch4_dual_launch.py --init
+# koch4/config/koch4_config.json の例（ペア A）
+#   "leader_port":   "/dev/tty.usbmodem＜リーダー A＞",
+#   "follower_host": "udp://＜握手用 Mac の IP＞:9101",
+#   "follower_port": "/dev/tty.usbmodem＜有線に戻すときのフォロワー A＞"
+# ペア B は 9102</pre></li>
+</ol>
+</div>
+<p>どのアームをどの口に挿すかは、テープで印を付けて固定します。挿す口を変えるとポートの名前が変わることがあります。</p>
+
+<!-- ===================================================== -->
+<h2 id="s3">3. 起動（毎回）</h2>
+<div class="step">
+<ol class="mb-0">
+  <li>4 本とも腕を机に寝かせ、AC アダプタを挿す（リーダー 5V・フォロワー 12V）。</li>
+  <li><strong>握手用の Mac</strong> で受け側を 2 つ起動する（端末を 2 つ開く）。
+<pre>cd twinarm/descovery
+uv run python koch4/koch4_follower_host.py --port ＜フォロワー A のポート＞ --id koch_follower_A --listen 9101 --grip-ma 500
+uv run python koch4/koch4_follower_host.py --port ＜フォロワー B のポート＞ --id koch_follower_B --listen 9102 --grip-ma 500</pre></li>
+  <li><strong>操作者側の Mac</strong> で起動する。
+<pre>cd twinarm/descovery
+./koch4/start.sh handshake</pre>
+  フォロワーが 1.5 秒かけてリーダーの姿勢に合流し、パネルがブラウザで開きます。</li>
+  <li>リーダーを動かし、フォロワーが付いてくることを 2 組とも確かめる。</li>
+</ol>
+</div>
+<div class="gate"><strong>関門 3</strong>: 片方のリーダーを動かしたとき、動くのは同じ組のフォロワーだけ（もう片方が動いたらポートの取り違え）。フォロワーの指で物を握ると、リーダーの指が押し返される。</div>
+
+<!-- ===================================================== -->
+<h2 id="s4">4. パネル（http://127.0.0.1:8780）</h2>
+<p>1 枚の画面に 2 組の状態が並びます。スライダとボタンは 2 組に同じ値で効きます（1 組ずつ変えることはしません）。</p>
+<table class="table table-striped">
+<thead><tr><th style="width:28%">表示・操作</th><th>意味</th></tr></thead>
+<tbody>
+<tr><td>握り上限 mA</td><td>リーダーの指に返す力の上限。上げると強く押し返すが、熱を持ちやすい（既定 450）</td></tr>
+<tr><td>ゲイン</td><td>フォロワーが握った力を、どれだけ強くリーダーに返すか</td></tr>
+<tr><td>モード OFF／gripper</td><td>握り返しの入・切</td></tr>
+<tr><td>合流</td><td>フォロワーをリーダーの姿勢にゆっくり合わせ直す</td></tr>
+<tr><td>赤い札</td><td>注意の表示（§7 の表）</td></tr>
+<tr><td>遅延・欠落</td><td>無線の状態。遅れが 0.3 秒を超えると赤い札が出る</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s5">5. 無線が切れたとき・有線に戻すとき</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:28%">無線の途切れ</th><th>フォロワーの動き</th></tr></thead>
+<tbody>
+<tr><td>0.3 秒</td><td>パネルに赤い札「フォロワー無線 遅延」</td></tr>
+<tr><td>0.5 秒</td><td>その場の姿勢を保つ（力は入ったままなので腕は落ちない）</td></tr>
+<tr><td>3 秒</td><td>操作者側が通信断と判断し、自動で繋ぎ直す</td></tr>
+<tr><td>復帰</td><td>1.5 秒かけてリーダーの姿勢に滑らかに戻る</td></tr>
+</tbody>
+</table>
+<p>無線が安定しないときは、フォロワーを操作者側の Mac に USB で繋ぎ替えて、有線で起動します。設定ファイルは同じものを使えます。</p>
+<pre>uv run python koch4/koch4_dual_launch.py --follower wired --ff gripper --grip-ma 500</pre>
+
+<!-- ===================================================== -->
+<h2 id="s6">6. 握る物と握力</h2>
+<ul>
+  <li>フォロワーの握る力には上限（<code>--grip-ma</code>・既定 500 mA）を掛けています。上限が無いと、物を握ったままサーボが力を出し続けて過負荷で止まり、物を落とします。</li>
+  <li>握力が足りないときは 600、700 と上げ、止まりやすいときは 400、350 と下げます。操作者側は <code>GRIP_MA=400 ./koch4/start.sh handshake</code>、握手用の Mac は <code>--grip-ma 400</code>。</li>
+  <li>物を持たせるなら、卓球ボール（直径 40 mm）が安全です。ゴルフボールは重さと滑りやすさで限界に近く、落としやすくなります。指先に滑り止めのテープを貼ると持ちやすくなります。</li>
+  <li>動きを穏やかにするには <code>--extra "--max-rel 15"</code> を付けて起動します（1 回に動く量の上限。既定 20）。</li>
+</ul>
+
+<!-- ===================================================== -->
+<h2 id="s7">7. 困ったとき</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:32%">症状・赤い札</th><th>確かめること・直し方</th></tr></thead>
+<tbody>
+<tr><td>起動時に「ポートが存在しません」</td><td><code>--list</code> で今のポート名を確かめ、設定ファイルを直す。挿す口を変えていないか</td></tr>
+<tr><td>フォロワーが動かない</td><td>握手用の Mac の受け側が動いているか。宛先の IP と 9101／9102。2 台が同じルータにいるか</td></tr>
+<tr><td>「…gripper エラー停止（過負荷）」</td><td>そのアームの AC アダプタを 10 秒抜いて入れ直す。繰り返すなら握力の上限を下げる</td></tr>
+<tr><td>「フォロワー握力が上限付近」</td><td>滑る・止まる前ぶれ。物を軽くするか、深く持たせる</td></tr>
+<tr><td>「握り反力が上限に張り付き」</td><td>握り込みを緩める</td></tr>
+<tr><td>「…°C」</td><td>サーボが熱い。60°C で力を弱め、65°C で握り返しを止める。体験の合間に休ませる</td></tr>
+<tr><td>「通信断 → 再接続中」</td><td>USB の接触。手を離して 2 秒待つ。続くならケーブルとハブの電源</td></tr>
+<tr><td>握っても押し返さない</td><td>起動時の表示に <code>Operating_Mode=5 / Position_P_Gain=800</code> が出ているか。パネルのモードが gripper か</td></tr>
+<tr><td>リーダーとフォロワーの姿勢が合わない</td><td>両方の腕を同じ姿勢に手で持ち、ずれを数値で見る。3% を超える関節は較正をやり直す
+<pre class="mb-0">uv run python koch4/koch4_calib_offset.py --leader-port ＜L＞ --follower-port ＜F＞ --leader-id koch_leader_A --follower-id koch_follower_A</pre></td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s8">8. 安全</h2>
+<div class="danger">
+<ul class="mb-0">
+  <li>来場者にはフォロワーの「手」だけを握ってもらう。腕の根元や関節には触れさせない。</li>
+  <li>握り返しが出ている間、説明員はリーダーから手を離さない。</li>
+  <li>フォロワーが止まったら（過負荷）、腕を支えてから AC アダプタを抜き差しする。</li>
+  <li>終わったら <kbd>Ctrl</kbd>+<kbd>C</kbd>（操作者側 → 握手用の順）で止め、4 本とも AC アダプタを抜く。止めるとフォロワーの力が抜けるので、先に腕を寝かせる。</li>
+</ul>
+</div>
+
+<!-- ===================================================== -->
+<h2 id="s9">9. 参考資料</h2>
+<table class="table">
+<thead><tr><th>資料</th><th>使った箇所</th></tr></thead>
+<tbody>
+<tr><td><a href="https://huggingface.co/docs/lerobot/koch">LeRobot Koch v1.1（Hugging Face）</a></td><td>§2 較正と基本のテレオペ</td></tr>
+<tr><td><a href="https://huggingface.co/docs/lerobot/lekiwi">LeRobot LeKiwi（Hugging Face）</a></td><td>§0 リーダーを手元の PC、ロボット側を別の PC にして通信で結ぶ構成</td></tr>
+<tr><td><a href="https://emanual.robotis.com/docs/en/dxl/x/xl330-m077/">ROBOTIS XL330-M077 e-Manual</a></td><td>§4・§7 握り返しの位置制御・電流の上限・温度</td></tr>
+<tr><td><a href="https://emanual.robotis.com/docs/en/dxl/x/xl330-m288/">ROBOTIS XL330-M288 e-Manual</a></td><td>§6 フォロワーの握る力の上限・過負荷の停止</td></tr>
+</tbody>
+</table>
+
+<footer>Koch 握手マニュアル</footer>
+</div>
+</body>
+</html>

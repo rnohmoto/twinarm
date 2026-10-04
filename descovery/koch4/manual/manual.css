@@ -1,0 +1,28 @@
+/* Koch 4 本 マニュアル共通スタイル（Bootstrap が読めない会場でもこの 1 枚で読める） */
+body { font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif; line-height: 1.8; background: #fff; color: #212529; margin: 0; }
+.container { max-width: 1100px; margin: 0 auto; padding-left: 16px; padding-right: 16px; }
+.nav-top { background: #2c3e50; padding: 10px 20px; position: sticky; top: 0; z-index: 10; }
+.nav-top a { color: #ecf0f1; text-decoration: none; margin-right: 15px; font-size: .95rem; white-space: nowrap; }
+.nav-top a:hover { text-decoration: underline; }
+.nav-top .sep { color: #7f8c8d; margin-right: 12px; }
+h2 { border-left: 6px solid #3498db; padding-left: 12px; margin-top: 2.2rem; font-size: 1.5rem; }
+h3 { margin-top: 1.4rem; font-size: 1.15rem; }
+.step { border-left: 4px solid #3498db; background: #f8f9fa; padding: 12px 16px; margin: 12px 0; }
+.gate { border-left: 4px solid #e67e22; background: #fff8f0; padding: 12px 16px; margin: 12px 0; }
+.danger { border-left: 4px solid #c0392b; background: #fdf2f2; padding: 12px 16px; margin: 12px 0; }
+.note { border-left: 4px solid #27ae60; background: #f1f9f4; padding: 12px 16px; margin: 12px 0; }
+figure.diagram { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 10px; margin: 14px 0; }
+figure.diagram svg { width: 100%; height: auto; }
+figure.diagram figcaption { font-size: .9rem; color: #495057; margin-top: 6px; }
+pre { background: #2c3e50; color: #ecf0f1; padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-size: .9rem; line-height: 1.5; }
+code { color: #c7254e; }
+pre code { color: inherit; }
+kbd { background: #343a40; color: #fff; border-radius: 4px; padding: 1px 6px; font-size: .85rem; }
+table { width: 100%; font-size: .93rem; border-collapse: collapse; margin: 10px 0; }
+th, td { border-bottom: 1px solid #dee2e6; padding: 6px 8px; text-align: left; vertical-align: top; }
+thead th { background: #f1f3f5; }
+.card { border: 1px solid #dee2e6; border-radius: 8px; }
+.card-body { padding: 14px 16px; }
+.swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; border: 1px solid rgba(0,0,0,.2); }
+footer { color: #6c757d; font-size: .85rem; margin: 40px 0 20px; }
+@media print { .nav-top { display: none; } pre { white-space: pre-wrap; } }

@@ -1,32 +1,37 @@
 #!/usr/bin/env python3
-"""VR bridge for the koch4 virtual-object demo (network only; stdlib only).
+r"""VR bridge for the koch4 virtual-object demo (network only; stdlib only).
 
 Serves ``webxr/`` (the three.js page) to the Quest Pro browser, republishes the
-teleop telemetry as ``/state``, keeps the twin/object configuration
-(``config/koch4_twin.json``: joint spans/offsets/signs, base placement, objects with
-stiffness/cap/mass and their spots) behind ``/config``, and relays the page's contact
-decisions to ``koch4_teleop.py`` as ``{"vwall": ...}`` control messages::
+telemetry of one or two teleop processes as ``/state`` (one arm each), keeps the
+twin/object configuration (``config/koch4_twin.json``: per-arm joint spans/offsets/
+signs and base placement, objects with stiffness/cap/mass/bounce and their spots,
+the desk) behind ``/config``, and relays the page's contact decisions to the right
+``koch4_teleop.py`` as ``{"vwall": ...}`` control messages::
 
-  koch4_teleop.py --ff vwall [--vw] --viz-port 8765,8769
-        │ UDP 8769 (telemetry)                    ▲ UDP 8766 (control: vwall / twin)
+  koch4_teleop.py --ff vwall --vw --viz-port 8767,8770 --ctl-port 8768 --arm-label B
+  koch4_teleop.py --leader-type koch_follower --ff vwall --vw --viz-port 8771,8773 \\
+                  --ctl-port 8772 --arm-label F                      (2 人目・任意)
+        │ UDP 8770 / 8773 (telemetry)              ▲ UDP 8768 / 8772 (control: vwall / twin)
         ▼                                          │
-  koch4_vr_bridge.py --telemetry 8769 --ctl-port 8766 --port 8443
-        │ GET /state /config                       ▲ POST /contact  POST /config
-        ▼                                          │
-  Quest Pro browser  https://<Mac の IP>:8443/  (webxr/index.html; ?spectator=1 = 見るだけ)
+  koch4_vr_bridge.py --arms B,F --telemetry 8770,8773 --ctl-port 8768,8772 --port 8444
+        │ GET /state /config                       ▲ POST /contact {"arm":"B","vwall":…}
+        ▼                                          │ POST /config
+  Quest Pro browser  https://<Mac の IP>:8444/  (webxr/index.html; ?spectator=1 = 見るだけ)
 
-The page decides *which* object the digital twin's gripper is touching; the teleop
-decides *whether* the trigger is inside that object and writes the servo registers;
-the servo's own position loop renders the wall, and (with --vw) the leader's lift and
-elbow render the object's weight. This bridge never opens a serial port. Risk class:
-network only, but it commands a live teleop session (every field is clamped by the
+The page decides *which* object each twin's gripper is touching; each teleop decides
+*whether* its trigger is inside that object and writes the servo registers; the
+servo's own position loop renders the wall, and (with --vw) the arm's lift/elbow
+render the object's weight. This bridge never opens a serial port. Risk class:
+network only, but it commands live teleop sessions (every field is clamped by the
 teleop and the wall is released after WALL_TTL_SEC without a refresh).
 
 使い方（Mac・descovery で `uv run`）:
-  uv run python koch4/koch4_vr_bridge.py --sim                # テレオペなし: 分身が正弦波で動き、壁は内部判定
-  uv run python koch4/koch4_vr_bridge.py --telemetry 8769     # テレオペ(--viz-port 8765,8769)と接続
-  uv run python koch4/koch4_vr_bridge.py --http --port 8080   # adb reverse 方式(証明書警告なし)
-設定ファイル: koch4/config/koch4_twin.json（ページの編集モードで保存される。手で編集しても可）
+  uv run python koch4/koch4_vr_bridge.py --sim                       # 1 本・テレオペなし
+  uv run python koch4/koch4_vr_bridge.py --sim --arms B,F            # 2 本の模擬
+  uv run python koch4/koch4_vr_bridge.py --arms B --telemetry 8770 --ctl-port 8768
+  uv run python koch4/koch4_vr_bridge.py --http --port 8080          # adb reverse 方式(証明書警告なし)
+設定ファイル: koch4/config/koch4_twin.json（ページの編集モード・位置合わせで保存。手で編集しても可。
+旧形式（arms なし・joints/base が最上位）は読み込み時に最初の腕へ移される）
 """
 
 import argparse
@@ -57,55 +62,71 @@ TELEMETRY_HOST = "127.0.0.1"
 STALE_AFTER_SEC = 2.0
 KEEPALIVE_SEC = 1.0
 TWIN_RESEND_SEC = 10.0
+CONFIG_VERSION = 2
 JOINTS = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"]
+MODELS = ("koch_leader", "koch_follower")
 
-# 分身と物体の既定値。ページ側の DEFAULTS と同じ内容(編集モードで上書き・保存される)
-DEFAULT_TWIN_CONFIG: dict[str, Any] = {
-    "joints": {
-        "shoulder_pan": {"span_deg": 180.0, "offset_deg": 0.0, "sign": 1},
-        "shoulder_lift": {"span_deg": 100.0, "offset_deg": 0.0, "sign": 1},
-        "elbow_flex": {"span_deg": 100.0, "offset_deg": 0.0, "sign": 1},
-        "wrist_flex": {"span_deg": 100.0, "offset_deg": 0.0, "sign": 1},
-        "wrist_roll": {"span_deg": 180.0, "offset_deg": 0.0, "sign": 1},
+DEFAULT_JOINTS: dict[str, dict[str, float | int]] = {
+    "shoulder_pan": {"span_deg": 180.0, "offset_deg": 0.0, "sign": 1},
+    "shoulder_lift": {"span_deg": 100.0, "offset_deg": 0.0, "sign": 1},
+    "elbow_flex": {"span_deg": 100.0, "offset_deg": 0.0, "sign": 1},
+    "wrist_flex": {"span_deg": 100.0, "offset_deg": 0.0, "sign": 1},
+    "wrist_roll": {"span_deg": 180.0, "offset_deg": 0.0, "sign": 1},
+}
+# 腕の既定の置き場所(local-floor 基準・m)。最初の腕=正面 0.6 m 先の机(高さ 0.75)、
+# 2 本目=その右 0.5 m。実機に合わせる作業はページの位置合わせ(C)で行う。
+DEFAULT_BASES = [
+    {"x": 0.0, "y": 0.75, "z": -0.6, "yaw_deg": 0.0},
+    {"x": 0.5, "y": 0.75, "z": -0.6, "yaw_deg": 0.0},
+]
+ARM_LABELS = {"koch_leader": "リーダー", "koch_follower": "フォロワー機(手)"}
+# 物体の並び順がページのキー 1/2/3。軽い・柔らかい → 重い・硬い。
+# spot は最初の腕のローカル座標(m)。bounce=反発係数(投げて落ちたときの跳ね方)
+DEFAULT_OBJECTS: dict[str, dict[str, Any]] = {
+    "sponge": {
+        "label": "スポンジ",
+        "width": 60,
+        "p_gain": 250,
+        "cap_ma": 120,
+        "release": 2.0,
+        "mass_g": 10,
+        "bounce": 0.15,
+        "color": "#facc15",
+        "kind": "box",
+        "spot": [-0.155, 0.0, 0.221],
     },
-    "base": {"x": 0.0, "y": 0.75, "z": -0.6, "yaw_deg": 0.0},
-    "objects": {
-        "ball": {
-            "label": "硬いボール",
-            "width": 45,
-            "p_gain": 900,
-            "cap_ma": 350,
-            "release": 1.5,
-            "mass_g": 45,
-            "color": "#ef4444",
-            "kind": "sphere",
-            "spot": [0.16, 0.0, 0.10],
-        },
-        "sponge": {
-            "label": "スポンジ",
-            "width": 60,
-            "p_gain": 250,
-            "cap_ma": 120,
-            "release": 2.0,
-            "mass_g": 10,
-            "color": "#facc15",
-            "kind": "box",
-            "spot": [-0.14, 0.0, 0.12],
-        },
-        "block": {
-            "label": "ブロック",
-            "width": 30,
-            "p_gain": 1200,
-            "cap_ma": 400,
-            "release": 1.5,
-            "mass_g": 120,
-            "color": "#60a5fa",
-            "kind": "box",
-            "spot": [0.02, 0.0, 0.22],
-        },
+    "ball": {
+        "label": "ボール",
+        "width": 45,
+        "p_gain": 900,
+        "cap_ma": 350,
+        "release": 1.5,
+        "mass_g": 45,
+        "bounce": 0.65,
+        "color": "#ef4444",
+        "kind": "sphere",
+        "spot": [0.0, 0.0, 0.27],
+    },
+    "block": {
+        "label": "鉄ブロック",
+        "width": 30,
+        "p_gain": 2000,
+        "cap_ma": 450,
+        "release": 1.0,
+        "mass_g": 300,
+        "bounce": 0.05,
+        "color": "#94a3b8",
+        "kind": "box",
+        "spot": [0.155, 0.0, 0.221],
     },
 }
-LIMITS = {  # POST /config の clamp 範囲
+DEFAULT_SCENE: dict[str, Any] = {
+    # 机(最初の腕のローカル座標・m)。2 本目の腕が置かれたら幅はページ側で広げる
+    "desk": {"x": 0.05, "z": 0.05, "w": 0.5, "d": 0.4},
+    "sound": True,
+    "ghost": "half",  # AR 中の分身の見せ方: solid / half / tips
+}
+LIMITS = {
     "span_deg": (10.0, 360.0),
     "offset_deg": (-180.0, 180.0),
     "width": (0.0, 100.0),
@@ -113,22 +134,16 @@ LIMITS = {  # POST /config の clamp 範囲
     "cap_ma": (0, 900),
     "release": (0.0, 20.0),
     "mass_g": (0.0, 2000.0),
+    "bounce": (0.0, 1.0),
 }
 
-STATE: dict[str, Any] = {
-    "t": 0.0,
-    "pos": {},
-    "q": [0.0] * 5,
-    "open": 100.0,
-    "vwall": None,
-    "vw": None,
-    "alerts": [],
-    "hw": None,
-    "mode": "off",
-    "src": "none",
-}
-CONTACT: dict[str, Any] = {"vwall": None, "t": 0.0}
-TWIN: dict[str, Any] = copy.deepcopy(DEFAULT_TWIN_CONFIG)
+# label -> latest telemetry frame of that arm
+STATE: dict[str, dict[str, Any]] = {}
+# label -> {"vwall": …, "t": monotonic}
+CONTACT: dict[str, dict[str, Any]] = {}
+TWIN: dict[str, Any] = {}
+ARMS: list[str] = []  # order = --arms (the first one is the frame of desk/objects)
+CTL_PORTS: dict[str, int] = {}
 LOCK = threading.Lock()
 
 
@@ -137,11 +152,50 @@ def clamp(value, lo, hi):
     return max(lo, min(hi, value))
 
 
-def norm_to_rad(name, value):
-    """Map a normalized joint value (±100) to radians with the twin config."""
-    m = TWIN["joints"][name]
+def norm_to_rad(joint_map, name, value):
+    """Map a normalized joint value (±100) to radians with one arm's joint map."""
+    m = joint_map[name]
     degrees = float(value) / 100.0 * m["span_deg"] / 2.0 + m["offset_deg"]
     return m["sign"] * math.radians(degrees)
+
+
+def empty_state():
+    """A telemetry frame before anything arrived."""
+    return {
+        "t": 0.0,
+        "pos": {},
+        "q": [0.0] * 5,
+        "open": 100.0,
+        "vwall": None,
+        "vw": None,
+        "vw_unit": None,
+        "alerts": [],
+        "hw": None,
+        "mode": "off",
+        "src": "none",
+        "device": "",
+    }
+
+
+def default_arm(index, model):
+    """Default twin for the index-th arm of the given model."""
+    base = DEFAULT_BASES[min(index, len(DEFAULT_BASES) - 1)]
+    return {
+        "label": ARM_LABELS.get(model, model),
+        "model": model,
+        "joints": copy.deepcopy(DEFAULT_JOINTS),
+        "base": dict(base),
+    }
+
+
+def default_twin(arms, models):
+    """The whole default configuration for the configured arms."""
+    return {
+        "version": CONFIG_VERSION,
+        "arms": {a: default_arm(i, models[i]) for i, a in enumerate(arms)},
+        "objects": copy.deepcopy(DEFAULT_OBJECTS),
+        "scene": copy.deepcopy(DEFAULT_SCENE),
+    }
 
 
 def load_twin_config(path):
@@ -155,13 +209,10 @@ def load_twin_config(path):
         print(f"[config] ⚠ {path} を読めません({e}) — 既定値で続行")
 
 
-def merge_twin_config(payload):
-    """Merge a (partial) config into TWIN with every number clamped."""
-    if not isinstance(payload, dict):
-        return
-    for j, m in (payload.get("joints") or {}).items():
-        if j in TWIN["joints"] and isinstance(m, dict):
-            cur = TWIN["joints"][j]
+def _merge_joints(target, payload):
+    for j, m in (payload or {}).items():
+        if j in target and isinstance(m, dict):
+            cur = target[j]
             cur["span_deg"] = clamp(
                 float(m.get("span_deg", cur["span_deg"])), *LIMITS["span_deg"]
             )
@@ -169,48 +220,110 @@ def merge_twin_config(payload):
                 float(m.get("offset_deg", cur["offset_deg"])), *LIMITS["offset_deg"]
             )
             cur["sign"] = 1 if int(m.get("sign", cur["sign"])) >= 0 else -1
-    base = payload.get("base")
-    if isinstance(base, dict):
-        for k in ("x", "y", "z"):
-            TWIN["base"][k] = clamp(float(base.get(k, TWIN["base"][k])), -3.0, 3.0)
-        TWIN["base"]["yaw_deg"] = clamp(
-            float(base.get("yaw_deg", TWIN["base"]["yaw_deg"])), -180.0, 180.0
-        )
-    for name, obj in (payload.get("objects") or {}).items():
+
+
+def _merge_base(target, payload):
+    if not isinstance(payload, dict):
+        return
+    for k in ("x", "y", "z"):
+        target[k] = clamp(float(payload.get(k, target[k])), -3.0, 3.0)
+    target["yaw_deg"] = clamp(
+        float(payload.get("yaw_deg", target["yaw_deg"])), -180.0, 180.0
+    )
+
+
+def _merge_arm(label, payload):
+    arm = TWIN["arms"].get(label)
+    if arm is None or not isinstance(payload, dict):
+        return
+    if isinstance(payload.get("label"), str):
+        arm["label"] = payload["label"][:32]
+    if payload.get("model") in MODELS:
+        arm["model"] = payload["model"]
+    _merge_joints(arm["joints"], payload.get("joints"))
+    _merge_base(arm["base"], payload.get("base"))
+
+
+def _merge_objects(payload):
+    if not isinstance(payload, dict):
+        return
+    names = []
+    for name, obj in payload.items():
         if not isinstance(obj, dict):
             continue
+        key = str(name)[:32]
+        names.append(key)
         cur = TWIN["objects"].setdefault(
-            str(name)[:32], copy.deepcopy(DEFAULT_TWIN_CONFIG["objects"]["ball"])
+            key, copy.deepcopy(DEFAULT_OBJECTS.get(key) or DEFAULT_OBJECTS["ball"])
         )
-        for key in ("width", "p_gain", "cap_ma", "release", "mass_g"):
-            if key in obj:
-                lo, hi = LIMITS[key]
-                cur[key] = type(lo)(clamp(float(obj[key]), lo, hi))
-        for key in ("label", "color", "kind"):
-            if key in obj:
-                cur[key] = str(obj[key])[:32]
+        for field in ("width", "p_gain", "cap_ma", "release", "mass_g", "bounce"):
+            if field in obj:
+                lo, hi = LIMITS[field]
+                cur[field] = type(lo)(clamp(float(obj[field]), lo, hi))
+        for field in ("label", "color", "kind"):
+            if field in obj:
+                cur[field] = str(obj[field])[:32]
         if isinstance(obj.get("spot"), list) and len(obj["spot"]) == 3:
             cur["spot"] = [clamp(float(v), -1.0, 1.0) for v in obj["spot"]]
+    # 並び順＝ページのキー 1/2/3。全物体を含むペイロード(ファイル・保存)のときだけ揃える
+    if names and set(names) >= set(TWIN["objects"]):
+        TWIN["objects"] = {key: TWIN["objects"][key] for key in names}
+
+
+def _merge_scene(payload):
+    if not isinstance(payload, dict):
+        return
+    scene = TWIN["scene"]
+    desk = payload.get("desk")
+    if isinstance(desk, dict):
+        for k in ("x", "z"):
+            scene["desk"][k] = clamp(float(desk.get(k, scene["desk"][k])), -2.0, 2.0)
+        for k in ("w", "d"):
+            scene["desk"][k] = clamp(float(desk.get(k, scene["desk"][k])), 0.2, 3.0)
+    if "sound" in payload:
+        scene["sound"] = bool(payload["sound"])
+    if payload.get("ghost") in ("solid", "half", "tips"):
+        scene["ghost"] = payload["ghost"]
+
+
+def merge_twin_config(payload):
+    """Merge a (partial) config into TWIN with every number clamped.
+
+    Accepts the v2 shape (``arms``/``objects``/``scene``) and the v1 shape
+    (``joints``/``base`` at the top level = the first arm).
+    """
+    if not isinstance(payload, dict):
+        return
+    if "arms" in payload and isinstance(payload["arms"], dict):
+        for label, arm in payload["arms"].items():
+            _merge_arm(str(label), arm)
+    elif ARMS and ("joints" in payload or "base" in payload):
+        _merge_arm(
+            ARMS[0], {"joints": payload.get("joints"), "base": payload.get("base")}
+        )
+    _merge_objects(payload.get("objects"))
+    _merge_scene(payload.get("scene"))
 
 
 def save_twin_config(path):
-    """Write TWIN to disk (pretty JSON)."""
+    """Write TWIN to disk (pretty JSON, UTF-8)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(TWIN, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def send_ctl(ctl_sock, ctl_port, message):
-    """Send one JSON control message to the teleop (no-op in --sim)."""
-    if ctl_sock is not None:
-        ctl_sock.sendto(json.dumps(message).encode(), (TELEMETRY_HOST, ctl_port))
+def send_ctl(ctl_sock, label, message):
+    """Send one JSON control message to the teleop of one arm (no-op in --sim)."""
+    port = CTL_PORTS.get(label)
+    if ctl_sock is not None and port:
+        ctl_sock.sendto(json.dumps(message).encode(), (TELEMETRY_HOST, port))
 
 
-def telemetry_loop(port):
-    """Receive teleop telemetry frames and keep the latest one."""
+def telemetry_loop(label, port):
+    """Receive one teleop's telemetry frames and keep the latest one."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((TELEMETRY_HOST, port))
     sock.settimeout(1.0)
-    print(f"[bridge] テレメトリ待受 UDP {port}")
+    print(f"[bridge] 腕 {label}: テレメトリ待受 UDP {port}")
     while True:
         try:
             data, _ = sock.recvfrom(65535)
@@ -222,85 +335,127 @@ def telemetry_loop(port):
             continue
         pos = frame.get("pos", {})
         with LOCK:
-            STATE.update(
+            joint_map = TWIN["arms"][label]["joints"]
+            STATE[label].update(
                 t=float(frame.get("t", 0.0)),
                 pos={k: round(float(v), 2) for k, v in pos.items()},
-                q=[round(norm_to_rad(j, pos.get(j, 0.0)), 4) for j in JOINTS],
+                q=[
+                    round(norm_to_rad(joint_map, j, pos.get(j, 0.0)), 4) for j in JOINTS
+                ],
                 open=float(pos.get("gripper", 100.0)),
                 vwall=frame.get("vwall"),
                 vw=frame.get("vw"),
+                vw_unit=frame.get("vw_unit"),
                 alerts=frame.get("alerts", []),
                 hw=frame.get("hw"),
                 mode=frame.get("mode", "off"),
+                device=frame.get("device", ""),
                 src="teleop",
             )
-            STATE["_rx"] = time.monotonic()
+            STATE[label]["_rx"] = time.monotonic()
 
 
 def sim_loop(hz):
-    """Synthesize a moving twin and a gripper sweep; engage the wall locally."""
+    """Synthesize moving twins and gripper sweeps; engage the walls locally."""
     t0 = time.perf_counter()
-    engaged = False
+    engaged = dict.fromkeys(ARMS, False)
     while True:
         t = time.perf_counter() - t0
-        pos = {
-            "shoulder_pan": 40.0 * math.sin(t * 0.6),
-            "shoulder_lift": 45.0 * math.sin(t * 0.8) + 25.0,
-            "elbow_flex": 50.0 * math.sin(t * 0.7 + 1),
-            "wrist_flex": 40.0 * math.sin(t * 0.9 + 2),
-            "wrist_roll": 60.0 * math.sin(t * 0.5),
-            "gripper": 50.0 + 50.0 * math.sin(t * 1.2),
-        }
-        with LOCK:
-            wall = CONTACT["vwall"]
-        vwall = None
-        if wall:
-            limit = wall["width"] + (wall.get("release", 1.0) if engaged else 0.0)
-            engaged = pos["gripper"] <= limit
-            vwall = {"name": wall["name"], "width": wall["width"], "engaged": engaged}
-        else:
-            engaged = False
-        with LOCK:
-            STATE.update(
-                t=round(t, 3),
-                pos={k: round(v, 2) for k, v in pos.items()},
-                q=[round(norm_to_rad(j, pos[j]), 4) for j in JOINTS],
-                open=round(pos["gripper"], 1),
-                vwall=vwall,
-                vw={
-                    "shoulder_lift": 40 if engaged else 0,
-                    "elbow_flex": 20 if engaged else 0,
-                },
-                alerts=(
-                    ["⚠ 上限負荷（模擬）: 握り反力が上限に張り付いています"]
-                    if engaged and pos["gripper"] < 20.0
-                    else []
-                ),
-                hw={"L": 0, "F": 0},
-                mode="vwall",
-                src="sim",
-            )
-            STATE["_rx"] = time.monotonic()
+        for i, label in enumerate(ARMS):
+            ph = i * 1.7
+            pos = {
+                "shoulder_pan": 40.0 * math.sin(t * 0.6 + ph),
+                "shoulder_lift": 45.0 * math.sin(t * 0.8 + ph) + 25.0,
+                "elbow_flex": 50.0 * math.sin(t * 0.7 + 1 + ph),
+                "wrist_flex": 40.0 * math.sin(t * 0.9 + 2 + ph),
+                "wrist_roll": 60.0 * math.sin(t * 0.5 + ph),
+                "gripper": 50.0 + 50.0 * math.sin(t * 1.2 + ph),
+            }
+            with LOCK:
+                wall = CONTACT.get(label, {}).get("vwall")
+                joint_map = TWIN["arms"][label]["joints"]
+            vwall = None
+            if wall:
+                limit = wall["width"] + (
+                    wall.get("release", 1.0) if engaged[label] else 0.0
+                )
+                engaged[label] = pos["gripper"] <= limit
+                vwall = {
+                    "name": wall["name"],
+                    "width": wall["width"],
+                    "engaged": engaged[label],
+                }
+            else:
+                engaged[label] = False
+            with LOCK:
+                STATE[label].update(
+                    t=round(t, 3),
+                    pos={k: round(v, 2) for k, v in pos.items()},
+                    q=[round(norm_to_rad(joint_map, j, pos[j]), 4) for j in JOINTS],
+                    open=round(pos["gripper"], 1),
+                    vwall=vwall,
+                    vw={
+                        "shoulder_lift": 40 if engaged[label] else 0,
+                        "elbow_flex": 20 if engaged[label] else 0,
+                    },
+                    alerts=(
+                        ["⚠ 上限負荷（模擬）: 握り反力が上限に張り付いています"]
+                        if engaged[label] and pos["gripper"] < 20.0
+                        else []
+                    ),
+                    hw={"L": 0, "F": 0},
+                    mode="vwall",
+                    vw_unit={
+                        "shoulder_lift": "PWM"
+                        if TWIN["arms"][label]["model"] == "koch_follower"
+                        else "mA",
+                        "elbow_flex": "mA",
+                    },
+                    device=TWIN["arms"][label]["model"],
+                    src="sim",
+                )
+                STATE[label]["_rx"] = time.monotonic()
         time.sleep(1.0 / hz)
 
 
-def keepalive_loop(ctl_sock, ctl_port):
-    """Re-send the contact (wall TTL) every second and the twin config every 10 s."""
+def keepalive_loop(ctl_sock):
+    """Re-send each arm's contact (wall TTL) every second and its twin map every 10 s."""
     last_twin = 0.0
     while True:
         time.sleep(KEEPALIVE_SEC)
+        now = time.monotonic()
         with LOCK:
-            wall = CONTACT["vwall"]
-            fresh = time.monotonic() - CONTACT["t"] < STALE_AFTER_SEC * 2
-            joints = copy.deepcopy(TWIN["joints"])
-        if wall is not None and fresh:
-            send_ctl(ctl_sock, ctl_port, {"vwall": wall})
-        if time.monotonic() - last_twin > TWIN_RESEND_SEC:
-            send_ctl(ctl_sock, ctl_port, {"twin": {"joints": joints}})
-            last_twin = time.monotonic()
+            contacts = {
+                label: (c.get("vwall"), now - c.get("t", 0.0) < STALE_AFTER_SEC * 2)
+                for label, c in CONTACT.items()
+            }
+            joints = {a: copy.deepcopy(TWIN["arms"][a]["joints"]) for a in ARMS}
+        for label, (wall, fresh) in contacts.items():
+            if wall is not None and fresh:
+                send_ctl(ctl_sock, label, {"vwall": wall})
+        if now - last_twin > TWIN_RESEND_SEC:
+            for label in ARMS:
+                send_ctl(ctl_sock, label, {"twin": {"joints": joints[label]}})
+            last_twin = now
 
 
-def make_handler(ctl_sock, ctl_port, sim, config_path):
+def public_state():
+    """The /state body: every arm, plus the first arm mirrored at the top level."""
+    now = time.monotonic()
+    with LOCK:
+        arms = {}
+        for label in ARMS:
+            body = {k: v for k, v in STATE[label].items() if not k.startswith("_")}
+            if now - STATE[label].get("_rx", 0.0) > STALE_AFTER_SEC:
+                body["src"] = "none"
+            arms[label] = body
+    out: dict[str, Any] = {"t": round(now, 3), "arms": arms}
+    if ARMS:
+        out.update(arms[ARMS[0]])  # 旧ページ互換(1 本目を最上位にも)
+    return out
+
+
+def make_handler(ctl_sock, config_path):
     """Build the HTTP handler class bound to the control socket."""
 
     class Handler(SimpleHTTPRequestHandler):
@@ -328,12 +483,7 @@ def make_handler(ctl_sock, ctl_port, sim, config_path):
             """Serve /state and /config as JSON, everything else from webxr/."""
             route = self.path.split("?")[0]
             if route == "/state":
-                with LOCK:
-                    stale = time.monotonic() - STATE.get("_rx", 0.0) > STALE_AFTER_SEC
-                    body = {k: v for k, v in STATE.items() if not k.startswith("_")}
-                if stale:
-                    body["src"] = "none"
-                self.send_json(body)
+                self.send_json(public_state())
             elif route == "/config":
                 with LOCK:
                     body = copy.deepcopy(TWIN)
@@ -342,7 +492,7 @@ def make_handler(ctl_sock, ctl_port, sim, config_path):
                 super().do_GET()
 
         def do_POST(self):
-            """/contact: {"vwall": {...}|null} → teleop. /config: merge, save, forward."""
+            """/contact: {"arm": label, "vwall": {...}|null} → that arm's teleop. /config: merge, save, forward."""
             route = self.path.split("?")[0]
             msg = self.read_json()
             if msg is None:
@@ -350,25 +500,41 @@ def make_handler(ctl_sock, ctl_port, sim, config_path):
                 self.end_headers()
                 return
             if route == "/contact":
+                label = str(msg.get("arm") or (ARMS[0] if ARMS else ""))
+                if label not in CONTACT:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
                 wall = msg.get("vwall")
                 with LOCK:
-                    changed = wall != CONTACT["vwall"]
-                    CONTACT["vwall"], CONTACT["t"] = wall, time.monotonic()
+                    changed = wall != CONTACT[label]["vwall"]
+                    CONTACT[label]["vwall"], CONTACT[label]["t"] = (
+                        wall,
+                        time.monotonic(),
+                    )
                 if changed:
-                    print(f"[contact] {wall['name'] if wall else '解除'}: {wall}")
-                send_ctl(ctl_sock, ctl_port, {"vwall": wall})
+                    print(
+                        f"[contact] {label}: {wall['name'] if wall else '解除'}: {wall}"
+                    )
+                send_ctl(ctl_sock, label, {"vwall": wall})
                 self.send_response(204)
                 self.end_headers()
             elif route == "/config":
                 with LOCK:
                     if msg.get("reset"):
+                        models = [TWIN["arms"][a]["model"] for a in ARMS]
                         TWIN.clear()
-                        TWIN.update(copy.deepcopy(DEFAULT_TWIN_CONFIG))
+                        TWIN.update(default_twin(ARMS, models))
                     else:
                         merge_twin_config(msg)
                     save_twin_config(config_path)
                     body = copy.deepcopy(TWIN)
-                send_ctl(ctl_sock, ctl_port, {"twin": {"joints": body["joints"]}})
+                for label in ARMS:
+                    send_ctl(
+                        ctl_sock,
+                        label,
+                        {"twin": {"joints": body["arms"][label]["joints"]}},
+                    )
                 print(f"[config] 保存 {config_path}")
                 self.send_json(body)
             else:
@@ -376,7 +542,7 @@ def make_handler(ctl_sock, ctl_port, sim, config_path):
                 self.end_headers()
 
         def log_message(self, format, *args):  # http.server's own parameter name
-            """Silence the 20 Hz /state and /contact chatter."""
+            """Silence the 30 Hz /state and /contact chatter."""
             first = str(args[0]) if args else ""
             if "/state" not in first and "/contact" not in first:
                 super().log_message(format, *args)
@@ -432,6 +598,11 @@ def lan_ip():
         return "127.0.0.1"
 
 
+def split_list(spec, cast=str):
+    """Turn 'B,F' / '8770,8773' into a list; blanks are dropped."""
+    return [cast(p.strip()) for p in str(spec).split(",") if p.strip()]
+
+
 def build_parser():
     """Define the command line."""
     ap = argparse.ArgumentParser(
@@ -441,16 +612,24 @@ def build_parser():
         "--sim", action="store_true", help="テレオペなしのデモ(壁は内部で判定)"
     )
     ap.add_argument(
+        "--arms",
+        default="B",
+        help="腕の名前をカンマ区切り(例 B,F)。順番が --telemetry/--ctl-port と対応。1 本目が机と物体の基準",
+    )
+    ap.add_argument(
+        "--models",
+        default="",
+        help="腕ごとの機種をカンマ区切り(koch_leader/koch_follower)。未指定=1 本目 leader・2 本目以降 follower",
+    )
+    ap.add_argument(
         "--telemetry",
-        type=int,
-        default=8769,
-        help="テレオペのテレメトリを受ける UDP ポート",
+        default="8769",
+        help="テレオペのテレメトリを受ける UDP ポート(腕ごとにカンマ区切り)",
     )
     ap.add_argument(
         "--ctl-port",
-        type=int,
-        default=8766,
-        help="テレオペの制御 UDP ポート(壁を送る先)",
+        default="8766",
+        help="テレオペの制御 UDP ポート(壁を送る先・腕ごとにカンマ区切り)",
     )
     ap.add_argument(
         "--port", type=int, default=8443, help="Quest が開く HTTP(S) ポート"
@@ -483,23 +662,44 @@ def main():
         sys.exit(
             f"three.module.js がありません: {WEBXR_DIR}\n→ python koch4/webxr/setup_assets.py を一度実行"
         )
+    arms = split_list(args.arms)
+    if not arms:
+        sys.exit("--arms に腕の名前を 1 つ以上")
+    models = split_list(args.models) or []
+    models += [
+        "koch_leader" if i == 0 else "koch_follower"
+        for i in range(len(models), len(arms))
+    ]
+    if any(m not in MODELS for m in models):
+        sys.exit(f"--models は {MODELS} から")
+    tele_ports = split_list(args.telemetry, int)
+    ctl_ports = split_list(args.ctl_port, int)
+    if not args.sim and len(tele_ports) != len(arms):
+        sys.exit("--telemetry は --arms と同じ数のポートをカンマ区切りで")
+    if len(ctl_ports) == 1 and len(arms) > 1:
+        ctl_ports = ctl_ports * len(arms)  # --sim などで 1 つだけ渡されたとき
+    if len(ctl_ports) != len(arms):
+        sys.exit("--ctl-port は --arms と同じ数のポートをカンマ区切りで")
+    ARMS[:] = arms
+    CTL_PORTS.update(dict(zip(arms, ctl_ports, strict=True)))
+    for label in arms:
+        STATE[label] = empty_state()
+        CONTACT[label] = {"vwall": None, "t": 0.0}
+    TWIN.update(default_twin(arms, models))
+
     config_path = args.config_dir / TWIN_CONFIG_NAME
     load_twin_config(config_path)
     ctl_sock = None if args.sim else socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     if args.sim:
         threading.Thread(target=sim_loop, args=(args.hz,), daemon=True).start()
     else:
-        threading.Thread(
-            target=telemetry_loop, args=(args.telemetry,), daemon=True
-        ).start()
-    threading.Thread(
-        target=keepalive_loop, args=(ctl_sock, args.ctl_port), daemon=True
-    ).start()
+        for label, port in zip(arms, tele_ports, strict=True):
+            threading.Thread(
+                target=telemetry_loop, args=(label, port), daemon=True
+            ).start()
+    threading.Thread(target=keepalive_loop, args=(ctl_sock,), daemon=True).start()
 
-    handler = partial(
-        make_handler(ctl_sock, args.ctl_port, args.sim, config_path),
-        directory=str(WEBXR_DIR),
-    )
+    handler = partial(make_handler(ctl_sock, config_path), directory=str(WEBXR_DIR))
     httpd = ThreadingHTTPServer(
         ("0.0.0.0", args.port), handler
     )  # LAN 待受(ヘッドセットが開く)
@@ -511,7 +711,9 @@ def main():
         httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
         scheme = "https"
     url = f"{scheme}://{lan_ip()}:{args.port}/"
-    print(f"\n=== koch4 VR bridge [{'SIM' if args.sim else 'teleop'}] ===")
+    print(
+        f"\n=== koch4 VR bridge [{'SIM' if args.sim else 'teleop'}] 腕={arms} 機種={models} ==="
+    )
     print(f"Quest ブラウザでこの URL を開く: {url}   (観客用: {url}?spectator=1)")
     if scheme == "https":
         print(
@@ -519,15 +721,15 @@ def main():
         )
     else:
         print(
-            f"（adb reverse tcp:{args.port} tcp:{args.port} → Quest で http://localhost:{args.port}/ ）"
+            f"（USB 方式: koch4_quest_usb.py --port {args.port} を実行すると Quest 側で "
+            f"http://localhost:{args.port}/ が開く）"
         )
-    print("Ctrl+C で終了\n")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        pass
-    finally:
-        send_ctl(ctl_sock, args.ctl_port, {"vwall": None})
+        print("\n終了")
+        for label in arms:
+            send_ctl(ctl_sock, label, {"vwall": None})  # 壁を残さない
 
 
 if __name__ == "__main__":

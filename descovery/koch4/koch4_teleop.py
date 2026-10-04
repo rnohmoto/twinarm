@@ -9,6 +9,10 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
   * `--config-dir` / `--work-dir`: 較正 JSON・設定・ログを専用フォルダに置く
     （lerobot の calibration_dir を明示指定。~/.cache に散らばらない）
   * `--follower-port none`: リーダーのみ（VR 仮想反力デモ・フォロワー不要）
+  * `--leader-type koch_follower`: 入力装置がフォロワー機（手で動かす 2 人目用）。接続後に
+    腕 5 軸のトルクを抜き、gripper だけ Mode 5 の壁にする。重さは肘（XL330-M288・電流制御）と
+    肩（XL430-W250・電流制御が無いので PWM＝電圧制御モード。握っている間だけトルク ON）。
+    Kt と握りの上限は M288 用に自動で換算。`--vw-pwm-cap 0` で肩の PWM を使わない
   * `--ff vwall`: 仮想物体（VR ブリッジ or `--wall` 固定指定）の反力。壁の描画は
     サーボ内部の位置ループに任せ（Operating_Mode 5・Goal_Position=壁・Goal_Current=上限・
     Position_P_Gain=硬さ）、ホストは「壁に触れているか」だけを 30fps で切り替える
@@ -37,6 +41,8 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
       --ff gripper --panel --csv
   uv run python koch4/koch4_teleop.py --leader-port /dev/tty.usbmodemYYYY \
       --follower-port none --ff vwall --wall ball:45:800:300      # 壁を固定して手で確認
+  uv run python koch4/koch4_teleop.py --leader-port /dev/tty.usbmodemZZZZ --leader-id koch_follower_B
+      --leader-type koch_follower --follower-port none --ff vwall --vw --arm-label F   # 2 人目: フォロワー機を手で
   python koch4_teleop.py --selftest       # 制御則の自己診断（ハード・lerobot 不要）
 """
 
@@ -70,6 +76,33 @@ VW_JOINTS = [
     "shoulder_lift",
     "elbow_flex",
 ]  # 仮想重さを返すリーダー腕関節(どちらも XL330-M077)
+# 入力装置の機種差。koch_follower を手で動かす 2 人目用: 肩 2 軸は XL430-W250 で
+# 電流制御(Mode 0/5)が無い → 肩の重さは PWM モード(Mode 16・Goal_PWM 0.113 %/count・
+# 上限 885)で返す。ストール 1.5 N*m @ 12 V なので duty ≈ トルク / 1.5 N*m。肘は M288 の電流制御。
+# M288 のストールは M077 の約 2.4 倍(0.52 vs 0.215 N*m @ 5V, 同じ 1.47 A)なので Kt が違い、
+# 握りの電流上限も同じ力になるよう縮める。
+DEVICE_MODELS = {
+    "koch_leader": {
+        "kt": 0.146,
+        "vw_joints": ["shoulder_lift", "elbow_flex"],
+        "pwm_joints": {},
+        "wall_scale": 1.0,
+        "hand_joints": [],
+    },
+    "koch_follower": {
+        "kt": 0.354,
+        "vw_joints": ["shoulder_lift", "elbow_flex"],
+        "pwm_joints": {"shoulder_lift": {"stall_nm": 1.5, "pwm_limit": 885}},
+        "wall_scale": 0.45,
+        "hand_joints": [
+            "shoulder_pan",
+            "shoulder_lift",
+            "elbow_flex",
+            "wrist_flex",
+            "wrist_roll",
+        ],
+    },
+}
 JOINT_SPAN_DEG = {
     "shoulder_pan": 180.0,
     "shoulder_lift": 100.0,
@@ -87,6 +120,10 @@ FF_GRIPPER_P_GAIN = 800
 FF_CAP_MAX_MA = 900
 FF_CAP_WARN_MA = 500
 ARM_CAP_MAX_MA = 400
+PWM_CAP_MAX = 400  # 肩 PWM の上限(885 = 100 %)。400 ≈ 45 % ≈ 0.68 N*m
+PWM_LIMIT_DEFAULT = 885
+MODE_PWM = 16
+MODE_EXTENDED_POSITION = 4
 FREE_SPACE_P_GAIN = 800
 STALL_FRAMES_MAX = 10
 MAX_RECONNECTS = 20
@@ -296,27 +333,38 @@ class VirtualWeightLaw:
     release: float = 0.5
     invert_shoulder: bool = False
     invert_elbow: bool = False
+    kt_nm_per_a: float = KT_NM_PER_A
+    shoulder_gain_per_nm: float | None = None
+    shoulder_cap: float | None = None
 
 
 @dataclass(frozen=True)
 class VirtualWeightState:
-    """Smoothed currents [mA] for shoulder_lift and elbow_flex."""
+    """Smoothed outputs for shoulder_lift and elbow_flex (mA, or PWM counts for a PWM shoulder)."""
 
     shoulder_ma: float = 0.0
     elbow_ma: float = 0.0
 
 
 def _weight_target_ma(law, torque_nm, invert):
-    physical_ma = torque_nm / KT_NM_PER_A * 1000.0
+    physical_ma = torque_nm / law.kt_nm_per_a * 1000.0
     target = max(min(physical_ma * law.scale, law.cap_ma), -law.cap_ma)
     return -target if invert else target
+
+
+def _shoulder_target(law, torque_nm):
+    if law.shoulder_gain_per_nm is None:
+        return _weight_target_ma(law, torque_nm, law.invert_shoulder)
+    cap = law.cap_ma if law.shoulder_cap is None else law.shoulder_cap
+    target = max(min(torque_nm * law.shoulder_gain_per_nm, cap), -cap)
+    return -target if law.invert_shoulder else target
 
 
 def virtual_weight_step(law, state, engaged, mass_g, levers_m):
     """Advance the weight law by one frame; releases decay faster than they rise."""
     if engaged and mass_g > 0.0:
         force_n = mass_g / 1000.0 * G_MPS2
-        target_s = _weight_target_ma(law, force_n * levers_m[0], law.invert_shoulder)
+        target_s = _shoulder_target(law, force_n * levers_m[0])
         target_e = _weight_target_ma(law, force_n * levers_m[1], law.invert_elbow)
         alpha = law.alpha
     else:
@@ -392,9 +440,77 @@ def selftest():
     vw = VirtualWeightLaw(scale=0.12, cap_ma=120, alpha=1.0)
     w = virtual_weight_step(vw, VirtualWeightState(), True, 100.0, (0.2, 0.1))
     assert w.shoulder_ma == 120.0 and 80.0 < w.elbow_ma < 81.0, w
+    m288 = VirtualWeightLaw(scale=0.12, cap_ma=400, alpha=1.0, kt_nm_per_a=0.354)
+    w2 = virtual_weight_step(m288, VirtualWeightState(), True, 100.0, (0.1, 0.1))
+    assert abs(w2.elbow_ma - 80.6 * 0.146 / 0.354) < 0.5, w2
+    pwm_law = VirtualWeightLaw(
+        alpha=1.0, shoulder_gain_per_nm=0.5 * 885 / 1.5, shoulder_cap=150
+    )
+    light = virtual_weight_step(pwm_law, VirtualWeightState(), True, 45.0, (0.25, 0.1))
+    heavy = virtual_weight_step(pwm_law, VirtualWeightState(), True, 300.0, (0.25, 0.1))
+    assert 32.0 < light.shoulder_ma < 33.0 and heavy.shoulder_ma == 150.0, (
+        light,
+        heavy,
+    )
+    selftest_pwm_joints()
     print(
         "selftest OK: spring/error/vwall/weight/thermal 制御則は twinarm domain と同じ値"
+        "・肩 PWM の書込み順序"
     )
+
+
+class _FakeBus:
+    """Selftest stand-in for MotorsBus: records writes, reads back the last value."""
+
+    def __init__(self):
+        self.reg = {
+            ("PWM_Limit", "shoulder_lift"): 885,
+            ("Goal_PWM", "shoulder_lift"): 885,
+        }
+        self.log = []
+
+    def write(self, name, motor, value, *, normalize=True):
+        """Store and log one register write."""
+        self.reg[(name, motor)] = int(value)
+        self.log.append((name, int(value)))
+
+    def read(self, name, motor, *, normalize=True):
+        """Return the last value written to a register (0 if never written)."""
+        return self.reg.get((name, motor), 0)
+
+
+class _FakeDev:
+    """Selftest stand-in for a device with a ``bus``."""
+
+    def __init__(self):
+        self.bus = _FakeBus()
+
+
+def selftest_pwm_joints():
+    """Check the safety-critical write order of the PWM shoulder with a fake bus."""
+    dev = _FakeDev()
+    log = dev.bus.log
+    pwm = PwmWeightJoints(dev, ["shoulder_lift"])
+    pwm.setup(quiet=True)
+    assert pwm.ready, "PWM setup not confirmed"
+    assert log == [("Torque_Enable", 0), ("Operating_Mode", 16), ("Goal_PWM", 0)], log
+    log.clear()
+    assert pwm.write("shoulder_lift", 120) == 120
+    # 0 を書いてからトルク ON(位置モードの上限値 885 が残ったまま ON にしない)
+    assert log == [("Goal_PWM", 0), ("Torque_Enable", 1), ("Goal_PWM", 120)], log
+    log.clear()
+    assert pwm.write("shoulder_lift", 121) == 120 and log == [], log
+    assert pwm.write("shoulder_lift", 0) == 0
+    assert log == [("Goal_PWM", 0), ("Torque_Enable", 0)], log
+    log.clear()
+    pwm.release()
+    assert log == [
+        ("Goal_PWM", 0),
+        ("Torque_Enable", 0),
+        ("Operating_Mode", 4),
+        ("Goal_PWM", 885),
+    ], log
+    assert pwm.write("shoulder_lift", 50) == 0  # release 後は書かない
 
 
 def to_signed16(v):
@@ -442,6 +558,8 @@ def gripper_ticks(bus):
     g = cal.get("gripper")
     if g is None:
         return None
+    if int(getattr(g, "drive_mode", 0) or 0) == 1:  # 反転モーターは端が入れ替わる
+        return int(g.range_max), int(g.range_min)
     return int(g.range_min), int(g.range_max)
 
 
@@ -541,6 +659,88 @@ def release_arm(bus, joints=ARM_FF_JOINTS):
     for j in joints:
         bus.write("Goal_Current", j, 0, normalize=False)
         bus.write("Torque_Enable", j, 0, normalize=False)
+
+
+class PwmWeightJoints:
+    """XL430 joints that render the virtual weight in PWM (voltage) mode.
+
+    The XL430-W250 has no current control, so the shoulder of a hand-moved follower
+    gets its weight as a PWM duty (Operating_Mode 16, Goal_PWM in 0.113 % counts).
+    Torque is enabled only while a weight is applied: with torque on and zero duty
+    the driver brakes the motor, which would make the free arm feel heavy.
+    Goal_PWM is zeroed *before* torque is enabled, because in position mode the same
+    register holds the PWM limit (885 = 100 %); it is restored on release so the arm
+    works as a follower again without a power cycle. Risk class: moves motors.
+    """
+
+    def __init__(self, dev, joints):
+        self.dev = dev
+        self.joints = list(joints)
+        self.torque = dict.fromkeys(self.joints, False)
+        self.out = dict.fromkeys(self.joints, 0)
+        self.limit = dict.fromkeys(self.joints, PWM_LIMIT_DEFAULT)
+        self.ready = False
+
+    def setup(self, quiet=False):
+        """Switch the joints to PWM mode with zero duty and torque off; read back."""
+        if not self.joints:
+            return
+        bus = self.dev.bus
+        ok = True
+        for j in self.joints:
+            bus.write("Torque_Enable", j, 0, normalize=False)
+            limit = int(bus.read("PWM_Limit", j, normalize=False))
+            self.limit[j] = limit if limit > 0 else PWM_LIMIT_DEFAULT
+            bus.write("Operating_Mode", j, MODE_PWM, normalize=False)
+            bus.write("Goal_PWM", j, 0, normalize=False)
+            mode = int(bus.read("Operating_Mode", j, normalize=False))
+            goal = int(bus.read("Goal_PWM", j, normalize=False))
+            ok = ok and mode == MODE_PWM and goal == 0
+            self.torque[j], self.out[j] = False, 0
+            if not quiet:
+                print(
+                    f"[vw] {j}(XL430) PWM モード: Operating_Mode={mode}(期待{MODE_PWM}) "
+                    f"/ Goal_PWM={goal}(期待0) / PWM_Limit={self.limit[j]}"
+                )
+        self.ready = ok
+        if not ok and not quiet:
+            print(
+                "[vw] ⚠ PWM モードの設定を読み戻せません — この軸の重さは出しません(この行をClaudeへ)"
+            )
+
+    def write(self, joint, out):
+        """Apply a duty to one joint; returns the duty now commanded."""
+        if not self.ready:
+            return 0
+        bus = self.dev.bus
+        if out != 0 and not self.torque[joint]:
+            bus.write(
+                "Goal_PWM", joint, 0, normalize=False
+            )  # 上限値が残ったまま ON にしない
+            bus.write("Torque_Enable", joint, 1, normalize=False)
+            self.torque[joint] = True
+        if abs(out - self.out[joint]) >= 3 or (out == 0 and self.out[joint] != 0):
+            bus.write("Goal_PWM", joint, out, normalize=False)
+            self.out[joint] = out
+        if out == 0 and self.torque[joint]:
+            bus.write(
+                "Torque_Enable", joint, 0, normalize=False
+            )  # 0 duty のブレーキを残さない
+            self.torque[joint] = False
+        return self.out[joint]
+
+    def release(self):
+        """Zero the duty, drop torque, restore extended-position mode and the PWM limit."""
+        if not self.joints:
+            return
+        bus = self.dev.bus
+        for j in self.joints:
+            bus.write("Goal_PWM", j, 0, normalize=False)
+            bus.write("Torque_Enable", j, 0, normalize=False)
+            bus.write("Operating_Mode", j, MODE_EXTENDED_POSITION, normalize=False)
+            bus.write("Goal_PWM", j, self.limit[j], normalize=False)
+            self.torque[j], self.out[j] = False, 0
+        self.ready = False
 
 
 def apply_follower_grip_cap(robot, cap_ma):
@@ -821,6 +1021,55 @@ class RemoteFollower:
         }
 
 
+class HandFollower:
+    """A Koch follower moved by hand: the input device of a second player.
+
+    Wraps lerobot's KochFollower so the frame loop can treat it like KochLeader
+    (connect / disconnect / is_connected / ``get_action()`` with ``<motor>.pos``
+    normalized values / ``bus``). On connect the five arm joints are left
+    torque-free so a person can move the arm (hold it: a raised arm drops); the
+    gripper keeps its torque for the virtual wall (Mode 5). Risk class: torque
+    off (arm) + moves motors (gripper wall).
+    """
+
+    def __init__(self, follower, hand_joints):
+        self._follower = follower
+        self._hand_joints = list(hand_joints)
+
+    @property
+    def bus(self):
+        """The follower's MotorsBus (the frame loop reads/writes registers on it)."""
+        return self._follower.bus
+
+    @property
+    def is_connected(self):
+        """True while lerobot considers the follower connected."""
+        return self._follower.is_connected
+
+    def connect(self):
+        """Connect through lerobot (it enables torque), then free the arm joints."""
+        self._follower.connect()
+        self.free_arm()
+
+    def free_arm(self):
+        """Drop torque on the arm joints so the arm can be moved by hand."""
+        for j in self._hand_joints:
+            self._follower.bus.write("Torque_Enable", j, 0, normalize=False)
+        print(
+            f"[hand] 腕 {len(self._hand_joints)} 軸のトルクを抜きました"
+            "(手で動かせる。離すと落ちるので支えること)"
+        )
+
+    def disconnect(self):
+        """Disconnect through lerobot (its default drops torque on every motor)."""
+        self._follower.disconnect()
+
+    def get_action(self):
+        """Read the hand-moved pose as a leader-style action dict."""
+        pos = self._follower.bus.sync_read("Present_Position")
+        return {f"{m}.pos": float(v) for m, v in pos.items()}
+
+
 def check_hw_errors(dev, label):
     """Print any latched hardware error (overload etc.) on a bus."""
     try:
@@ -880,6 +1129,41 @@ def build_parser():
     ap.add_argument("--follower-id", default="koch_follower_arm")
     ap.add_argument("--leader-port", default=None)
     ap.add_argument("--leader-id", default="koch_leader_arm")
+    ap.add_argument(
+        "--leader-type",
+        choices=list(DEVICE_MODELS),
+        default="koch_leader",
+        help="入力装置の機種。koch_follower=フォロワー機を手で動かす(2 人目・--follower-port none 必須)",
+    )
+    ap.add_argument(
+        "--arm-label",
+        default="",
+        help="テレメトリに載せる腕の名前(VR ページの表示と /contact の宛先。例 B / F)",
+    )
+    ap.add_argument(
+        "--wall-scale",
+        type=float,
+        default=None,
+        help="仮想壁の電流上限の倍率(未指定=機種既定 M077 1.0 / M288 0.45)",
+    )
+    ap.add_argument(
+        "--vw-kt",
+        type=float,
+        default=None,
+        help="重さ計算のトルク定数 N*m/A(未指定=機種既定 0.146 / 0.354)",
+    )
+    ap.add_argument(
+        "--vw-pwm-scale",
+        type=float,
+        default=0.5,
+        help="肩が XL430 のとき: 重さの倍率(物理値=ストール 1.5 N*m で duty 100%% に対する割合)",
+    )
+    ap.add_argument(
+        "--vw-pwm-cap",
+        type=int,
+        default=150,
+        help="肩が XL430 のとき: PWM の上限(885=100%%・既定 150≈17%%・最大 400)。0=肩の PWM を使わない",
+    )
     ap.add_argument(
         "--config-dir",
         type=Path,
@@ -1064,6 +1348,26 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     leader_only = args.follower_port.lower() == LEADER_ONLY
     if leader_only and args.ff in ("gripper", "arm"):
         sys.exit("--follower-port none のとき使える --ff は off / vwall だけです")
+    model = DEVICE_MODELS[args.leader_type]
+    if args.leader_type != "koch_leader" and not leader_only:
+        sys.exit(
+            "--leader-type koch_follower は --follower-port none(手で動かす入力装置)でだけ使えます"
+        )
+    wall_scale = (
+        model["wall_scale"]
+        if args.wall_scale is None
+        else max(0.0, min(args.wall_scale, 2.0))
+    )
+    vw_kt = model["kt"] if args.vw_kt is None else max(0.05, args.vw_kt)
+    vw_joints = list(model["vw_joints"])  # 重さを書く関節(機種で違う)
+    pwm_spec = dict(model["pwm_joints"])  # 電流制御の無い軸(XL430)は PWM で重さを返す
+    if args.vw_pwm_cap > PWM_CAP_MAX:
+        args.vw_pwm_cap = PWM_CAP_MAX
+        print(f"[vw] 肩 PWM の上限は安全のため最大{PWM_CAP_MAX}に制限しました")
+    if args.vw_pwm_cap <= 0:
+        vw_joints = [j for j in vw_joints if j not in pwm_spec]
+        pwm_spec = {}
+    cur_joints = [j for j in vw_joints if j not in pwm_spec]  # 電流制御で重さを書く軸
     if args.ff_cap > FF_CAP_MAX_MA:
         args.ff_cap = FF_CAP_MAX_MA
         print(f"[ff] cap は安全のため最大{FF_CAP_MAX_MA}mAに制限しました")
@@ -1079,6 +1383,10 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         print(f"[vw] 重さ cap は安全のため最大{ARM_CAP_MAX_MA}mAに制限しました")
     guard = ThermalGuard()
     viz_ports = parse_ports(args.viz_port)
+    if args.wall is not None and wall_scale != 1.0:
+        args.wall = replace(
+            args.wall, cap_ma=round(args.wall.cap_ma * wall_scale)
+        )  # 機種差の換算(M288 は同じ電流で約 2.4 倍の力)
     if args.wall is not None and args.wall.cap_ma > args.ff_cap:
         args.wall = replace(
             args.wall, cap_ma=int(args.ff_cap)
@@ -1125,11 +1433,25 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 max_relative_target=float(args.max_rel) if args.max_rel > 0 else None,
             )
         )
-    teleop = KochLeader(
-        KochLeaderConfig(
-            port=args.leader_port, id=args.leader_id, calibration_dir=cal_l
+    if args.leader_type == "koch_follower":
+        teleop = HandFollower(
+            KochFollower(
+                KochFollowerConfig(
+                    port=args.leader_port, id=args.leader_id, calibration_dir=cal_f
+                )
+            ),
+            model["hand_joints"],
         )
-    )
+        print(
+            "[hand] ⚠ 入力装置=フォロワー機: 接続直後に腕のトルクが抜ける(腕を手で支えて起動)。"
+            f" 重さ=電流 {cur_joints}＋PWM {list(pwm_spec)}・壁の電流上限 ×{wall_scale}・Kt={vw_kt}"
+        )
+    else:
+        teleop = KochLeader(
+            KochLeaderConfig(
+                port=args.leader_port, id=args.leader_id, calibration_dir=cal_l
+            )
+        )
     if robot is not None:
         robot.connect()
     teleop.connect()
@@ -1173,10 +1495,12 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         )
         vwall_on = False
     vw_on = vwall_on and args.vw
+    pwm = PwmWeightJoints(teleop, list(pwm_spec))
     if vw_on:
-        setup_arm_ff(teleop, VW_JOINTS)
+        setup_arm_ff(teleop, cur_joints)
+        pwm.setup()
         print(
-            "[vw] ⚠ 仮想重さON: 握っている間だけ肩・肘に電流が出る。リーダーから手を離さない"
+            f"[vw] ⚠ 仮想重さON: 握っている間だけ {vw_joints} に力が出る。腕から手を離さない"
         )
     wall = [args.wall]  # 現在の仮想物体(None=自由空間)
     wall_cmd = [None]  # 最後に書いた WallCommand
@@ -1264,12 +1588,21 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 f"（往復 {stats['rtt_ms']}ms・欠落 {stats['loss'] * 100:.0f}%）",
             )
 
+    shoulder_pwm = pwm_spec.get("shoulder_lift")
+
     def vw_law():
         return VirtualWeightLaw(
             scale=args.vw_scale,
             cap_ma=args.vw_cap,
             invert_shoulder="shoulder_lift" in vw_invert,
             invert_elbow="elbow_flex" in vw_invert,
+            kt_nm_per_a=vw_kt,
+            shoulder_gain_per_nm=(
+                args.vw_pwm_scale * shoulder_pwm["pwm_limit"] / shoulder_pwm["stall_nm"]
+                if shoulder_pwm
+                else None
+            ),
+            shoulder_cap=args.vw_pwm_cap if shoulder_pwm else None,
         )
 
     def spring_law():
@@ -1302,7 +1635,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         """Drop the weight currents and free the lift/elbow joints."""
         nonlocal vw_on
         if vw_on:
-            release_arm(teleop.bus, VW_JOINTS)
+            release_arm(teleop.bus, cur_joints)
+            pwm.release()
         vw_on = False
         vw_state[0] = VirtualWeightState()
         for j in VW_JOINTS:
@@ -1339,7 +1673,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             ff_anchor[0] = arm_gripper_ff(teleop, args)
             ff_on, vwall_on, wall_cmd[0] = False, True, None
             if args.vw:
-                setup_arm_ff(teleop, VW_JOINTS)
+                setup_arm_ff(teleop, cur_joints)
+                pwm.setup()
                 vw_on = True
         if new == "off" and (ff_on or vwall_on):
             release_gripper(teleop.bus)
@@ -1393,6 +1728,10 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 set_ff_mode(cmd["mode"])
             if "vwall" in cmd:
                 wall[0] = wall_from_message(cmd["vwall"])
+                if wall[0] is not None and wall_scale != 1.0:
+                    wall[0] = replace(
+                        wall[0], cap_ma=round(wall[0].cap_ma * wall_scale)
+                    )  # 機種差の換算
                 if wall[0] is not None and wall[0].cap_ma > args.ff_cap:
                     wall[0] = replace(
                         wall[0], cap_ma=int(args.ff_cap)
@@ -1527,15 +1866,24 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             "shoulder_lift": vw_state[0].shoulder_ma,
             "elbow_flex": vw_state[0].elbow_ma,
         }
-        for j in VW_JOINTS:
+        for j in vw_joints:
             out = round(outs[j])
+            if (
+                j in pwm_spec
+            ):  # XL430: PWM(トルク ON/OFF の順序は PwmWeightJoints が持つ)
+                vw_out[j] = pwm.write(j, out)
+                continue
             if abs(out - vw_out[j]) >= 3 or (out == 0 and vw_out[j] != 0):
                 teleop.bus.write("Goal_Current", j, out, normalize=False)
                 vw_out[j] = out
-        if engaged and any(abs(v) >= args.vw_cap for v in vw_out.values()):
+        if engaged and any(
+            abs(vw_out[j]) >= (args.vw_pwm_cap if j in pwm_spec else args.vw_cap)
+            for j in vw_joints
+        ):
             raise_alert(
                 "vwcap",
-                f"⚠ 重さの電流が上限 {args.vw_cap}mA — 物体が重すぎるか倍率が高い",
+                f"⚠ 重さの出力が上限（電流 {args.vw_cap}mA／肩 PWM {args.vw_pwm_cap}）"
+                " — 物体が重すぎるか倍率が高い",
             )
         if n[0] % TEMP_CHECK_EVERY == TEMP_CHECK_EVERY // 2:
             j = VW_JOINTS[(n[0] // TEMP_CHECK_EVERY) % len(VW_JOINTS)]
@@ -1600,6 +1948,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                     "rec": reconnects[0],
                     "n": n[0],
                     "leader_only": leader_only,
+                    "arm": args.arm_label,
+                    "device": args.leader_type,
                     "alerts": active_alerts(),
                     "hw": dict(hw_bits),
                     "link": (
@@ -1607,7 +1957,12 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                         if isinstance(robot, RemoteFollower)
                         else None
                     ),
-                    "vw": {j: vw_out[j] for j in VW_JOINTS} if vw_on else None,
+                    "vw": {j: vw_out[j] for j in vw_joints} if vw_on else None,
+                    "vw_unit": (
+                        {j: ("PWM" if j in pwm_spec else "mA") for j in vw_joints}
+                        if vw_on
+                        else None
+                    ),
                     "vwall": (
                         {
                             "name": wall[0].name,
@@ -1714,7 +2069,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             setup_arm_ff(teleop, ARM_FF_JOINTS)
             ff_arm = True
         if vw_on:
-            setup_arm_ff(teleop, VW_JOINTS)
+            setup_arm_ff(teleop, cur_joints)
+            pwm.setup()
             vw_state[0] = VirtualWeightState()
             for j in VW_JOINTS:
                 vw_out[j] = 0
@@ -1763,7 +2119,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             if args.ff == "arm":
                 release_arm(teleop.bus)
             if vw_on:
-                release_arm(teleop.bus, VW_JOINTS)
+                release_arm(teleop.bus, cur_joints)
+                pwm.release()
         except Exception:  # noqa: BLE001, S110 - the bus may already be gone
             pass
         if fcsv:

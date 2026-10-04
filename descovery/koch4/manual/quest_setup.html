@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quest Pro の準備（Meta アカウントから USB 接続まで）</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="manual.css" rel="stylesheet">
+</head>
+<body>
+<nav class="nav-top">
+  <a href="index.html">入口</a><a href="handshake.html">握手（2 ペア）</a><a href="vr.html">VR（一人称・2 人）</a><a href="quest_setup.html"><strong>Quest の準備</strong></a><span class="sep">｜</span>
+  <a href="#s0">流れ</a><a href="#s1">用意</a><a href="#s2">Meta アカウント</a><a href="#s3">アプリ</a><a href="#s4">初期設定</a><a href="#s5">開発者の登録</a><a href="#s6">開発者モード</a><a href="#s7">Mac と接続</a><a href="#s8">展示の前に</a><a href="#s9">困ったとき</a><a href="#s10">参考資料</a>
+</nav>
+<div class="container py-4">
+
+<header class="mb-4">
+  <h1 class="h2">Quest Pro の準備</h1>
+  <p class="text-muted mb-1">Meta アカウントを作るところから、ゴーグルを USB で Mac に繋いで VR のページを開けるようにするところまでの手引きです。最初に 1 回だけ行います。</p>
+  <p class="mb-0">開発者の登録ではアカウントの確認があり、日数がかかることがあります。本番の 1〜2 週間前に済ませます。所要時間は、確認の待ち時間を除いて 30〜40 分ほどです。</p>
+</header>
+
+<!-- ===================================================== -->
+<h2 id="s0">0. 流れ</h2>
+<figure class="diagram">
+<svg viewBox="0 0 940 210" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
+  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#2c3e50"/></marker></defs>
+  <g>
+    <rect x="14" y="30" width="118" height="70" rx="8" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+    <text x="73" y="56" text-anchor="middle" font-weight="bold">① アカウント</text>
+    <text x="73" y="78" text-anchor="middle" font-size="12">Meta アカウント</text>
+    <rect x="168" y="30" width="118" height="70" rx="8" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+    <text x="227" y="56" text-anchor="middle" font-weight="bold">② アプリ</text>
+    <text x="227" y="78" text-anchor="middle" font-size="12">スマホに入れる</text>
+    <rect x="322" y="30" width="118" height="70" rx="8" fill="#eaf7ef" stroke="#27ae60" stroke-width="2"/>
+    <text x="381" y="56" text-anchor="middle" font-weight="bold">③ 初期設定</text>
+    <text x="381" y="78" text-anchor="middle" font-size="12">ゴーグルを設定</text>
+    <rect x="476" y="30" width="118" height="70" rx="8" fill="#fff8f0" stroke="#e67e22" stroke-width="2"/>
+    <text x="535" y="56" text-anchor="middle" font-weight="bold">④ 開発者の登録</text>
+    <text x="535" y="78" text-anchor="middle" font-size="12">組織と確認</text>
+    <rect x="630" y="30" width="118" height="70" rx="8" fill="#fff8f0" stroke="#e67e22" stroke-width="2"/>
+    <text x="689" y="56" text-anchor="middle" font-weight="bold">⑤ 開発者モード</text>
+    <text x="689" y="78" text-anchor="middle" font-size="12">アプリでオン</text>
+    <rect x="784" y="30" width="142" height="70" rx="8" fill="#f4ecf7" stroke="#8e44ad" stroke-width="2"/>
+    <text x="855" y="56" text-anchor="middle" font-weight="bold">⑥ Mac と USB</text>
+    <text x="855" y="78" text-anchor="middle" font-size="12">許可して確認</text>
+  </g>
+  <g stroke="#2c3e50" stroke-width="2" marker-end="url(#a1)">
+    <line x1="132" y1="65" x2="166" y2="65"/><line x1="286" y1="65" x2="320" y2="65"/><line x1="440" y1="65" x2="474" y2="65"/><line x1="594" y1="65" x2="628" y2="65"/><line x1="748" y1="65" x2="782" y2="65"/>
+  </g>
+  <text x="73" y="130" text-anchor="middle" font-size="12" fill="#495057">パソコンかスマホ</text>
+  <text x="227" y="130" text-anchor="middle" font-size="12" fill="#495057">スマホ</text>
+  <text x="381" y="130" text-anchor="middle" font-size="12" fill="#495057">ゴーグルとスマホ</text>
+  <text x="535" y="130" text-anchor="middle" font-size="12" fill="#495057">パソコン</text>
+  <text x="689" y="130" text-anchor="middle" font-size="12" fill="#495057">スマホ</text>
+  <text x="855" y="130" text-anchor="middle" font-size="12" fill="#495057">Mac とゴーグル</text>
+  <rect x="476" y="150" width="272" height="34" rx="6" fill="#fff" stroke="#e67e22" stroke-dasharray="5 4"/>
+  <text x="612" y="172" text-anchor="middle" font-size="12">確認に日数がかかることがある。先に始める</text>
+</svg>
+<figcaption>図 0-1: 準備の 6 段階と、それぞれを行う機器。</figcaption>
+</figure>
+
+<!-- ===================================================== -->
+<h2 id="s1">1. 用意する物</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:30%">物</th><th>条件</th></tr></thead>
+<tbody>
+<tr><td>メールアドレス</td><td>展示専用のアカウントに使うもの。会社のメールアドレスにすると、担当が替わっても引き継げる</td></tr>
+<tr><td>スマートフォン</td><td>Meta Horizon アプリを入れる（iOS 15.1 以降か Android 5.0 以降）。初期設定のあいだ Wi-Fi と Bluetooth をオンにする</td></tr>
+<tr><td>電話番号か支払い方法</td><td>開発者アカウントの確認に使う。SMS を受け取れる携帯電話の番号、またはクレジットカードなど（PayPal は不可）</td></tr>
+<tr><td>Wi-Fi（インターネット）</td><td>初期設定と更新のときだけ必要。展示の当日は使わない</td></tr>
+<tr><td>Quest Pro 一式</td><td>ヘッドセット・コントローラ 2 本・充電ドック・45W 電源アダプター・充電ケーブル（箱に同梱）</td></tr>
+<tr><td>Mac と USB-C ケーブル</td><td>ケーブルはデータ通信に対応したもの（充電専用は不可）</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s2">2. Meta アカウントを作る</h2>
+<p>ゴーグルを使うには Meta アカウントが必須です。Facebook や Instagram のアカウントは要りません。</p>
+<div class="step">
+<ol class="mb-0">
+  <li>パソコンかスマートフォンのブラウザで <a href="https://auth.meta.com/">auth.meta.com</a> を開く。「ログインまたはアカウントを作成」という画面が出る。</li>
+  <li><strong>「携帯電話番号またはメールアドレスを使用」</strong>を選ぶ（Facebook・Instagram でログイン、は選ばない）。</li>
+  <li>展示専用にするメールアドレスを入力して「次へ」。</li>
+  <li>この先は画面の案内に従う。メールに届く確認コードの入力、名前、生年月日、パスワードの設定を求められる。生年月日は 18 歳以上になる実際の日付を入れる（開発者の登録は 18 歳以上が条件）。</li>
+  <li>パスワードと、確認に使ったメールアドレスを、担当者どうしで決めた場所に記録する。</li>
+</ol>
+</div>
+<div class="note">
+<strong>なぜ展示専用のアカウントにするか</strong>: Meta の規約では、アカウントのパスワードを他人と共有したり、アカウントを譲ったりすることはできません。個人のアカウントで会社のゴーグルを設定すると、担当が替わったときに引き継げなくなります。会社のメールアドレスで 1 つ作り、管理する人を決めておくのが安全です。
+</div>
+<div class="gate"><strong>関門 2</strong>: <a href="https://auth.meta.com/">auth.meta.com</a> に、作ったメールアドレスとパスワードでログインできる。</div>
+
+<!-- ===================================================== -->
+<h2 id="s3">3. スマートフォンに Meta Horizon アプリを入れる</h2>
+<div class="step">
+<ol class="mb-0">
+  <li>App Store か Google Play で「Meta Horizon」を入れる。</li>
+  <li>アプリを開き、§2 で作ったアカウントでログインする。</li>
+  <li>スマートフォンの Wi-Fi と Bluetooth をオンにしておく（初期設定に必要）。</li>
+</ol>
+</div>
+
+<!-- ===================================================== -->
+<h2 id="s4">4. ゴーグルの初期設定とペアリング</h2>
+<div class="step">
+<ol class="mb-0">
+  <li><strong>電源を入れる</strong>。ヘッドセット左側の電源ボタンを 3 秒、チャイムが鳴るまで長押しする。</li>
+  <li><strong>コントローラを起こす</strong>。左はメニューボタン、右はホームボタンを押す。両方を 2 秒長押しして、白いライトが点滅すれば準備完了。</li>
+  <li><strong>ゴーグルの中の案内に従う</strong>。言語を選び、Wi-Fi に繋ぎ、頭に合わせて締め具合と目の幅を調整する。</li>
+  <li><strong>スマートフォンとペアリングする</strong>。ゴーグルを外し、Meta Horizon アプリで メニュー → デバイス → 「新しいデバイスを接続」→ Meta Quest Pro を選び、画面の指示に従う。</li>
+  <li><strong>プロフィールを作る</strong>。初めてログインするときに Meta Horizon プロフィール（ゴーグルの中での名前）を作る。ユーザー名は 3〜30 文字。</li>
+  <li><strong>更新を済ませる</strong>。ソフトウェアの更新が出たら、充電ドックに載せたまま完了まで待つ。</li>
+</ol>
+</div>
+<p>充電ドックは付属の 45W 電源アダプターで使います。それより小さい充電器ではドックに電気が届きません。USB-C ケーブルで直接充電するときは、前面のガラスを守るため付属の保護カバーを付けます。</p>
+<div class="gate"><strong>関門 4</strong>: ゴーグルを被るとホーム画面が出て、Meta Horizon アプリの「デバイス」に Meta Quest Pro が表示される。</div>
+
+<!-- ===================================================== -->
+<h2 id="s5">5. 開発者の登録（組織を作り、アカウントを確認する）</h2>
+<p>USB で Mac から操作できるようにするには、ゴーグルの「開発者モード」が要り、その前提として開発者の登録をします。費用はかかりません。</p>
+<div class="step">
+<ol class="mb-0">
+  <li>パソコンのブラウザで <a href="https://developers.meta.com/horizon/">Meta の開発者サイト</a>を開き、§2 のアカウントでログインする。</li>
+  <li><strong>組織（チーム）を作る</strong>。開発者ダッシュボードの「Create New Team」のページで、組織の名前などを入力する。名前は自由に決めてよい（例: 会社名と部署名）。</li>
+  <li><strong>アカウントを確認する</strong>。ダッシュボードの確認（verification）の欄で、次のどちらかを行う。
+    <ul>
+      <li>携帯電話の番号を登録し、SMS で二段階認証を設定する</li>
+      <li>支払い方法（クレジットカードなど）を登録する。PayPal は不可</li>
+    </ul>
+  </li>
+  <li>§6 でスイッチが出ない場合だけ、組織の確認（身分証を使う管理者の確認。通常は数分）も行う。Meta の文書では、これはアプリを公開するための手続きですが、開発者モードの条件として求められた例があります。</li>
+</ol>
+</div>
+<div class="gate"><strong>関門 5</strong>: 開発者ダッシュボードに自分の組織が表示され、アカウントの確認が済んだ表示になっている。</div>
+
+<!-- ===================================================== -->
+<h2 id="s6">6. 開発者モードを入れる</h2>
+<div class="step">
+<ol class="mb-0">
+  <li>スマートフォンの Meta Horizon アプリを開く。</li>
+  <li>ツールバーのヘッドセットのアイコンをタップする。</li>
+  <li>ペアリング済みのヘッドセット（機種名と状態が出ている項目）をタップする。</li>
+  <li>ヘッドセットの絵の下の「ヘッドセット設定」をタップする。</li>
+  <li>「開発者モード」をタップし、スイッチをオンにする。</li>
+</ol>
+</div>
+<p>「開発者モード」の項目が見当たらないときは、アプリを一度終了して開き直し、ゴーグルも再起動します。それでも出なければ <a href="#s9">§9</a>。</p>
+
+<!-- ===================================================== -->
+<h2 id="s7">7. Mac と USB で繋いで許可する</h2>
+<div class="step">
+<ol class="mb-0">
+  <li>Mac に接続用のツール（adb）を入れる。
+<pre>brew install --cask android-platform-tools</pre></li>
+  <li>ゴーグルを USB-C ケーブルで Mac に繋ぐ。</li>
+  <li>ゴーグルを被る。「USB デバッグを許可しますか」と出るので、<strong>「このコンピュータから常に許可」</strong>を選ぶ。予備の Mac がある場合は、その Mac でも同じ許可を出しておく。</li>
+  <li>Mac で確認する。
+<pre>cd twinarm/descovery
+./koch4/start.sh check</pre>
+  最後に <code>✓ ＜番号＞: 接続済み（adb 可・USB）</code> とバッテリー残量が出れば完了。</li>
+</ol>
+</div>
+<div class="gate"><strong>関門 7</strong>: <code>./koch4/start.sh check</code> に「接続済み」が出る。ここまで済めば <a href="vr.html#s3">VR のページ §3</a> の起動に進める。</div>
+
+<!-- ===================================================== -->
+<h2 id="s8">8. 展示の前に済ませること</h2>
+<ul>
+  <li>ゴーグルのソフトウェア更新を前日までに済ませる。当日はインターネットに繋がないので、更新は始まりません。</li>
+  <li>会場で、ゴーグルの境界（ガーディアン）を設定する。その後に <a href="vr.html#s4">位置合わせ</a>を行う。</li>
+  <li>ゴーグルとコントローラを満充電にする。電源の組み方は <a href="vr.html#s8">VR のページ §8</a>。</li>
+  <li>来場者に着けてもらう場合は、使い方と注意を先に説明し、1 人ごとに顔に当たる部分を拭く。</li>
+</ul>
+
+<!-- ===================================================== -->
+<h2 id="s9">9. 困ったとき</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:32%">症状</th><th>確かめること・直し方</th></tr></thead>
+<tbody>
+<tr><td>アプリに「開発者モード」が出ない</td><td>開発者サイトで組織を作ったか。アカウントの確認（SMS か支払い方法）が済んでいるか。アプリとゴーグルを再起動する。ゴーグルのソフトウェアを最新にする。それでも出なければ、組織の確認（身分証）を行う</td></tr>
+<tr><td>SMS が届かない</td><td>支払い方法の登録に切り替える</td></tr>
+<tr><td>ペアリングで機器が見つからない</td><td>スマートフォンの Bluetooth と Wi-Fi がオンか。ゴーグルの電源。スマートフォンをゴーグルの近くに置く</td></tr>
+<tr><td>「USB デバッグを許可」が出ない</td><td>ケーブルがデータ対応か。開発者モードがオンか。ケーブルを挿し直してからゴーグルを被る。誤って拒否したときは、ケーブルを抜いてゴーグルを再起動し、繋ぎ直す</td></tr>
+<tr><td><code>check</code> に「未許可」と出る</td><td>ゴーグルを被り、許可の画面で「常に許可」を選ぶ</td></tr>
+<tr><td><code>check</code> に「adb が見つかりません」と出る</td><td>§7 の 1 を行う。Meta Quest Developer Hub を入れている場合は、その中の adb でもよい</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s10">10. 参考資料</h2>
+<table class="table">
+<thead><tr><th>資料</th><th>使った箇所</th></tr></thead>
+<tbody>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/1336626146870772/">Meta ヘルプ: Meta Horizon の Meta アカウントを作成する</a></td><td>§2 アカウントは auth.meta.com で作る</td></tr>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/508618010978035/">Meta ヘルプ: Meta Quest にログインする</a></td><td>§2・§4 Facebook や Instagram は不要・初回に Meta Horizon プロフィールを作る</td></tr>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/834224781086435/">Meta ヘルプ: Meta Quest Pro の要件</a></td><td>§1 Meta アカウントとモバイルアプリが必要</td></tr>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/1178714089211378/">Meta ヘルプ: スマートフォンに Meta Horizon モバイルアプリをインストールする</a></td><td>§1・§3 対応する OS・Wi-Fi と Bluetooth をオンにする</td></tr>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/869053370725118/">Meta ヘルプ: Meta Quest Pro の初期設定</a></td><td>§4 電源・コントローラ・ペアリングの手順</td></tr>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/430804835708882/">Meta ヘルプ: Meta Quest Pro のセット内容</a></td><td>§1 充電ドック・45W 電源アダプター・充電ケーブルが同梱</td></tr>
+<tr><td><a href="https://www.meta.com/help/quest/4988886794551067/">Meta ヘルプ: Meta Quest Pro を充電する</a></td><td>§4 ドックには 45W のアダプターが必要</td></tr>
+<tr><td><a href="https://developers.meta.com/horizon/documentation/native/android/mobile-device-setup/">Meta 開発者: Device setup</a></td><td>§5〜§7 組織の作成・アカウントの確認・開発者モード・USB デバッグの許可</td></tr>
+<tr><td><a href="https://developers.meta.com/horizon/policy/developer-verification/">Meta 開発者: Developer verification</a></td><td>§5 確認の方法（支払い方法か二段階認証）</td></tr>
+<tr><td><a href="https://developers.meta.com/horizon/resources/publish-organization-verification/">Meta 開発者: Organization verification</a></td><td>§5・§9 組織の確認（身分証・通常は数分）</td></tr>
+<tr><td><a href="https://www.meta.com/gb/legal/supplemental-terms-of-service/">Meta: 補足規約</a></td><td>§2 パスワードの共有とアカウントの譲渡はできない</td></tr>
+<tr><td><a href="https://developer.android.com/tools/releases/platform-tools">Android SDK Platform-Tools</a></td><td>§7 adb</td></tr>
+</tbody>
+</table>
+
+<footer>Quest Pro の準備</footer>
+</div>
+</body>
+</html>

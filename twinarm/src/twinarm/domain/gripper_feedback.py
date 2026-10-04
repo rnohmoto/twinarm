@@ -275,7 +275,18 @@ def tip_levers(
 
 @dataclass(frozen=True)
 class VirtualWeightLaw:
-    """Render a grasped object's weight as current on the leader's lift and elbow."""
+    """Render a grasped object's weight as current on the leader's lift and elbow.
+
+    ``kt_nm_per_a`` is the torque constant of the joint servos: 0.146 for the
+    leader's XL330-M077, about 0.354 for an XL330-M288 (a Koch follower moved by
+    hand as a second input device), so the same weight asks for less current there.
+
+    ``shoulder_gain_per_nm`` switches the shoulder to an actuator that is not
+    current controlled: the output is then ``torque * gain`` in the actuator's own
+    units, capped by ``shoulder_cap``. The hand-moved follower's shoulder is an
+    XL430-W250 (no current control) driven in PWM mode, where the gain is
+    ``scale * PWM limit (885) / stall torque (1.5 N*m at 12 V)`` PWM counts per N*m.
+    """
 
     scale: float = 0.12
     cap_ma: int = 120
@@ -283,6 +294,9 @@ class VirtualWeightLaw:
     release: float = 0.5
     invert_shoulder: bool = False
     invert_elbow: bool = False
+    kt_nm_per_a: float = KT_NM_PER_A
+    shoulder_gain_per_nm: float | None = None
+    shoulder_cap: float | None = None
 
 
 @dataclass(frozen=True)
@@ -294,9 +308,17 @@ class VirtualWeightState:
 
 
 def _weight_target_ma(law: VirtualWeightLaw, torque_nm: float, invert: bool) -> float:
-    physical_ma = torque_nm / KT_NM_PER_A * 1000.0
+    physical_ma = torque_nm / law.kt_nm_per_a * 1000.0
     target = max(min(physical_ma * law.scale, law.cap_ma), -law.cap_ma)
     return -target if invert else target
+
+
+def _shoulder_target(law: VirtualWeightLaw, torque_nm: float) -> float:
+    if law.shoulder_gain_per_nm is None:
+        return _weight_target_ma(law, torque_nm, law.invert_shoulder)
+    cap = law.cap_ma if law.shoulder_cap is None else law.shoulder_cap
+    target = max(min(torque_nm * law.shoulder_gain_per_nm, cap), -cap)
+    return -target if law.invert_shoulder else target
 
 
 def virtual_weight_step(
@@ -309,7 +331,7 @@ def virtual_weight_step(
     """Advance the weight law by one frame; releases decay faster than they rise."""
     if engaged and mass_g > 0.0:
         force_n = mass_g / 1000.0 * G_MPS2
-        target_s = _weight_target_ma(law, force_n * levers_m[0], law.invert_shoulder)
+        target_s = _shoulder_target(law, force_n * levers_m[0])
         target_e = _weight_target_ma(law, force_n * levers_m[1], law.invert_elbow)
         alpha = law.alpha
     else:

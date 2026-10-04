@@ -5,6 +5,10 @@
   ため、両方を試して効いた方を採用する。
 - RealSense は pyrealsense2 を遅延 import（未導入でも他モードは動く）。カラーのみ使用（深度は拡張用フック）。
 - FileCamera はテスト・ドライラン用（同じ画像を返し続ける）。
+- 専用カメラが無いとき（MacBook 内蔵カメラ・iPhone 連係カメラ）: AVFoundation は OpenCV から露出/WB を
+  固定できないので、画面内のグレーカード（reference_roi）が毎フレーム一定の明るさ・色になるよう
+  チャンネル別ゲインで補正する（露出とホワイトバランスの両方の揺れを吸収）。鏡越し（ミラークリップ）
+  で撮るときは mirror=True で鏡像を戻す。処理順は 回転 → 反転 → 補正（ROI・検出・較正は全て補正後の画素）。
 """
 from __future__ import annotations
 
@@ -36,6 +40,36 @@ def _rotate(frame: np.ndarray, deg: int) -> np.ndarray:
     return cv2.rotate(frame, code)
 
 
+def _normalize_by_reference(frame: np.ndarray, roi, target: int) -> np.ndarray:
+    """ROI（グレーカード）の平均が各チャンネル target になるようにゲインを掛ける。
+
+    自動露出・自動 WB が生きているカメラ向け。カードが見えていない（極端に暗い）ときは触らない。
+    ゲインは 0.3〜4.0 に抑える（カードが影に入っただけで画面全体が飛ばないように）。
+    """
+    if roi is None or len(roi) != 4:
+        return frame
+    h_img, w_img = frame.shape[:2]
+    x, y, w, h = (int(v) for v in roi)
+    x0, y0 = max(0, min(x, w_img - 1)), max(0, min(y, h_img - 1))
+    x1, y1 = max(x0 + 1, min(x + w, w_img)), max(y0 + 1, min(y + h, h_img))
+    mean = frame[y0:y1, x0:x1].reshape(-1, 3).astype(np.float32).mean(axis=0)
+    if (mean < 8).any():
+        return frame
+    gain = np.clip(float(target) / mean, 0.3, 4.0)
+    return np.clip(frame.astype(np.float32) * gain, 0, 255).astype(np.uint8)
+
+
+def _postprocess(frame: np.ndarray, cfg: CameraConfig) -> np.ndarray:
+    """回転 → 左右反転（鏡越し）→ グレーカード補正。全カメラ共通の出口。"""
+    out = _rotate(frame, cfg.rotation_deg)
+    if getattr(cfg, "mirror", False):
+        out = out[:, ::-1]
+    roi = getattr(cfg, "reference_roi", None)
+    if roi:
+        out = _normalize_by_reference(np.ascontiguousarray(out), roi, getattr(cfg, "reference_gray", 170))
+    return np.ascontiguousarray(out)
+
+
 class FileCamera(CameraBase):
     """画像ファイル（または ndarray）を固定フレームとして返す。"""
     def __init__(self, cfg: CameraConfig, frame: np.ndarray | None = None):
@@ -53,7 +87,7 @@ class FileCamera(CameraBase):
 
     def read(self) -> np.ndarray:
         assert self._frame is not None, "FileCamera not opened"
-        return _rotate(self._frame.copy(), self.cfg.rotation_deg)
+        return _postprocess(self._frame.copy(), self.cfg)
 
 
 class OpenCVCamera(CameraBase):
@@ -119,7 +153,7 @@ class OpenCVCamera(CameraBase):
             ok, frame = self.cap.read()
             if not ok or frame is None:
                 raise RuntimeError("OpenCVCamera: frame read failed")
-        return _rotate(frame, self.cfg.rotation_deg)
+        return _postprocess(frame, self.cfg)
 
     def actual_props(self) -> dict:
         import cv2
@@ -178,7 +212,7 @@ class RealSenseCamera(CameraBase):
         color = frames.get_color_frame()
         if not color:
             raise RuntimeError("RealSenseCamera: no color frame")
-        return _rotate(np.asanyarray(color.get_data()), self.cfg.rotation_deg)
+        return _postprocess(np.asanyarray(color.get_data()), self.cfg)
 
     def read_depth(self) -> np.ndarray:
         """深度 (H, W) uint16, mm 単位（拡張用: 高さ違い・積み重ねの判定）。"""

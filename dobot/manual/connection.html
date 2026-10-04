@@ -148,6 +148,9 @@ uv run python check_camera.py --list ; uv run python check_camera.py --index 0</
   <li>Magician と同じ USB ハブは避ける。カメラを 2 台にするときは別系統に分ける。</li>
   <li>取り付けは 1/4-20 ネジ（クリップの三脚穴かマジックアーム）。高さ 45cm で真下向き。詳細は初期設定マニュアル §3。</li>
   <li>露出・ホワイトバランス・オートフォーカスの固定は <code>check_camera.py</code> で確認する。Mac で固定できない場合は Logi Tune か OS の設定で固定する。</li>
+  <li><b>専用カメラが無いとき（MacBook Pro の内蔵カメラ・iPhone の連係カメラ）</b>: 画素からロボット座標への変換はホモグラフィなので、真上でなく斜めから見下ろしても較正（§4 の 4 点）で成立する。置き方は 2 通り。(a) iPhone を連係カメラにして USB で Mac に繋ぎ（会場 Wi-Fi は要らない。iPhone はロック状態・横向き）、クランプ付きアームで作業台の真上 50〜90 cm に固定する。(b) MacBook を高いスタンドに載せ、画面を 30〜40° まで倒して作業台を見下ろす（蓋を閉じ切るとスリープ）。ウェブカメラ用のミラークリップで鏡越しに真下を撮るときは <code>config.json</code> の <code>camera.mirror</code> を true にする（鏡像を戻す）。</li>
+  <li>内蔵カメラと iPhone は OpenCV から露出とホワイトバランスを固定できない（macOS の AVFoundation は幅・高さ・fps しか受け付けない）。作業台の端にグレーカード（白い紙でも可）を貼り、<code>camera.reference_roi</code>（x,y,w,h 画素）にその範囲を書くと、毎フレームそこが一定の明るさと色になるように補正する。<code>check_camera.py --ref x,y,w,h</code> で明るさの揺れが減るか確認し、照明は一定にする。</li>
+  <li>macOS はターミナルにカメラの権限が要る。Terminal.app から一度起動し「カメラへのアクセスを求めています」で許可する。出ないときは <code>tccutil reset Camera</code> の後に再実行、またはシステム設定 → プライバシーとセキュリティ → カメラ。iPhone や iPad が近くにあるとカメラ番号がずれるので、<code>check_camera.py --list</code> で番号を確かめてから <code>camera.index</code> に書く。</li>
 </ul>
 
 <h2 id="s4">4. PC 側の設定</h2>

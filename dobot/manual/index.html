@@ -33,7 +33,7 @@
 <body>
 <nav class="nav-top">
   <a href="purchase.html">購入リスト</a><a href="connection.html">接続マニュアル</a><span style="color:#7f8c8d">｜</span>
-  <a href="#s0">全体像</a><a href="#s1">用意する物</a><a href="#s2">Magician</a><a href="#s3">カメラ</a><a href="#s4">ソフト</a><a href="#s5">キャリブ</a><a href="#s6">対象物</a><a href="#s7">初回P&amp;P</a><a href="#s8">困ったとき</a><a href="#s9">安全</a><a href="#s10">写真</a>
+  <a href="#s0">全体像</a><a href="#s1">用意する物</a><a href="#s2">Magician</a><a href="#s3">カメラ</a><a href="#s3mac">カメラが無いとき</a><a href="#s4">ソフト</a><a href="#s5">キャリブ</a><a href="#s6">対象物</a><a href="#s7">初回P&amp;P</a><a href="#s8">困ったとき</a><a href="#s9">安全</a><a href="#s10">写真</a>
 </nav>
 <div class="container py-4">
 
@@ -189,6 +189,66 @@
   <div class="col-md-6"><figure class="photo"><img src="img/05_camera_view.jpg" alt="カメラの視野" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 05 未撮影: check_camera.py のスナップショット（logs/camera_check_*.jpg）</div><figcaption>写真 3-3: カメラから見た作業域。</figcaption></figure></div>
 </div>
 <div class="gate"><strong>関門 3</strong>: 作業域全体が写り、カメラは手で押しても動かない。</div>
+
+<h3 id="s3mac">3.3 専用カメラが無いとき（iPhone・MacBook の内蔵カメラ）</h3>
+<p>USB カメラが手元に無くても、iPhone か MacBook の内蔵カメラで動かせます。画像の位置を mm に変える計算は、カメラが斜めから見下ろしていても §5 の 4 点の較正で成り立ちます。違いは 2 つで、置き方と、明るさ・色の自動調整を止められないことです。</p>
+<figure class="diagram">
+<svg viewBox="0 0 900 350" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
+  <!-- left: iPhone -->
+  <text x="225" y="26" text-anchor="middle" font-weight="bold" font-size="14">(a) iPhone を真上に（おすすめ）</text>
+  <rect x="30" y="290" width="390" height="12" fill="#343a40"/>
+  <rect x="50" y="250" width="56" height="40" rx="6" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
+  <text x="78" y="275" text-anchor="middle" font-size="11">Magician</text>
+  <line x1="390" y1="290" x2="390" y2="70" stroke="#6c757d" stroke-width="5"/>
+  <line x1="390" y1="72" x2="240" y2="72" stroke="#6c757d" stroke-width="5"/>
+  <rect x="200" y="62" width="80" height="20" rx="5" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+  <text x="240" y="54" text-anchor="middle" font-size="12">iPhone（レンズを下に）</text>
+  <path d="M240 82 L 100 290 M240 82 L 380 290" stroke="#3498db" stroke-width="1.5" stroke-dasharray="4 4" fill="none"/>
+  <text x="300" y="190" font-size="12">高さ 50〜90cm</text>
+  <rect x="330" y="282" width="34" height="8" fill="#bdbdbd" stroke="#616161"/>
+  <text x="347" y="322" text-anchor="middle" font-size="11">グレーカード</text>
+  <rect x="180" y="278" width="22" height="12" fill="#e74c3c"/><rect x="225" y="278" width="22" height="12" fill="#27ae60"/>
+  <text x="225" y="340" text-anchor="middle" font-size="12" fill="#495057">クランプ付きアームで固定・Mac へは USB</text>
+  <!-- right: MacBook -->
+  <text x="675" y="26" text-anchor="middle" font-weight="bold" font-size="14">(b) MacBook を高い台に（斜めから）</text>
+  <rect x="480" y="290" width="390" height="12" fill="#343a40"/>
+  <rect x="500" y="250" width="56" height="40" rx="6" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
+  <text x="528" y="275" text-anchor="middle" font-size="11">Magician</text>
+  <rect x="760" y="150" width="100" height="140" fill="#f1f3f5" stroke="#adb5bd"/>
+  <text x="810" y="225" text-anchor="middle" font-size="12">台（40cm 以上）</text>
+  <rect x="760" y="140" width="100" height="10" fill="#6c757d"/>
+  <line x1="762" y1="140" x2="700" y2="62" stroke="#3498db" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="702" cy="64" r="5" fill="#2c3e50"/>
+  <text x="640" y="54" text-anchor="middle" font-size="12">画面を手前に倒す（カメラは画面の上端）</text>
+  <path d="M702 66 L 540 290 M702 66 L 750 290" stroke="#3498db" stroke-width="1.5" stroke-dasharray="4 4" fill="none"/>
+  <rect x="690" y="282" width="34" height="8" fill="#bdbdbd" stroke="#616161"/>
+  <text x="707" y="322" text-anchor="middle" font-size="11">グレーカード</text>
+  <rect x="600" y="278" width="22" height="12" fill="#e74c3c"/><rect x="645" y="278" width="22" height="12" fill="#2980b9"/>
+  <text x="675" y="340" text-anchor="middle" font-size="12" fill="#495057">画面は閉じ切らない（閉じるとスリープ）</text>
+</svg>
+<figcaption>図 3-4: 専用カメラが無いときの 2 つの置き方。どちらも、作業域の端に灰色か白のカードを貼って画面に入れます。</figcaption>
+</figure>
+<div class="step">
+  <ol class="mb-0">
+    <li><strong>置く</strong>。(a) iPhone は「連係カメラ」として Mac のカメラになります。USB ケーブルで Mac に繋ぎ（会場の Wi-Fi は要りません）、画面をロックした状態で、クランプ付きのアームでレンズを真下に向けて固定します。(b) MacBook は高い台に載せ、画面を手前に 30〜40° まで倒して作業域を見下ろします。</li>
+    <li><strong>カメラ番号を確かめる</strong>。iPhone や iPad が近くにあると番号がずれます。
+<pre>uv run python check_camera.py --list
+uv run python check_camera.py --index 0        # 写った絵が logs/camera_check_*.jpg に保存される</pre></li>
+    <li><strong>グレーカードを貼る</strong>。作業域の端（物を置かない場所）に、灰色か白の紙を 5cm 角ほど貼ります。次のコマンドで窓が開くので、カードの上をマウスでドラッグして Enter を押すと、カードの位置（x,y,w,h。単位は画素）が表示されます。
+<pre>uv run python check_camera.py --index 0 --pick-ref</pre></li>
+    <li><strong>補正の効きを確かめる</strong>。内蔵カメラと iPhone は明るさと色を自動で変えるので、カードが毎回同じ明るさ・色になるようにソフトが補正します。
+<pre>uv run python check_camera.py --index 0 --ref 1100,40,80,80     # 上で表示された x,y,w,h を入れる</pre>
+    「明るさは安定しています」と出れば使えます。</li>
+    <li><strong>設定に書く</strong>。<code>uv run python setup_wizard.py</code> の [1/8] で、カメラ番号・鏡を使うか・カードの位置を聞かれます（カードの位置は p と答えると、同じように窓でドラッグして選べます）。答えは <code>config.json</code> の <code>camera.index</code>・<code>camera.mirror</code>・<code>camera.reference_roi</code> に保存されます。</li>
+  </ol>
+</div>
+<ul>
+  <li>Mac は、ターミナルにカメラを使う許可が要ります。最初の実行で出る「カメラへのアクセスを求めています」を許可します。出ないときは <code>tccutil reset Camera</code> を実行してからやり直します。</li>
+  <li>斜めから見る (b) は、背の高い物ほど位置がずれます（高さ 2cm の物で最大 1cm ほど）。§5 の較正のマーカーは、物の上面と同じ高さに置きます。</li>
+  <li>ノート PC 用のミラークリップ（鏡で真下を映す）を使うときは、絵が左右反転するので <code>camera.mirror</code> を true にします。視野が狭く、作業域の全体が入らないことがあります。</li>
+  <li>照明は一定に保ちます。カードに影が落ちたり、カードを物が隠したりすると補正が乱れます。</li>
+</ul>
+<div class="gate"><strong>関門 3.3</strong>: <code>check_camera.py --ref …</code> が「明るさは安定しています」を出し、作業域の全体とカードが写っている。</div>
 
 <!-- ===================================================== -->
 <h2 id="s4">4. ソフトの準備（uv・テスト・疎通チェック）</h2>
@@ -378,6 +438,8 @@ uv run python calibrate.py --config config.json            # カメラで 4 枚�
     <tr><td><a href="https://www.dobot-robots.com/products/education/magician.html">Dobot Magician 製品ページ</a></td><td>吸盤 φ20mm・−35kPa、グリッパ 27.5mm・8N、可搬 500g、リーチ 320mm</td></tr>
     <tr><td><a href="https://huggingface.co/docs/lerobot/en/cameras">LeRobot Cameras（Hugging Face）</a></td><td>§3 同じカメラを Koch に使う</td></tr>
     <tr><td><a href="https://github.com/luismesas/pydobot">pydobot</a></td><td>§4 Magician の制御ライブラリ</td></tr>
+    <tr><td><a href="https://support.apple.com/102546">Apple: 連係カメラ（iPhone を Mac のカメラとして使う）</a></td><td>§3.3 iPhone を USB か無線で Mac のカメラにする条件</td></tr>
+    <tr><td><a href="https://github.com/opencv/opencv/blob/4.x/modules/videoio/src/cap_avfoundation_mac.mm">OpenCV の macOS カメラ実装</a></td><td>§3.3 Mac では OpenCV から明るさ・色の固定ができない（設定できるのは幅・高さ・fps）</td></tr>
   </tbody>
 </table>
 <footer>作成 2026年9月20日。TwinArm <code>dobot/manual/index.html</code>。価格は購入リストの当日表示。</footer>

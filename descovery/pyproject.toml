@@ -8,6 +8,9 @@ dependencies = [
     "lerobot[dynamixel]>=0.6.1",
 ]
 
+[tool.uv]
+package = false
+
 [dependency-groups]
 dev = [    
     "ruff>=0.16.3",

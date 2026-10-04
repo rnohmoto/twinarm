@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Koch VR マニュアル（一人称・投げる・2 人）</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="manual.css" rel="stylesheet">
+</head>
+<body>
+<nav class="nav-top">
+  <a href="index.html">入口</a><a href="handshake.html">握手（2 ペア）</a><a href="vr.html"><strong>VR（一人称・2 人）</strong></a><span class="sep">｜</span>
+  <a href="#s0">全体</a><a href="#s1">用意</a><a href="#s2">Quest の準備</a><a href="#s3">起動</a><a href="#s4">位置合わせ</a><a href="#s5">遊び方</a><a href="#s6">2 人</a><a href="#s7">観客の画面</a><a href="#s8">電源</a><a href="#s9">Wi-Fi</a><a href="#s10">調整</a><a href="#s11">困ったとき</a><a href="#s12">安全</a><a href="#s13">参考資料</a>
+</nav>
+<div class="container py-4">
+
+<header class="mb-4">
+  <h1 class="h2">Koch VR マニュアル</h1>
+  <p class="text-muted mb-1">ゴーグル（Meta Quest Pro）を着けたまま実物のアームを握り、目の前の同じ位置に見える仮想の物を拾い、硬さと重さを手で感じ、投げる体験の手引きです。</p>
+  <p class="mb-0">ゴーグルには現実の机とアームがそのまま映り（パススルー）、そこにデジタルにしか無い物が重なって見えます。入力はゴーグルのコントローラではなく、握っているアームそのものです。</p>
+</header>
+
+<!-- ===================================================== -->
+<h2 id="s0">0. 全体（何が何に繋がるか）</h2>
+<figure class="diagram">
+<svg viewBox="0 0 940 380" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
+  <rect x="370" y="40" width="200" height="90" rx="10" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+  <text x="470" y="72" text-anchor="middle" font-weight="bold" font-size="15">Mac</text>
+  <text x="470" y="94" text-anchor="middle" font-size="12">腕の制御＋VR のページを配信</text>
+  <text x="470" y="112" text-anchor="middle" font-size="12">./koch4/start.sh vr</text>
+  <rect x="40" y="50" width="210" height="70" rx="10" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
+  <text x="145" y="80" text-anchor="middle" font-weight="bold">リーダー B（1 人目が握る）</text>
+  <text x="145" y="100" text-anchor="middle" font-size="12">5V の AC アダプタ</text>
+  <rect x="40" y="170" width="210" height="70" rx="10" fill="#eaf0fb" stroke="#2563eb" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="145" y="200" text-anchor="middle" font-weight="bold">フォロワー B（2 人目が握る）</text>
+  <text x="145" y="220" text-anchor="middle" font-size="12">12V・2 人のときだけ</text>
+  <rect x="690" y="50" width="210" height="70" rx="10" fill="#eaf7ef" stroke="#27ae60" stroke-width="2"/>
+  <text x="795" y="80" text-anchor="middle" font-weight="bold">Meta Quest Pro</text>
+  <text x="795" y="100" text-anchor="middle" font-size="12">ブラウザでページを表示</text>
+  <rect x="690" y="170" width="210" height="60" rx="10" fill="#fff" stroke="#6c757d"/>
+  <text x="795" y="196" text-anchor="middle" font-weight="bold">モニタ</text>
+  <text x="795" y="214" text-anchor="middle" font-size="12">観客用の画面</text>
+  <line x1="250" y1="85" x2="370" y2="85" stroke="#2c3e50" stroke-width="2.5"/>
+  <text x="310" y="76" text-anchor="middle" font-size="12">USB</text>
+  <path d="M250 205 Q 330 205 390 130" fill="none" stroke="#2c3e50" stroke-width="2.5" stroke-dasharray="6 4"/>
+  <text x="318" y="190" text-anchor="middle" font-size="12">USB</text>
+  <line x1="570" y1="85" x2="690" y2="85" stroke="#2c3e50" stroke-width="2.5"/>
+  <text x="630" y="76" text-anchor="middle" font-size="12">USB-C（データ）</text>
+  <path d="M550 130 Q 620 200 690 200" fill="none" stroke="#6c757d" stroke-width="2"/>
+  <text x="610" y="190" text-anchor="middle" font-size="12">HDMI</text>
+  <!-- flow -->
+  <rect x="150" y="290" width="640" height="64" rx="8" fill="#f8f9fa" stroke="#dee2e6"/>
+  <text x="470" y="314" text-anchor="middle" font-size="13">アームの関節の角度 → Mac → ゴーグルの中の分身が同じ姿勢になる</text>
+  <text x="470" y="338" text-anchor="middle" font-size="13">分身の指先が物に触れる → Mac → アームのサーボが「壁」と「重さ」を出す</text>
+</svg>
+<figcaption>図 0-1: 実線は必須、破線は 2 人で遊ぶときだけ。会場の Wi-Fi は使わず、ゴーグルは USB ケーブルで Mac に繋ぎます。</figcaption>
+</figure>
+
+<!-- ===================================================== -->
+<h2 id="s1">1. 用意する物</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:26%">物</th><th style="width:16%">数</th><th>条件</th></tr></thead>
+<tbody>
+<tr><td>Mac</td><td>1</td><td><a href="index.html#s2">入口のページ §2</a> の準備が済んでいること</td></tr>
+<tr><td>Koch リーダー（ペア B）</td><td>1</td><td>5V の AC アダプタ。較正済み</td></tr>
+<tr><td>Koch フォロワー（ペア B）</td><td>1</td><td>2 人で遊ぶときだけ。12V の AC アダプタ。較正済み</td></tr>
+<tr><td>Meta Quest Pro とコントローラ</td><td>1 組</td><td>開発者モードを有効にしたもの（§2）。コントローラは位置合わせに 1 本使う</td></tr>
+<tr><td>USB-C ケーブル（データ対応）</td><td>1</td><td>3 m 程度。充電専用のケーブルは使えない</td></tr>
+<tr><td>45W の USB-C 充電器</td><td>1</td><td>ゴーグルの給電用（§8）。付属の充電ドックでも可</td></tr>
+<tr><td>モニタ</td><td>1</td><td>観客用（§7）。無くても体験はできる</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s2">2. 最初の 1 回だけ（Quest と Mac の準備）</h2>
+<p>ゴーグルを USB で Mac に繋いでページを開くには、ゴーグルの「開発者モード」が要ります。アカウントの確認に日数がかかることがあるので、本番の 1〜2 週間前に済ませます。</p>
+<div class="step">
+<ol class="mb-0">
+  <li><strong>Meta アカウントを用意する</strong>。ゴーグルの初期設定には Meta アカウントが必須です（メールアドレスで作れます。Facebook は不要）。展示用には、会社のメールアドレスで展示専用のアカウントを 1 つ作ると、担当が替わっても引き継げます。</li>
+  <li><strong>開発者の登録をする</strong>。<a href="https://developers.meta.com/horizon/">Meta の開発者サイト</a>で組織（チーム）を作り、アカウントを確認します（電話番号の SMS か、支払い方法の登録。18 歳以上）。組織の確認（身分証の提出）を求められたら、それも済ませます。</li>
+  <li><strong>開発者モードを入れる</strong>。スマートフォンの Meta Horizon アプリ → ヘッドセットのアイコン → ヘッドセット設定 → 開発者モード → オン。</li>
+  <li><strong>Mac に adb を入れる</strong>。
+<pre>brew install --cask android-platform-tools</pre></li>
+  <li><strong>USB の許可を出す</strong>。ゴーグルを USB-C ケーブルで Mac に繋ぎ、ゴーグルを被ると「USB デバッグを許可しますか」と出るので、「このコンピュータから常に許可」を選びます。</li>
+  <li><strong>確認する</strong>。
+<pre>./koch4/start.sh check</pre>
+  最後に <code>✓ ＜番号＞: 接続済み（adb 可・USB）</code> とバッテリー残量が出れば完了です。</li>
+</ol>
+</div>
+<div class="gate"><strong>関門 2</strong>: <code>./koch4/start.sh check</code> に「接続済み」が出る。出ないときは <a href="#s11">§11</a> の「Quest が見えない」。</div>
+
+<!-- ===================================================== -->
+<h2 id="s3">3. 起動（毎回）</h2>
+<div class="step">
+<ol class="mb-0">
+  <li>リーダー B の AC アダプタ（5V）を挿す。腕は机に寝かせておく。</li>
+  <li>ゴーグルを USB-C ケーブルで Mac に繋ぐ。</li>
+  <li>Mac で起動する。
+<pre>cd twinarm/descovery
+./koch4/start.sh vr</pre>
+  腕の制御とページの配信が始まり、約 12 秒後にゴーグルのブラウザでページが自動で開きます。</li>
+  <li>ゴーグルを被り、ページ下の <strong>「AR表示（パススルー）」</strong> をコントローラで押す。現実の机とアームが見え、その上に仮想の物が 3 つ浮かびます。</li>
+  <li>初回と、ゴーグルの境界（ガーディアン）を引き直した後は、<a href="#s4">§4 の位置合わせ</a>をする。</li>
+</ol>
+</div>
+<p>先に実機なしで画面だけ見たいときは <code>./koch4/start.sh sim</code>（Mac のブラウザに模擬の腕と物体が出ます）。ゴーグルを繋ぎ直したときは <code>./koch4/start.sh quest</code>。</p>
+<div class="gate"><strong>関門 3</strong>: ゴーグルの中で、アームを動かすと半透明の分身が同じ姿勢で動く。左上の表示に「実機」「送信OK」と出る。</div>
+
+<!-- ===================================================== -->
+<h2 id="s4">4. 位置合わせ（分身を実物のアームに重ねる）</h2>
+<p>起動した直後の分身は、実物とは別の場所に浮いています。コントローラの先で実物の指先を 2〜3 回触ると、分身が実物の位置と向きに重なります。所要 10 秒ほどです。</p>
+<figure class="diagram">
+<svg viewBox="0 0 940 330" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
+  <rect x="40" y="270" width="860" height="12" fill="#495057"/>
+  <text x="470" y="304" text-anchor="middle" font-size="12">机</text>
+  <!-- base -->
+  <rect x="150" y="238" width="44" height="32" fill="#e2e8f0" stroke="#64748b"/>
+  <!-- pose 1 -->
+  <path d="M172 238 L 210 150 L 300 120" fill="none" stroke="#334155" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M300 120 l 26 -10 M300 120 l 28 8" stroke="#d97706" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="330" cy="116" r="7" fill="none" stroke="#c0392b" stroke-width="2.5"/>
+  <text x="346" y="150" font-weight="bold" fill="#c0392b">① 指先の中点</text>
+  <!-- pose 2 (ghost) -->
+  <path d="M172 238 L 250 170 L 380 200" fill="none" stroke="#94a3b8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 7"/>
+  <circle cx="412" cy="206" r="7" fill="none" stroke="#c0392b" stroke-width="2.5"/>
+  <text x="426" y="230" font-weight="bold" fill="#c0392b">②</text>
+  <!-- pose 3 (ghost) -->
+  <path d="M172 238 L 160 140 L 90 90" fill="none" stroke="#94a3b8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 7"/>
+  <circle cx="66" cy="74" r="7" fill="none" stroke="#c0392b" stroke-width="2.5"/>
+  <text x="40" y="58" font-weight="bold" fill="#c0392b">③</text>
+  <!-- controller -->
+  <g transform="translate(332,112) rotate(-35)">
+    <rect x="4" y="-9" width="96" height="18" rx="9" fill="#eaf7ef" stroke="#27ae60" stroke-width="2"/>
+    <circle cx="4" cy="0" r="4" fill="#27ae60"/>
+  </g>
+  <text x="470" y="52" font-size="13">コントローラの先端を当てて、人差し指のトリガーを引く</text>
+  <!-- steps -->
+  <rect x="560" y="84" width="340" height="170" rx="8" fill="#f8f9fa" stroke="#dee2e6"/>
+  <text x="576" y="110" font-weight="bold">手順</text>
+  <text x="576" y="134" font-size="12">1. 画面下の「C 位置合わせ」を押す</text>
+  <text x="576" y="156" font-size="12">2. アームを片手で支え、もう片手のコントローラの先を</text>
+  <text x="590" y="174" font-size="12">実物の指先の中点に当ててトリガー（1 点目＝位置）</text>
+  <text x="576" y="196" font-size="12">3. アームの姿勢を大きく変えて 2 点目、3 点目（＝向き）</text>
+  <text x="576" y="218" font-size="12">4. 中央に出る「ずれ ○ cm」を見て「確定(保存)」</text>
+  <text x="576" y="240" font-size="12">やり直しは「取消(1 点)」、やめるときは「中止」</text>
+</svg>
+<figcaption>図 4-1: 触る場所は 2 本の指先の中点（赤い丸）。点どうしは 25 cm 以上離すと向きが正確になります。</figcaption>
+</figure>
+<ul>
+  <li>ハンドトラッキングを使っているときは、コントローラの代わりに人差し指の先を当てて、親指とつまむ動作をします。</li>
+  <li>結果は Mac に保存され、次回の起動でも同じ位置から始まります。ゴーグルの境界を引き直すと座標の原点が変わるので、やり直します。</li>
+  <li>数 mm〜1 cm の残りは <kbd>E</kbd>（編集）で台の x・y・z・yaw を 1 cm 刻みで直せます。</li>
+  <li><kbd>G</kbd> で分身の見せ方を「実体 → 半透明 → 指先の輪だけ」と切り替えます。実物が見えるので、半透明か指先だけが見やすくなります。</li>
+</ul>
+<div class="gate"><strong>関門 4</strong>: 分身の指先の輪が、実物の指先に重なって動く（ずれの表示がおよそ 2 cm 以下）。</div>
+
+<!-- ===================================================== -->
+<h2 id="s5">5. 遊び方</h2>
+<h3>5.1 仮想の物（3 種類）</h3>
+<table class="table table-striped align-middle">
+<thead><tr><th>物</th><th>握ったときの硬さ</th><th>重さ</th><th>落としたとき</th></tr></thead>
+<tbody>
+<tr><td><span class="swatch" style="background:#facc15"></span>スポンジ</td><td>やわらかい。指が沈み込み、弱く押し返す</td><td>10 g（ほぼ感じない）</td><td>ほとんど跳ねない。ふわっと落ちる</td></tr>
+<tr><td><span class="swatch" style="background:#ef4444"></span>ボール</td><td>ふつう。はっきり止まる</td><td>45 g</td><td>よく跳ねる</td></tr>
+<tr><td><span class="swatch" style="background:#94a3b8"></span>鉄ブロック</td><td>かたい。壁のように止まる</td><td>300 g（腕が下に引かれる）</td><td>跳ねない。低い音</td></tr>
+</tbody>
+</table>
+<h3>5.2 握る・持ち上げる・投げる</h3>
+<div class="step">
+<ol class="mb-0">
+  <li><strong>近づける</strong>: アームの指先を物に寄せると、その物が黄色く光ります（候補）。</li>
+  <li><strong>握る</strong>: 指を閉じていき、物の幅まで来るとサーボが押し返します。物は赤く光って指先に付きます。</li>
+  <li><strong>持ち上げる</strong>: 握っている間だけ、物の重さに応じて腕が下向きに引かれます。腕を前に伸ばすほど重く感じます。</li>
+  <li><strong>放す・投げる</strong>: 指を開くと物が離れます。腕を振りながら開くと、その瞬間の指先の速さで飛びます（最大で秒速 5 m）。机や床に当たると、物ごとの跳ね方をして止まります。</li>
+  <li><strong>戻す</strong>: 「R 配置リセット」で 3 つとも元の場所に戻ります。</li>
+</ol>
+</div>
+<h3>5.3 ボタンとキー</h3>
+<p>ボタンはゴーグルの中ではコントローラで指して押します。Mac のブラウザではキーも使えます。</p>
+<table class="table table-striped">
+<thead><tr><th style="width:26%">ボタン／キー</th><th>はたらき</th></tr></thead>
+<tbody>
+<tr><td>AR表示（パススルー）／VR表示</td><td>ゴーグルの表示を始める。AR は現実が見える。VR は現実が見えない</td></tr>
+<tr><td><kbd>C</kbd> 位置合わせ</td><td>分身を実物に重ねる（§4）。もう一度 <kbd>C</kbd> で確定、<kbd>Backspace</kbd> で 1 点取消、<kbd>Esc</kbd> で中止</td></tr>
+<tr><td><kbd>R</kbd> 配置リセット</td><td>物を元の場所に戻す</td></tr>
+<tr><td><kbd>G</kbd> 分身</td><td>分身の見せ方を切り替える（実体／半透明／指先だけ）</td></tr>
+<tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>／<kbd>0</kbd></td><td>腕を動かさずに、その物を「触っている」ことにする／解除。硬さだけ確かめたいときに使う</td></tr>
+<tr><td><kbd>E</kbd> 編集</td><td>物の硬さ・重さ・跳ね方・置き場所、分身の位置を数値で直して保存する</td></tr>
+<tr><td><kbd>Tab</kbd></td><td>2 人のとき、ボタンとキーの対象になる腕を切り替える</td></tr>
+<tr><td><kbd>V</kbd></td><td>Mac のブラウザの視点を切り替える（握る人の目線／俯瞰）</td></tr>
+<tr><td><kbd>S</kbd></td><td>当たったときの音の入・切</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s6">6. 2 人で遊ぶ</h2>
+<p>ペア B のフォロワー機を、2 人目が手で握る入力装置にします。ゴーグルは 1 台なので、1 人目がゴーグル、2 人目はモニタを見ながら遊びます。</p>
+<div class="step">
+<ol class="mb-0">
+  <li>フォロワー B を USB で<strong>操作する机の Mac</strong> に繋ぎ、AC アダプタ（12V）を挿す。</li>
+  <li>フォロワー B の腕を<strong>手で支える</strong>（起動直後に腕の力が抜けて落ちます）。</li>
+  <li>起動する。画面の案内に従って Enter を押す。
+<pre>./koch4/start.sh vr2</pre></li>
+  <li>ページに分身が 2 体出る（1 人目＝橙、2 人目＝青）。<kbd>Tab</kbd> で青い腕を選び、<a href="#s4">§4</a> と同じ位置合わせを青い腕にも行う。</li>
+</ol>
+</div>
+<table class="table table-striped">
+<thead><tr><th style="width:24%"></th><th>1 人目（リーダー）</th><th>2 人目（フォロワー機を手で）</th></tr></thead>
+<tbody>
+<tr><td>握ったときの壁</td><td>あり</td><td>あり（サーボが強いので電流の上限を 0.45 倍にしてある）</td></tr>
+<tr><td>重さ</td><td>肩と肘（どちらも電流で制御）</td><td>肘は電流、肩は電圧（PWM）で制御。握っている間だけ肩に力が入る</td></tr>
+<tr><td>動かしやすさ</td><td>軽い</td><td>やや重い（減速比が大きいサーボのため）</td></tr>
+</tbody>
+</table>
+<ul>
+  <li>同じ物は、先に握った人のものです。放すと相手が拾えます。投げて渡すこともできます。</li>
+  <li>2 人目の肩の重さの向きと強さは、最初に <a href="#s10">§10</a> の手順で確かめます。</li>
+  <li>この起動のあいだ、フォロワー B は握手には使えません（握手に戻すときは一度止めて <code>./koch4/start.sh handshake</code>）。</li>
+</ul>
+
+<!-- ===================================================== -->
+<h2 id="s7">7. 観客用の画面</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:28%">方法</th><th>見えるもの</th><th>やり方</th></tr></thead>
+<tbody>
+<tr><td>観客ページ</td><td>握る人の目線に近い位置から見た、腕と物の 3D 画面（現実の映像は入らない）</td><td>Mac のブラウザで <code>http://localhost:8444/?spectator=1</code></td></tr>
+<tr><td>ゴーグルの実画面（Cast）</td><td>ゴーグルの中の見え方そのまま（現実＋仮想）</td><td>Meta Quest Developer Hub の Cast（USB のまま使える。16:9 の表示を選べる）</td></tr>
+<tr><td>ゴーグルの実画面（scrcpy）</td><td>同上</td><td><code>uv run python koch4/koch4_quest_usb.py --port 8444 --mirror</code>（<code>brew install scrcpy</code> が必要）</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s8">8. 電源（ゴーグルのバッテリー）</h2>
+<p><strong>バッテリーだけでは 1 日もちません。</strong>Quest Pro のバッテリーは公称 1〜2 時間で、付属の 45W 充電ドックでの満充電に約 2 時間かかります。展示では給電しながら使う前提で組みます。</p>
+<figure class="diagram">
+<svg viewBox="0 0 940 300" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
+  <!-- A -->
+  <rect x="20" y="20" width="290" height="260" rx="10" fill="#f8f9fa" stroke="#adb5bd"/>
+  <text x="165" y="46" text-anchor="middle" font-weight="bold">A. USB のまま使う</text>
+  <rect x="50" y="70" width="90" height="44" rx="6" fill="#eaf2fb" stroke="#3498db"/><text x="95" y="97" text-anchor="middle">Mac</text>
+  <rect x="190" y="70" width="90" height="44" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="235" y="97" text-anchor="middle">Quest</text>
+  <line x1="140" y1="92" x2="190" y2="92" stroke="#2c3e50" stroke-width="2.5"/>
+  <text x="165" y="140" text-anchor="middle" font-size="12">データと給電を 1 本で</text>
+  <text x="165" y="176" text-anchor="middle" font-size="12">Mac の USB は充電器より弱い。</text>
+  <text x="165" y="194" text-anchor="middle" font-size="12">減り方が遅くなるだけのことがある</text>
+  <text x="165" y="232" text-anchor="middle" font-size="12" fill="#495057">まずこれで 30 分測る</text>
+  <!-- B -->
+  <rect x="325" y="20" width="290" height="260" rx="10" fill="#f1f9f4" stroke="#27ae60"/>
+  <text x="470" y="46" text-anchor="middle" font-weight="bold">B. Wi-Fi 接続＋充電器</text>
+  <rect x="345" y="70" width="80" height="44" rx="6" fill="#eaf2fb" stroke="#3498db"/><text x="385" y="97" text-anchor="middle">Mac</text>
+  <rect x="515" y="70" width="80" height="44" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="555" y="97" text-anchor="middle">Quest</text>
+  <path d="M425 92 L515 92" stroke="#8e44ad" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <text x="470" y="84" text-anchor="middle" font-size="11">5 GHz ルータ</text>
+  <rect x="505" y="140" width="100" height="34" rx="6" fill="#fff8f0" stroke="#e67e22"/><text x="555" y="162" text-anchor="middle" font-size="12">45W 充電器</text>
+  <line x1="555" y1="114" x2="555" y2="140" stroke="#e67e22" stroke-width="2.5"/>
+  <text x="470" y="204" text-anchor="middle" font-size="12">./koch4/start.sh wifi の後、</text>
+  <text x="470" y="222" text-anchor="middle" font-size="12">USB を抜いて充電器に差し替える</text>
+  <text x="470" y="256" text-anchor="middle" font-size="12" fill="#495057">長時間向き。ルータが要る</text>
+  <!-- C -->
+  <rect x="630" y="20" width="290" height="260" rx="10" fill="#f8f9fa" stroke="#adb5bd"/>
+  <text x="775" y="46" text-anchor="middle" font-weight="bold">C. 休憩ごとにドックで充電</text>
+  <rect x="730" y="70" width="90" height="44" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="775" y="97" text-anchor="middle">Quest</text>
+  <rect x="715" y="130" width="120" height="30" rx="6" fill="#fff8f0" stroke="#e67e22"/><text x="775" y="150" text-anchor="middle" font-size="12">充電ドック（45W）</text>
+  <line x1="775" y1="114" x2="775" y2="130" stroke="#e67e22" stroke-width="2.5"/>
+  <text x="775" y="194" text-anchor="middle" font-size="12">1 時間の充電で約半分回復。</text>
+  <text x="775" y="212" text-anchor="middle" font-size="12">体験を止める時間が要る</text>
+  <text x="775" y="246" text-anchor="middle" font-size="12" fill="#495057">A・B の補助として</text>
+</svg>
+<figcaption>図 8-1: 給電の 3 つの組み方。A は配線が最も少なく、B は電池の心配が無く、C は道具が要りません。</figcaption>
+</figure>
+<div class="step">
+<p class="mb-1"><strong>減り方を測る（本番の前に 1 回）</strong></p>
+<ol class="mb-0">
+  <li>満充電にして <code>./koch4/start.sh vr</code> で AR 表示のまま 30 分使う。</li>
+  <li><code>./koch4/start.sh check</code> でバッテリー残量（%）を読む。30 分で減った分から、何時間もつかを計算する。</li>
+  <li>1 日分に足りなければ B に切り替える。Mac とゴーグルを同じ自前ルータに繋ぎ、USB を挿した状態で <code>./koch4/start.sh wifi</code> を実行し、表示が出たら USB を抜いて 45W の充電器（またはモバイルバッテリー）に差し替える。</li>
+</ol>
+</div>
+<p>ゴーグルは顔から外すとしばらくして休止し、消費が下がります。来場者の入れ替えの間は外して置くだけでも持ちが延びます。</p>
+
+<!-- ===================================================== -->
+<h2 id="s9">9. USB を使えないとき（Wi-Fi で繋ぐ）</h2>
+<p>開発者モードの準備が間に合わないときは、自前の 5 GHz ルータに Mac とゴーグルを繋いで https で開きます。</p>
+<div class="step">
+<ol class="mb-0">
+  <li>Mac とゴーグルを同じ自前ルータに繋ぐ（会場のゲスト Wi-Fi は端末どうしが通信できないので使わない）。</li>
+  <li>https で起動する（<code>--vr-http</code> を付けない）。
+<pre>uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --no-panel</pre></li>
+  <li>記録 <code>koch4/work/logs/dual_B_vr.log</code> に出る <code>https://＜Mac の IP＞:8444/</code> を、ゴーグルのブラウザに入力する。</li>
+  <li>「この接続ではプライバシーが保護されません」と出たら、詳細設定 → アクセスする、で進む（最初の 1 回だけ）。</li>
+</ol>
+</div>
+<p><code>http://＜Mac の IP＞:8444/</code>（https でも localhost でもない）で開くと、ブラウザの決まりで「AR表示」のボタンが出ません。</p>
+
+<!-- ===================================================== -->
+<h2 id="s10">10. 調整（硬さ・重さ・向き）</h2>
+<h3>10.1 画面で直せるもの（<kbd>E</kbd> 編集 → 保存）</h3>
+<p>物ごとの 幅（どこで指が止まるか）・硬さ（P）・押し返す力の上限（mA）・重さ（g）・跳ね方（0〜1）、物の置き場所（「ここに置く」）、机の大きさ、分身の位置。保存すると次回の起動にも使われます。</p>
+<h3>10.2 起動時に指定するもの</h3>
+<p>初めて重さを試すときは、上限を下げて起動し、向きを確かめてから上げます。</p>
+<pre>uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --vr-http --no-panel --extra "--vw-cap 60"</pre>
+<table class="table table-striped">
+<thead><tr><th style="width:34%">指定</th><th>意味</th><th style="width:18%">既定</th></tr></thead>
+<tbody>
+<tr><td><code>--vw-cap</code></td><td>重さとして出す電流の上限（mA）。60 から始めて 120、150 へ</td><td>120</td></tr>
+<tr><td><code>--vw-scale</code></td><td>重さの倍率。大きいほど重く感じる</td><td>0.12</td></tr>
+<tr><td><code>--vw-invert shoulder_lift</code>（<code>elbow_flex</code>）</td><td>重さが上向きに出る関節を反転する。両方なら <code>shoulder_lift,elbow_flex</code></td><td>なし</td></tr>
+<tr><td><code>--vw-pwm-cap</code></td><td>2 人目の肩（PWM）の上限。885 が 100%。80 から始める。0 で肩を使わない</td><td>150</td></tr>
+<tr><td><code>--vw-pwm-scale</code></td><td>2 人目の肩の重さの倍率</td><td>0.5</td></tr>
+<tr><td><code>--wall-scale</code></td><td>2 人目の握りの電流上限の倍率。硬すぎるなら下げる</td><td>0.45</td></tr>
+<tr><td><code>--ff-pgain</code></td><td>壁の位置制御の強さ。かちかち震えるなら 400 に下げる</td><td>800</td></tr>
+</tbody>
+</table>
+<div class="gate"><strong>関門 10</strong>: 鉄ブロックを握って腕を前に伸ばすと、肩と肘が下に引かれる。上に押されるなら <code>--vw-invert</code> でその関節を反転する。2 人目の肩は、起動時の記録に <code>Operating_Mode=16 / Goal_PWM=0</code> と出ていることも確かめる。</div>
+
+<!-- ===================================================== -->
+<h2 id="s11">11. 困ったとき</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:30%">症状</th><th>確かめること・直し方</th></tr></thead>
+<tbody>
+<tr><td>Quest が見えない（check に「端末が見えません」）</td><td>ケーブルがデータ対応か。ゴーグルの電源。開発者モードがオンか。ケーブルを挿し直してゴーグルを被り、許可の画面で「常に許可」</td></tr>
+<tr><td>ページが開かない</td><td><code>./koch4/start.sh quest</code> をやり直す。ゴーグルのブラウザに <code>http://localhost:8444/</code> と手で入れてもよい</td></tr>
+<tr><td>「AR表示」のボタンが出ない</td><td>アドレスが <code>http://localhost:8444/</code> か <code>https://…</code> か。<code>http://＜IP＞</code> では出ない</td></tr>
+<tr><td>分身が動かない・「未接続」の赤い帯</td><td>腕の制御が止まっている。Mac の端末と <code>koch4/work/logs/dual_B_teleop.log</code> を見る。ポートの書き間違い、AC アダプタ</td></tr>
+<tr><td>分身が実物とずれる</td><td>位置合わせ（§4）をやり直す。関節の曲がる向きが逆なら <kbd>E</kbd> で、その関節の向き（＋／−）と offset を直して保存</td></tr>
+<tr><td>握っても押し返さない</td><td>物が黄色く光っているか（光らないなら指先が届いていない）。<kbd>1</kbd>〜<kbd>3</kbd> で強制して壁だけ確かめる。記録に <code>[vwall] 接触</code> が出るか</td></tr>
+<tr><td>握るとかちかち震える</td><td><code>--extra "--ff-pgain 400"</code> で起動し直す。または <kbd>E</kbd> でその物の硬さ（P）を下げる</td></tr>
+<tr><td>重さが上向き・強すぎる</td><td>§10 の <code>--vw-invert</code>・<code>--vw-cap</code>・<code>--vw-scale</code></td></tr>
+<tr><td>赤い帯「握り反力が上限に張り付き」</td><td>握り込みを緩める</td></tr>
+<tr><td>赤い帯「…°C」</td><td>サーボが熱い。60°C で力を弱め、65°C で止める。数分休ませる</td></tr>
+<tr><td>赤い帯「VR からの更新が途絶えたので壁を解除」</td><td>ページが閉じたか、接続が切れた。ページを開き直す</td></tr>
+<tr><td>物が机の外に落ちた</td><td>「R 配置リセット」</td></tr>
+<tr><td>ゴーグルの電池が減る</td><td>§8</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s12">12. 安全</h2>
+<div class="danger">
+<ul class="mb-0">
+  <li>ゴーグルを着けた人の周り 1 m に、ぶつかる物を置かない。補助の人が横に付く。</li>
+  <li>握っている間は、腕に重さの力が出ています。手を離す前に指を開いて物を放す。</li>
+  <li>2 人目のフォロワー機は、起動直後と終了時に腕の力が抜けます。手で支える。</li>
+  <li>投げる動作は小さく。腕の届く範囲（半径 40 cm）に人の顔が入らない向きで行う。</li>
+  <li>終わったら <kbd>Ctrl</kbd>+<kbd>C</kbd> で止め、AC アダプタを抜く。</li>
+  <li>ゴーグルは 1 人ごとに顔に当たる部分を拭く。気分が悪くなったらすぐ外してもらう。</li>
+</ul>
+</div>
+
+<!-- ===================================================== -->
+<h2 id="s13">13. 参考資料</h2>
+<table class="table">
+<thead><tr><th>資料</th><th>使った箇所</th></tr></thead>
+<tbody>
+<tr><td><a href="https://developers.meta.com/horizon/documentation/native/android/mobile-device-setup/">Meta: Device setup</a></td><td>§2 開発者モードの入れ方と前提（組織・SMS か支払い方法・18 歳以上）・USB デバッグの許可</td></tr>
+<tr><td><a href="https://developers.meta.com/horizon/documentation/web/browser-remote-debugging/">Meta: Debug Browser content</a></td><td>§3 USB で繋いで <code>localhost</code> を開く方法（adb reverse）</td></tr>
+<tr><td><a href="https://developers.meta.com/horizon/documentation/web/webxr-mixed-reality/">Meta: Mixed Reality Support in Browser</a></td><td>§3 Quest Pro のブラウザで現実を映したまま 3D を重ねる表示</td></tr>
+<tr><td><a href="https://developers.meta.com/horizon/documentation/native/android/ts-mqdh-media/">Meta Quest Developer Hub: Cast</a></td><td>§7 ゴーグルの画面を Mac に映す</td></tr>
+<tr><td><a href="https://www.meta.com/help/quest/3482884435359892/">Meta ヘルプ: ヘッドセットの充電</a></td><td>§8 Quest Pro に必要な電源は 45W・PC の USB では充電が遅い</td></tr>
+<tr><td><a href="https://www.roadtovr.com/quest-pro-battery-life-included-dock/">Road to VR: Quest Pro のバッテリー</a></td><td>§8 公称 1〜2 時間・ドックで約 2 時間で満充電</td></tr>
+<tr><td><a href="https://developer.android.com/tools/releases/platform-tools">Android SDK Platform-Tools</a></td><td>§2 adb</td></tr>
+<tr><td><a href="https://github.com/Genymobile/scrcpy">scrcpy</a></td><td>§7 画面の映し出し</td></tr>
+<tr><td><a href="https://emanual.robotis.com/docs/en/dxl/x/xl430-w250/">ROBOTIS XL430-W250 e-Manual</a></td><td>§6・§10 フォロワーの肩の PWM 制御（0.113%／目盛り・上限 885）</td></tr>
+<tr><td><a href="https://emanual.robotis.com/docs/en/dxl/x/xl330-m077/">ROBOTIS XL330-M077 e-Manual</a></td><td>§5・§10 リーダーの電流制御と位置制御</td></tr>
+</tbody>
+</table>
+
+<footer>Koch VR マニュアル</footer>
+</div>
+</body>
+</html>

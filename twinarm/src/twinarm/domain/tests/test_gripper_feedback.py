@@ -340,3 +340,43 @@ def test_virtual_weight_scales_with_the_servo_torque_constant() -> None:
     # same torque (0.0981 Nm): 672 mA * 0.12 = 80.6 mA on an M077, 0.146/0.354 of it on an M288
     assert leader.elbow_ma == pytest.approx(80.6, abs=0.5)
     assert hand_follower.elbow_ma == pytest.approx(80.6 * 0.146 / 0.354, abs=0.5)
+
+
+@pytest.mark.unit
+def test_virtual_weight_shoulder_can_be_a_pwm_actuator() -> None:
+    from twinarm.domain.gripper_feedback import (
+        VirtualWeightLaw,
+        VirtualWeightState,
+        virtual_weight_step,
+    )
+
+    # XL430-W250 shoulder in PWM mode: half of (885 counts / 1.5 Nm stall) per Nm, cap 150
+    law = VirtualWeightLaw(
+        alpha=1.0, shoulder_gain_per_nm=0.5 * 885 / 1.5, shoulder_cap=150
+    )
+
+    light = virtual_weight_step(
+        law, VirtualWeightState(), engaged=True, mass_g=45.0, levers_m=(0.25, 0.1)
+    )
+    heavy = virtual_weight_step(
+        law, VirtualWeightState(), engaged=True, mass_g=300.0, levers_m=(0.25, 0.1)
+    )
+    flipped = virtual_weight_step(
+        VirtualWeightLaw(
+            alpha=1.0,
+            shoulder_gain_per_nm=0.5 * 885 / 1.5,
+            shoulder_cap=150,
+            invert_shoulder=True,
+        ),
+        VirtualWeightState(),
+        engaged=True,
+        mass_g=300.0,
+        levers_m=(0.25, 0.1),
+    )
+
+    # 0.045 kg * 9.81 * 0.25 m = 0.110 Nm -> 32.6 counts; 0.3 kg -> 217 -> cap 150
+    assert light.shoulder_ma == pytest.approx(32.6, abs=0.2)
+    assert heavy.shoulder_ma == pytest.approx(150.0)
+    assert flipped.shoulder_ma == pytest.approx(-150.0)
+    # the elbow keeps the current law (M077 default): 0.2943 Nm -> 2016 mA * 0.12 -> cap 120
+    assert heavy.elbow_ma == pytest.approx(120.0)

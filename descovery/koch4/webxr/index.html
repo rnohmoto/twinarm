@@ -302,10 +302,10 @@ let lastFrame = 0, selArm = 'B';
 function armState(id, tms){
   const live = st && performance.now() - lastOk < 2000;
   const s = live ? (st.arms ? st.arms[id] : (id === primaryId() ? st : null)) : null;
-  if (s && s.src !== undefined) return { pos: s.pos || {}, open: s.open ?? 100, vwall: s.vwall, vw: s.vw, src: s.src, alerts: s.alerts || [], live:true };
+  if (s && s.src !== undefined) return { pos: s.pos || {}, open: s.open ?? 100, vwall: s.vwall, vw: s.vw, vwUnit: s.vw_unit || {}, src: s.src, alerts: s.alerts || [], live:true };
   const t = tms / 1000, ph = Object.keys(arms).indexOf(id) * 1.7;
   return { pos: { shoulder_pan:40*Math.sin(t*.6+ph), shoulder_lift:45*Math.sin(t*.8+ph)+25, elbow_flex:50*Math.sin(t*.7+1+ph), wrist_flex:40*Math.sin(t*.9+2+ph), wrist_roll:60*Math.sin(t*.5+ph) },
-           open: 50 + 50*Math.sin(t*1.2+ph), vwall:null, vw:null, src:'demo', alerts:[], live:false };
+           open: 50 + 50*Math.sin(t*1.2+ph), vwall:null, vw:null, vwUnit:{}, src:'demo', alerts:[], live:false };
 }
 function applyPose(tms){
   const dt = Math.min(0.05, (tms - lastFrame) / 1000 || 0.016); lastFrame = tms;
@@ -344,7 +344,7 @@ function applyPose(tms){
     const c = arm.current ? arm.current.cfg : null;
     const held = objs.find(o => o.heldBy === arm.id);
     const objTxt = held ? `<b>${held.cfg.label} を握っている</b>` : c ? `${c.label}(幅${c.width}・P${c.p_gain}・上限${c.cap_ma}mA・${c.mass_g}g)` : 'なし(自由空間)';
-    const vwTxt = s.vw ? ` / 重さ ${Object.entries(s.vw).map(([j,v]) => `${j === 'shoulder_lift' ? '肩' : '肘'}${v}mA`).join('・')}` : '';
+    const vwTxt = s.vw ? ` / 重さ ${Object.entries(s.vw).map(([j,v]) => `${j === 'shoulder_lift' ? '肩' : '肘'}${v}${s.vwUnit[j] || 'mA'}`).join('・')}` : '';
     const srcTxt = s.src === 'teleop' ? '実機' : s.src === 'sim' ? 'シミュレータ' : s.src === 'demo' ? '内蔵デモ' : '停止中';
     lines.push(`<span class="arm">${arm.id === selArm ? '▶' : '　'}${arm.id} ${arm.cfg.label}</span> ${srcTxt} 開き ${s.open.toFixed(0)} / ${objTxt}${vwTxt}` + (arm.forced ? ' <b>強制</b>' : '') + (SPECTATOR ? '' : ` / ${arm.sendStatus}`));
   }

@@ -168,6 +168,7 @@ def empty_state():
         "open": 100.0,
         "vwall": None,
         "vw": None,
+        "vw_unit": None,
         "alerts": [],
         "hw": None,
         "mode": "off",
@@ -344,6 +345,7 @@ def telemetry_loop(label, port):
                 open=float(pos.get("gripper", 100.0)),
                 vwall=frame.get("vwall"),
                 vw=frame.get("vw"),
+                vw_unit=frame.get("vw_unit"),
                 alerts=frame.get("alerts", []),
                 hw=frame.get("hw"),
                 mode=frame.get("mode", "off"),
@@ -403,6 +405,12 @@ def sim_loop(hz):
                     ),
                     hw={"L": 0, "F": 0},
                     mode="vwall",
+                    vw_unit={
+                        "shoulder_lift": "PWM"
+                        if TWIN["arms"][label]["model"] == "koch_follower"
+                        else "mA",
+                        "elbow_flex": "mA",
+                    },
                     device=TWIN["arms"][label]["model"],
                     src="sim",
                 )

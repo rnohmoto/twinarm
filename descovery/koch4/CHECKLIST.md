@@ -5,6 +5,8 @@
 koch4 のコマンドに置き換えて 1 枚にしたもの。**合格は、ユーザーが実行して報告した結果だけを事実とする。**
 実機を動かす・トルクを抜くコマンドは、その会話でユーザーが明示的に頼んだときだけ実行する。
 
+入口: `./koch4/start.sh`（check／handshake／vr／vr2／sim／quest／wifi／manual）。図解つきの手引きは `manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`）。
+
 方針（2026-09-20 裁定）: **2ペアが原則**（`--pair both` 既定・パネル 1 枚・ゲインは全ペア同じ値）。
 **VR は別枠**（リーダー 1 本で `--vr`。握手ペアと混ぜない）。
 
@@ -198,10 +200,14 @@ uv run python koch4/koch4_dual_launch.py --follower wired --ff gripper    # USB 
 4. Mac: `brew install --cask android-platform-tools`（または Meta Quest Developer Hub）
 5. データ対応の USB-C ケーブルで Quest を Mac に挿し、ヘッドセットを被って「USB デバッグを許可」→「常に許可」（予備の Mac でも）
 6. `uv run python koch4/koch4_quest_usb.py --check` → `✓ <serial>: 接続済み`
-7. 給電: Quest Pro の指定電源は 45W（公称バッテリー 1〜2 時間）。Mac の USB では足りないので、PD 45W 以上の電源と PD パススルー付きハブ（Mac へデータ・Quest へ給電）を使うか、休憩ごとにドックで充電する。本番前に連続稼働を測る
+7. 給電: Quest Pro のバッテリーは公称 1〜2 時間・付属の 45W ドックで満充電に約 2 時間 → **バッテリーだけでは 1 日もたない**。構成は 3 つ:
+   A. USB のまま（Mac から給電。Mac の USB は 45W 充電器より弱く、減りが遅くなるだけのことがある）→ まず 30 分測る（`./koch4/start.sh check` が残量 % を出す）
+   B. `./koch4/start.sh wifi`（adb を Wi-Fi に切替・Mac と Quest は同じ自前 5 GHz ルータ）→ USB を抜いて 45W 充電器かモバイルバッテリーに差し替える。ヘッドセットを再起動したらやり直す
+   C. 休憩ごとにドックで充電（1 時間で約半分）
 
 ```
-Meta アカウント [ ]  組織の検証 [ ]  開発者モード [ ]  adb --check [ ]  給電構成:              連続稼働:     分
+Meta アカウント [ ]  組織の検証 [ ]  開発者モード [ ]  adb --check [ ]
+30 分の減り: A(USB)   %  B(Wi-Fi＋充電器)   %   採用: A / B / C     adb over Wi-Fi で reverse が張れる [ ]
 ```
 
 ### U1 — 観客用の画面（ヘッドセットの中を見せる）
@@ -311,12 +317,18 @@ offset: pan    lift    elbow    wrist    roll     台: x     y     z     yaw    
 ```bash
 uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --vr-http --vr2 --no-panel
 ```
-- ⚠ 2 人目のフォロワー機は接続直後に腕 5 軸のトルクが抜ける（**手で支えて起動**）。gripper だけ壁（M288 用に電流上限 ×0.45・Kt 0.354）、重さは肘だけ（肩の XL430 に電流制御は無い）
+- ⚠ 2 人目のフォロワー機は接続直後に腕 5 軸のトルクが抜ける（**手で支えて起動**）。gripper だけ壁（M288 用に電流上限 ×0.45・Kt 0.354）
+- 重さ: 肘（M288）は電流制御、**肩（XL430）は PWM＝電圧制御モード**（電流制御が無いため）。握っている間だけ肩のトルクが入る。
+  初回は `--extra "--vw-cap 60 --vw-pwm-cap 80"` で起動し、ログ `work/logs/dual_B_hand.log` の
+  `[vw] shoulder_lift(XL430) PWM モード: Operating_Mode=16(期待16) / Goal_PWM=0(期待0)` を確認 → 鉄ブロックを握って腕を前に伸ばし、
+  肩が下に引かれれば正しい。上に押されるなら `--vw-invert shoulder_lift`。弱ければ `--vw-pwm-cap` を 80→150→250、`--vw-pwm-scale` を 0.5→1.0
+- 終了後、フォロワー機を握手に戻す前に `[vw]` の解放（Ctrl+C で自動: Goal_PWM を上限へ戻し Mode 4）を確認。気になるときは AC アダプタを抜き差しすれば初期値に戻る
 - ページに分身が 2 体（B＝橙・F＝青）。**Tab** で選択を切替え、F も C 位置合わせ。同じ物体は先に握った腕のもの（もう片方は候補にならない）。ヘッドセットの人が B、2 人目はモニタ（一人称プレビュー／観客ページ）で見る
 - 2 人目の壁が硬すぎる／柔らかすぎるときは `--extra "--wall-scale 0.3"` のように倍率を変える（F の teleop にも同じ `--extra` が渡る）
 
 ```
-F の壁 [ ]  F の重さ(肘) [ ]  2 体の位置合わせ [ ]  受け渡し [ ]  発熱(F gripper):   °C   wall-scale=
+F の壁 [ ]  F の重さ 肘 [ ] 肩(PWM) [ ] 向き: 正/逆  pwm-cap=     pwm-scale=     Mode16/Goal_PWM=0 の読み戻し [ ]
+2 体の位置合わせ [ ]  受け渡し [ ]  発熱(F gripper／肩):   °C   wall-scale=      握手に戻して肩が保持できる [ ]
 ```
 
 ### V3 — フェス形態の判断（84_ Step 3）

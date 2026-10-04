@@ -248,7 +248,7 @@
   <rect x="140" y="66" width="74" height="40" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="177" y="91" text-anchor="middle">Quest</text>
   <line x1="102" y1="86" x2="140" y2="86" stroke="#2c3e50" stroke-width="2.5"/>
   <text x="121" y="140" text-anchor="middle" font-size="12">データと電気を 1 本で</text>
-  <text x="121" y="166" text-anchor="middle" font-size="12">Mac の USB は 15W まで</text>
+  <text x="121" y="166" text-anchor="middle" font-size="12">USB の給電は規格で 15W</text>
   <text x="121" y="186" text-anchor="middle" font-size="12">減りが遅くなるだけの</text>
   <text x="121" y="206" text-anchor="middle" font-size="12">ことがある</text>
   <text x="121" y="254" text-anchor="middle" font-size="12" fill="#495057">まず 30 分測る</text>
@@ -280,7 +280,7 @@
   <rect x="784" y="66" width="74" height="40" rx="6" fill="#eaf7ef" stroke="#27ae60"/><text x="821" y="91" text-anchor="middle">Quest</text>
   <rect x="757" y="126" width="128" height="30" rx="6" fill="#fff8f0" stroke="#e67e22"/><text x="821" y="146" text-anchor="middle" font-size="12">充電ドック（45W）</text>
   <line x1="821" y1="106" x2="821" y2="126" stroke="#e67e22" stroke-width="2.5"/>
-  <text x="821" y="186" text-anchor="middle" font-size="12">1 時間で約半分回復</text>
+  <text x="821" y="186" text-anchor="middle" font-size="12">満充電まで約 2 時間</text>
   <text x="821" y="206" text-anchor="middle" font-size="12">体験を止める時間が要る</text>
   <text x="821" y="254" text-anchor="middle" font-size="12" fill="#495057">補助として</text>
 </svg>
@@ -289,8 +289,8 @@
 <table class="table table-striped">
 <thead><tr><th style="width:22%">組み方</th><th style="width:30%">要る物</th><th>注意</th></tr></thead>
 <tbody>
-<tr><td>A. USB のまま</td><td>データ対応の USB-C ケーブル</td><td>Mac の USB から出せる電気は 15W までで、ゴーグルの指定（45W）に届かない。減りが遅くなるだけのことがあるので、30 分測って決める</td></tr>
-<tr><td>A+. 充電口つきケーブル</td><td>充電ポート付きの Link 用ケーブル（5 m）と、付属の 45W 電源アダプター</td><td>市販品はパソコン側が USB-A のものが多く、Mac には変換アダプタが要る。対応機種に Quest Pro と書かれていない製品が多いので、買ったら最初に <code>./koch4/start.sh check</code> で「接続済み」と「充電中」が両方出ることを確かめる</td></tr>
+<tr><td>A. USB のまま</td><td>データ対応の USB-C ケーブル</td><td>USB の口が機器へ出せる電気は規格の値で 15W で、ゴーグルの指定（45W）に届かない。減りが遅くなるだけのことがあるので、30 分測って決める</td></tr>
+<tr><td>A+. 充電口つきケーブル</td><td>充電ポート付きの Link 用ケーブル（5 m）と、付属の 45W 電源アダプター・充電ケーブル</td><td>市販品はパソコン側が USB-A のものが多く、Mac には変換アダプタが要る。対応機種に Quest Pro と書かれていない製品が多いので、買ったら最初に <code>./koch4/start.sh check</code> で「接続済み」と「充電中」が両方出ることを確かめる</td></tr>
 <tr><td>B. Wi-Fi 接続＋充電</td><td>自前の 5 GHz ルータと、付属の 45W 電源アダプター・充電ケーブル</td><td>電気は確実に足りる。Wi-Fi への切り替えが通るかを先に 1 回確かめる。ゴーグルを再起動したら切り替えをやり直す</td></tr>
 <tr><td>C. 休憩ごとにドック</td><td>付属の充電ドック</td><td>体験を止める時間が要るので、A や B の補助にする</td></tr>
 </tbody>
@@ -386,6 +386,7 @@
 <tr><td><a href="https://www.meta.com/help/quest/3482884435359892/">Meta ヘルプ: ヘッドセットの充電</a></td><td>§8 Quest Pro に必要な電源は 45W・PC の USB では充電が遅い</td></tr>
 <tr><td><a href="https://www.meta.com/ja-jp/help/quest/430804835708882/">Meta ヘルプ: Meta Quest Pro のセット内容</a></td><td>§1・§8 45W 電源アダプターと充電ケーブルが同梱</td></tr>
 <tr><td><a href="https://en.wikipedia.org/wiki/USB-C">USB-C（Wikipedia）</a></td><td>§8 給電の取り決めが無い USB-C は 5V で 1.5A か 3A まで</td></tr>
+<tr><td><a href="https://en.wikipedia.org/wiki/Thunderbolt_(interface)">Thunderbolt（Wikipedia）</a></td><td>§8 Thunderbolt の口が機器へ出す電力は 15W</td></tr>
 <tr><td><a href="https://www.roadtovr.com/quest-pro-battery-life-included-dock/">Road to VR: Quest Pro のバッテリー</a></td><td>§8 公称 1〜2 時間・ドックで約 2 時間で満充電</td></tr>
 <tr><td><a href="https://developer.android.com/tools/releases/platform-tools">Android SDK Platform-Tools</a></td><td>§2 adb</td></tr>
 <tr><td><a href="https://github.com/Genymobile/scrcpy">scrcpy</a></td><td>§7 画面の映し出し</td></tr>

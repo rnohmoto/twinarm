@@ -5,7 +5,7 @@
 koch4 のコマンドに置き換えて 1 枚にしたもの。**合格は、ユーザーが実行して報告した結果だけを事実とする。**
 実機を動かす・トルクを抜くコマンドは、その会話でユーザーが明示的に頼んだときだけ実行する。
 
-入口: `./koch4/start.sh`（check／handshake／vr／vr2／sim／quest／wifi／manual）。図解つきの手引きは `manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`）。
+入口: `./koch4/start.sh`（check／handshake／host／vr／vr2／sim／rehearse／quest／wifi／manual）。図解つきの手引きは `manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`・Quest の準備＝`quest_setup.html`）。
 
 方針（2026-09-20 裁定）: **2ペアが原則**（`--pair both` 既定・パネル 1 枚・ゲインは全ペア同じ値）。
 **VR は別枠**（リーダー 1 本で `--vr`。握手ペアと混ぜない）。
@@ -17,6 +17,22 @@ koch4 のコマンドに置き換えて 1 枚にしたもの。**合格は、ユ
 ```
 実施日:            実施者:            Mac:            uv sync 日:
 ハブ: 型番                 セルフパワー [ ]  4口ともデータ対応 [ ]  ケーブル: データ対応品 [ ]
+```
+
+---
+
+## S0 — 準備状況と通し稽古（腕に触れない・各 Mac で 1 回）
+
+```bash
+./koch4/start.sh check       # 自己診断・準備状況（起動できるもの）・ポート一覧・Quest。VR ページの部品も取得する
+./koch4/start.sh rehearse    # 仮想のサーボで握手・VR・2 人・無線・較正不一致・通信断・同時起動を通す（約 3 分）
+```
+- 合格: `check` に「selftest OK」。`rehearse` の最後に「すべて通りました」
+- 通し稽古が確かめるのはソフトの経路だけ（起動・モード切替・書込みの順序・終了時のトルク）。腕の挙動は以下の TEST で確かめる
+- `rehearse` は固定のポート番号を使うので、実機のセッションを止めてから実行する
+
+```
+check: selftest OK [ ]  起動できるもの 握手 A [ ] B [ ]  VR 1 人 [ ]  VR 2 人 [ ]      rehearse: すべて通りました [ ]
 ```
 
 ---
@@ -167,8 +183,8 @@ uv run python koch4/koch4_teleop.py --leader-port <L> --follower-port udp://127.
 ### W2 — 握手の場の PC で（5 GHz 自前ルータ越し）
 - その PC: `uv sync` 済み・フォロワーの USB・12 V 電源。`hostname -I`（Pi/Linux）や `ipconfig`（Windows）で IP を確認
 - **2 台目の MacBook Pro を使う場合（推奨）**: `git clone` → `cd twinarm/descovery && uv sync` → フォロワーを USB で挿す →
-  `ipconfig getifaddr en0` で IP → `uv run python koch4/koch4_follower_host.py --port /dev/tty.usbmodemXXXX --id koch_follower_A --listen 9101 --grip-ma 500`
-  （2 本目は `--listen 9102`）。較正 JSON は `koch4/config/calibration/koch_follower/` に置く。Mac 本体はバッテリで動くので握手の場の電源はアームの 12 V だけ
+  `./koch4/start.sh host A /dev/tty.usbmodemXXXX`（2 本目は `host B <port>`。起動時に、操作者側の設定に書く宛先を表示する。
+  中身は `koch4_follower_host.py --port <port> --id koch_follower_A --listen 9101 --grip-ma 500`）。較正 JSON は `koch4/config/calibration/koch_follower/` に置く。Mac 本体はバッテリで動くので握手の場の電源はアームの 12 V だけ
 - Mac: config の `follower_host` に `udp://<IP>:9101` → `koch4_dual_launch.py --pair A --ff gripper`
 ```
 IP=              rtt=   ms  age 最大=   ms  欠落=   %  10 分: 赤帯  回・通信断  回

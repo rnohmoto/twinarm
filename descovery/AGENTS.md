@@ -16,3 +16,6 @@ Read @README.md for the script inventory, each script's hardware risk, and how t
 - Nothing is built or published from here; the packaging config is vestigial. Do not rename the
   directory or "fix" the package-name collision with `twinarm/`.
 - New experiments belong here as new standalone scripts, not in the `twinarm/` library.
+- `koch4/` can be rehearsed with no arms attached: `./koch4/start.sh rehearse` runs its launch
+  paths against simulated servos and checks them (see `koch4/simbus/README.md`). Run it after
+  changing a koch4 script. A pass says the software path holds together, nothing about the arms.

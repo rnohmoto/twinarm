@@ -15,7 +15,7 @@ hardware safety rules apply to every script here.
 
 ```
 koch4/
-├── start.sh               one entry point: check / handshake / vr / vr2 / sim / quest / wifi / manual
+├── start.sh               one entry point: check / handshake / host / vr / vr2 / sim / rehearse / quest / wifi / manual
 ├── manual/                HTML manuals for the fest: index.html (entry), handshake.html, vr.html, quest_setup.html (Meta account → developer mode → adb)
 ├── koch4_teleop.py        one pair: teleop + telemetry + leader force feedback (3 styles + virtual wall/weight)
 ├── koch4_dual_launch.py   both pairs by default (--pair A|B for staging), one panel, fixed ports, logs
@@ -25,6 +25,7 @@ koch4/
 ├── koch4_vr_bridge.py     serves webxr/ to the headset, /state /config /contact for one or two arms, relays to each teleop
 ├── koch4_quest_usb.py     USB route: adb reverse + open http://localhost:<port>/ in Quest Browser (+ scrcpy mirror)
 ├── webxr/index.html       three.js page: twins (1-2 arms), objects with physics (grab / drop / throw / bounce), in-headset calibration, editor (+ setup_assets.py)
+├── simbus/                rehearsal with no arms: a virtual Dynamixel bus (dynamixel_sdk/) and rehearse.py, seven scenarios with checks
 ├── config/                koch4_config.json (git-ignored; see .example), koch4_twin.json (saved by the editor)
 │   └── calibration/koch_follower/<id>.json, koch_leader/<id>.json   ← lerobot calibration
 ├── work/                  logs/ csv/ _certs/  (git-ignored)
@@ -43,14 +44,15 @@ Risk classes are the ones defined in [`../README.md`](../README.md).
 | Script | Purpose | Hardware risk | Extra I/O |
 | ------ | ------- | ------------- | --------- |
 | `koch4_teleop.py` | One pair. `--ff gripper --ff-style spring` (default; the 2026-09-04 fixes) / `--ff-style error` / `--ff arm` (untested on hardware) / `--ff vwall` (virtual wall, follower optional: `--follower-port none`) / `--vw` (virtual weight on `shoulder_lift` + `elbow_flex`, only while an object is grasped; `--vw-scale`, `--vw-cap` 120 mA, `--vw-invert`) / `--follower-grip-ma` (Goal_Current cap on the follower gripper against overload shutdowns). `--leader-type koch_follower` uses a Koch follower *moved by hand* as the input device (second player: arm joints torque-free, gripper wall only, weight on the elbow by current and on the XL430 shoulder by PWM mode with `--vw-pwm-scale` / `--vw-pwm-cap`, M288 current scaling, `--arm-label`). `--selftest` runs the laws with no hardware. | moves motors; force feedback and `--vw` put leader joints into current control; `vwall` holds the leader gripper in current-based position mode | UDP telemetry out (`--viz-port`, comma list), control in (`--ctl-port`), CSV in `work/csv/` |
-| `koch4_dual_launch.py` | `--list` ports+serials (read-only), `--init` config template, `--pair both` (default) / `A` / `B`, `--vr A|B` (+`--vw`) adds the bridge and forces that pair to `vwall`, `--vr2` also starts that pair's follower as a hand-moved second input (ports 8771/8772/8773) and gives the bridge both arms, `--grip-ma`, `--dry-run`. Ports: A 8765/8766 (+8769/8443), B 8767/8768 (+8770/8444), panel 8780. | launches `koch4_teleop.py` → moves motors | logs in `work/logs/dual_*.log` |
+| `koch4_dual_launch.py` | `--list` ports+serials (read-only), `--init` config template, `--doctor` readiness report (config, port names present, calibration files, VR asset → what can start; opens nothing), `--follower wireless` / `wired` / `none` (`none` = leader only, the follower need not be plugged in: one-player VR), `--pair both` (default) / `A` / `B`, `--vr A|B` (+`--vw`) adds the bridge and forces that pair to `vwall`, `--vr2` also starts that pair's follower as a hand-moved second input (ports 8771/8772/8773) and gives the bridge both arms, `--grip-ma`, `--dry-run`. Ports: A 8765/8766 (+8769/8443), B 8767/8768 (+8770/8444), panel 8780. | launches `koch4_teleop.py` → moves motors | logs in `work/logs/dual_*.log` |
 | `koch4_web_panel.py` | One page for all launched pairs: status chips and 4 graphs per pair, one row of sliders and mode buttons (OFF / gripper / arm / vwall) that go to every pair. | network only, but it commands live teleop sessions | HTTP `--http`, UDP in `--telemetry` (list), out `--ctl-port` (list) |
 | `koch4_live_plot.py` | matplotlib telemetry viewer. | network only | UDP in |
 | `koch4_calib_offset.py` | Torque off both arms, hold the same pose by hand, print raw ticks and normalized % per joint with the JSON fix to apply. Reads `config/calibration/`. | torque off (both arms) | reads calibration JSON |
 | `koch4_follower_host.py` | **Wireless follower.** Runs on the computer next to the follower (Raspberry Pi 4, or any Windows/Mac/Linux PC with lerobot): receives joint targets over UDP from the Mac's teleop (`--follower-port udp://<host>:9101`), drives lerobot's KochFollower, streams currents/positions/temperature/errors back. Holds the pose after 0.5 s without targets (torque kept), ramps back in after a gap; `--sim` needs no hardware. Same role as lerobot's LeKiwi host. | moves motors | UDP `--listen` (A 9101, B 9102) |
 | `koch4_vr_bridge.py` | Serves `webxr/`, republishes telemetry as `/state` (every arm; `--arms B,F` with one telemetry/control port per arm), keeps `config/koch4_twin.json` (v2: per-arm joints/base, objects with bounce, desk) behind `/config`, forwards `POST /contact {"arm","vwall"}` to that arm's teleop and the twin joint map to it (for the weight FK). `--sim` needs no teleop. | network only, but it commands the leader's virtual wall and weight (clamped by the teleop; dropped after 3 s without a refresh) | HTTP(S) `--port`, UDP in `--telemetry`, out `--ctl-port` |
 | `koch4_quest_usb.py` | USB route for the headset: finds adb, `adb reverse tcp:<port> tcp:<port>`, opens `http://localhost:<port>/` in Quest Browser (`--spectator`, `--mirror` = scrcpy, `--wifi` = move adb to Wi-Fi so the headset's USB port can take a 45 W charger, `--check` = status and battery level only). Needs developer mode once (CHECKLIST U0). | none (network only) | adb over USB |
-| `webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. | none | network (once) |
+| `webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. `start.sh check` runs it. | none | network (once) |
+| `simbus/rehearse.py` | Runs the launcher, teleop, bridge, panel and follower host against simulated servos (`simbus/dynamixel_sdk`, a stand-in for the SDK that lerobot loads from `PYTHONPATH`) and checks frame rate, feedback commands, register write order, refused EEPROM writes and torque at exit. Scenarios: `handshake` `vr` `vr2` `wireless` `mismatch` `dropout` `fest`. See [`simbus/README.md`](simbus/README.md). | none (no port is opened; fixed localhost ports, so not next to a live session) | logs in `work/rehearsal/` |
 
 ## Wireless follower (leader wired to the Mac, follower on its own computer)
 
@@ -72,9 +74,12 @@ Mac ── USB ── leader                 handshake table: host PC ── USB
 
 ## Quick start (Mac, from `descovery/`)
 
-The shortest path is `./koch4/start.sh` (`check` / `handshake` / `vr` / `vr2` / `sim` / `quest` /
-`wifi` / `manual`); the HTML manuals in [`manual/`](manual/index.html) walk through each with
-diagrams. The commands below are what it runs.
+The shortest path is `./koch4/start.sh` (`check` / `handshake` / `host` / `vr` / `vr2` / `sim` /
+`rehearse` / `quest` / `wifi` / `manual`); the HTML manuals in [`manual/`](manual/index.html) walk
+through each with diagrams. Arguments after the mode go to the launcher
+(`./koch4/start.sh handshake --pair A`, `./koch4/start.sh vr --extra "--vw-cap 60"`). Handshake on
+pair A and VR on pair B can run at the same time from two terminals; stopping one leaves the
+other running. The commands below are what it runs.
 
 ```bash
 uv sync
@@ -159,5 +164,9 @@ CHECKLIST.md; write the test first (TDD rule in `../../.claude/rules/common/test
 - The digital twin is the primitive model of robotics `84_`; joint spans are nominal until the
   editor's offsets are set against the real arm. Object widths are in lerobot's normalized
   0–100 gripper units; the weight lever arms use the twin's link lengths.
-- Checked in a desktop browser (inline mode, `--sim`) and with the launcher's `--dry-run`;
-  nothing here has run on the arms or on the headset yet.
+- Checked in a desktop browser (inline mode, `--sim`), with the launcher's `--dry-run`, and end to
+  end against simulated servos on lerobot 0.6.1 (`simbus/`, 2026-10-04); the first-person VR,
+  the second player and the wireless follower have not run on the arms or on the headset yet.
+- When started by the launcher (output in a log file), a teleop whose calibration file differs
+  from what the servos hold stops with the reason instead of waiting on lerobot's question; run
+  `koch4_teleop.py` directly in a terminal to answer it.

@@ -32,6 +32,7 @@ Risk class: moves motors（起動時にフォロワーへ接続し、目標角�
 
 import argparse
 import json
+import logging
 import math
 import socket
 import sys
@@ -43,6 +44,21 @@ from types import SimpleNamespace
 _reconfigure = getattr(sys.stdout, "reconfigure", None)
 if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
     _reconfigure(errors="replace")
+
+
+class _DropClampWarning(logging.Filter):
+    """Silence lerobot's per-frame clamp warning (harmless, caused by pose gaps).
+
+    Same filter as koch4_teleop.py: while the gripper is blocked (a hand, an object)
+    the goal stays beyond max_relative_target and lerobot would log it every frame.
+    """
+
+    def filter(self, record):
+        """Drop records that mention the safety clamp."""
+        return "clamped to be safe" not in str(record.getMessage())
+
+
+logging.getLogger().addFilter(_DropClampWarning())
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_CONFIG_DIR = HERE / "config"

@@ -645,7 +645,7 @@ def setup_arm_ff(leader, joints):
         bus.write("Torque_Enable", j, 1, normalize=False)
         bus.write("Goal_Current", j, 0, normalize=False)
     modes = [int(bus.read("Operating_Mode", j, normalize=False)) for j in joints]
-    print(f"[ff-arm] 腕反力ON {joints} Operating_Mode={modes}(期待[0, 0, 0])")
+    print(f"[ff-arm] 腕反力ON {joints} Operating_Mode={modes}(期待{[0] * len(joints)})")
 
 
 def release_gripper(bus):
@@ -1046,9 +1046,14 @@ class HandFollower:
         """True while lerobot considers the follower connected."""
         return self._follower.is_connected
 
-    def connect(self):
+    @property
+    def is_calibrated(self):
+        """True when the servos hold the same calibration as the file."""
+        return self._follower.is_calibrated
+
+    def connect(self, calibrate=True):
         """Connect through lerobot (it enables torque), then free the arm joints."""
-        self._follower.connect()
+        self._follower.connect(calibrate=calibrate)
         self.free_arm()
 
     def free_arm(self):
@@ -1068,6 +1073,54 @@ class HandFollower:
         """Read the hand-moved pose as a leader-style action dict."""
         pos = self._follower.bus.sync_read("Present_Position")
         return {f"{m}.pos": float(v) for m, v in pos.items()}
+
+
+def connect_device(dev, label):
+    """Connect one arm without ever leaving lerobot's calibration question unanswered.
+
+    When the calibration file differs from what the servos hold, lerobot asks on stdin
+    and ENTER writes the file into the servos' EEPROM. Under the launcher stdout is a
+    log file: the question would be invisible, the process would wait forever, and a
+    stray ENTER would overwrite the EEPROM (e.g. after the A and B ports were swapped).
+    A run in a terminal keeps lerobot's prompt; any other run stops with the reason.
+    """
+    stdin = sys.stdin
+    interactive = stdin is not None and stdin.isatty() and sys.stdout.isatty()
+    if interactive or isinstance(dev, RemoteFollower):
+        dev.connect()
+        return
+    dev.connect(calibrate=False)
+    if dev.is_calibrated:
+        return
+    try:
+        dev.disconnect()
+    except Exception:  # noqa: BLE001, S110 - already stopping
+        pass
+    sys.exit(
+        f"[calib] ✗ {label}の較正が、サーボ内の値とファイルで一致しません。起動を止めました。\n"
+        "  よくある原因: ポートの取り違え(A と B・リーダーとフォロワー)／"
+        "再キャリブレーション後にファイルを入れ替えていない\n"
+        "  → koch4/config/koch4_config.json のポートと id、config/calibration/ のファイルを確認。\n"
+        "  ファイルの値をサーボに書き込むと決めた場合だけ、このコマンドを端末で直接実行し、"
+        "lerobot の問いに ENTER で答える"
+    )
+
+
+def connect_pair(robot, teleop):
+    """Connect the follower, then the leader; a refused start leaves nothing connected."""
+    connected = []
+    try:
+        for dev, label in ((robot, "フォロワー"), (teleop, "リーダー")):
+            if dev is not None:
+                connect_device(dev, label)
+                connected.append(dev)
+    except SystemExit:
+        for dev in connected:
+            try:
+                dev.disconnect()
+            except Exception:  # noqa: BLE001, S110 - already stopping
+                pass
+        raise
 
 
 def check_hw_errors(dev, label):
@@ -1452,9 +1505,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 port=args.leader_port, id=args.leader_id, calibration_dir=cal_l
             )
         )
-    if robot is not None:
-        robot.connect()
-    teleop.connect()
+    connect_pair(robot, teleop)
     if robot is not None:
         check_hw_errors(robot, "フォロワー")
     check_hw_errors(teleop, "リーダー")
@@ -2056,9 +2107,9 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 pass
         time.sleep(2)
         if robot is not None and not robot.is_connected:
-            robot.connect()
+            connect_device(robot, "フォロワー")
         if not teleop.is_connected:
-            teleop.connect()
+            connect_device(teleop, "リーダー")
         if robot is not None:
             check_hw_errors(robot, "フォロワー")
         check_hw_errors(teleop, "リーダー")

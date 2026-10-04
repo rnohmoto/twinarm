@@ -23,9 +23,11 @@ Koch には lerobot 公式の bimanual 設定が無い（v0.6.1 に bi_koch な�
 使い方（Mac・descovery で `uv run`。ポートはユーザーが渡す＝推測しない）:
   uv run python koch4/koch4_dual_launch.py --list        # ポート+シリアル列挙(読み取りのみ)
   uv run python koch4/koch4_dual_launch.py --init        # config 雛形を作る → 記入
+  uv run python koch4/koch4_dual_launch.py --doctor      # 準備状況(握手/VR/2 人で足りないもの)。腕には触れない
   uv run python koch4/koch4_dual_launch.py --ff gripper                # 2ペア同時(既定)
   uv run python koch4/koch4_dual_launch.py --pair A --ff gripper       # ペアA単独(段階テスト)
   uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw        # VR は別枠: ペアBだけ仮想反力＋重さ
+  uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --follower none  # VR 1 人: リーダーだけ(フォロワーは繋がなくてよい)
   uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --vr2  # 2 人: ペアBのフォロワー機も手で握る入力装置に
   uv run python koch4/koch4_dual_launch.py --dry-run                   # コマンドを表示するだけ
 
@@ -37,6 +39,7 @@ USB シリアル番号を登録すれば起動時に現在のポート名へ解�
 import argparse
 import json
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -185,6 +188,8 @@ def pair_commands(pair, cfg, args, log_dir):
             return []
         hand_port, warn3 = resolve_port(cfg, "follower")
         fp_ = LEADER_ONLY
+    elif args.follower == "none":
+        fp_ = LEADER_ONLY  # フォロワーを使わない(VR 1 人: 繋がっていなくてよい)
     elif args.follower == "wireless" and host and not is_leader_only(fp_):
         fp_ = str(host)  # udp://… → koch4_teleop.py が RemoteFollower で繋ぐ
         print(f"[{pair}] フォロワー無線 {fp_}（有線に戻す: --follower wired）")
@@ -417,11 +422,94 @@ def build_parser():
     )
     ap.add_argument(
         "--follower",
-        choices=["wireless", "wired"],
+        choices=["wireless", "wired", "none"],
         default="wireless",
-        help="config に follower_host があれば無線(既定)。wired=USB のフォロワーポートを使う(バックアップ)",
+        help="config に follower_host があれば無線(既定)。wired=USB のフォロワーポートを使う(バックアップ)。"
+        "none=フォロワーを使わずリーダーだけ(VR 1 人。フォロワーは繋がなくてよい)",
+    )
+    ap.add_argument(
+        "--doctor",
+        action="store_true",
+        help="準備状況を表示(config・ポートの有無・較正ファイル・VR の部品)。腕には触れない",
     )
     return ap
+
+
+def log_tail(path, lines=6):
+    """Last non-empty lines of a child's log, shown when it exits with an error."""
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    rows = [r for r in text.replace("\r", "\n").split("\n") if r.strip()]
+    return "\n".join(f"    | {r[:220]}" for r in rows[-lines:])
+
+
+def doctor(args, config_path):
+    """Print what is ready for handshake / VR / two players. Reads files only.
+
+    Ports are only tested for existence (the names written in the config); nothing is
+    opened and no port is chosen for the user.
+    """
+    mark = {True: "✓", False: "✗"}
+    print(f"準備状況（腕には触れません）  config: {config_path}")
+    asset = HERE / "webxr" / "three.module.js"
+    twin = args.config_dir / "koch4_twin.json"
+    print(f"  {mark[asset.exists()]} VR ページの部品 three.module.js", end="")
+    print(
+        ""
+        if asset.exists()
+        else "  → uv run python koch4/webxr/setup_assets.py（要ネット・1 回）"
+    )
+    print(f"  {mark[twin.exists()]} 分身と物体の設定 {twin.name}")
+    if not config_path.exists():
+        print(
+            f"  ✗ {CONFIG_NAME} がありません → --list でポートを確認し --init で雛形を作って記入"
+        )
+        return
+    with open(config_path, encoding="utf-8") as f:
+        config = json.load(f)
+    cal = args.config_dir / "calibration"
+    ready = {}
+    for pair, cfg in config.get("pairs", {}).items():
+        lp_, fp_ = cfg.get("leader_port"), cfg.get("follower_port", LEADER_ONLY)
+        host = cfg.get("follower_host")
+        lid = cfg.get("leader_id", f"koch_leader_{pair}")
+        fid = cfg.get("follower_id", f"koch_follower_{pair}")
+        l_port = bool(lp_) and Path(str(lp_)).exists()
+        f_port = not is_leader_only(fp_) and Path(str(fp_)).exists()
+        l_cal = (cal / "koch_leader" / f"{lid}.json").exists()
+        f_cal = (cal / "koch_follower" / f"{fid}.json").exists()
+        print(f"  ペア {pair}")
+        print(
+            f"    {mark[l_port]} リーダーのポート {lp_}"
+            + ("" if l_port else "（未接続か名前違い）")
+        )
+        if is_leader_only(fp_):
+            print("    － フォロワーのポート none（このペアはリーダーだけ）")
+        else:
+            print(
+                f"    {mark[f_port]} フォロワーのポート {fp_}"
+                + ("" if f_port else "（未接続か名前違い）")
+            )
+        print(
+            f"    {'✓' if host else '－'} フォロワー無線の宛先 {host or '未設定（有線で使う）'}"
+        )
+        print(
+            f"    {mark[l_cal]} 較正 koch_leader/{lid}.json   {mark[f_cal]} 較正 koch_follower/{fid}.json"
+        )
+        ready[pair] = {
+            "握手": l_port and l_cal and (bool(host) or (f_port and f_cal)),
+            "VR 1 人": l_port and l_cal and asset.exists(),
+            "VR 2 人": l_port and l_cal and f_port and f_cal and asset.exists(),
+        }
+    print("  起動できるもの（この PC から見える範囲）")
+    for pair, modes in ready.items():
+        row = "  ".join(f"{mark[ok]} {name}" for name, ok in modes.items())
+        print(f"    ペア {pair}: {row}")
+    print(
+        "  ※ 無線の握手は、握手用の PC でフォロワー側（start.sh host）が先に動いていること"
+    )
 
 
 def write_template(config_path):
@@ -436,17 +524,44 @@ def write_template(config_path):
     )
 
 
-def stop_all(procs):
-    """Send Ctrl+C to every child (teleop drops torque), then terminate stragglers."""
+def request_stop(ports):
+    """Ask teleops to stop through their control ports (a clean exit on any OS)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        for port in ports:
+            s.sendto(b'{"stop": true}', ("127.0.0.1", port))
+
+
+def stop_all(procs, ctl_by_name=None):
+    """Stop every child: control-port request and Ctrl+C (teleop drops torque), then terminate.
+
+    The stop request goes only to teleops this launcher started and that are still
+    alive (a live child owns its control port), so a dry run, a failed start, or the
+    other launcher's pair (handshake on A, VR on B) is never stopped by this one.
+    """
+    ctl_by_name = ctl_by_name or {}
+    request_stop(
+        [
+            ctl_by_name[name]
+            for name, proc, _ in procs
+            if name in ctl_by_name and proc.poll() is None
+        ]
+    )
     for _, proc, _ in procs:
         if proc.poll() is None:
-            proc.send_signal(signal.SIGINT)
+            try:
+                proc.send_signal(signal.SIGINT)
+            except (
+                ValueError,
+                OSError,
+            ):  # Windows cannot signal a child; the request above stops teleops
+                pass
     time.sleep(STOP_GRACE_SEC)
     for _, proc, f in procs:
         if proc.poll() is None:
             proc.terminate()
         f.close()
-    print("全プロセス停止")
+    if procs:
+        print("全プロセス停止")
 
 
 def main():
@@ -458,6 +573,9 @@ def main():
         return
     if args.init:
         write_template(config_path)
+        return
+    if args.doctor:
+        doctor(args, config_path)
         return
     if not config_path.exists():
         sys.exit(f"{config_path} がありません。まず --init で作成してください")
@@ -482,6 +600,9 @@ def main():
     }
     if not any(per_pair.values()):
         sys.exit(1)
+    ctl_by_name = {f"{pair}-teleop": PORTS[pair]["ctl"] for pair in pairs}
+    if args.vr:
+        ctl_by_name[f"{args.vr}-hand"] = HAND_PORTS["ctl"]
     procs = []
     try:
         for name, cmd, log in plan:
@@ -501,24 +622,38 @@ def main():
         if args.dry_run:
             print("dry-run: 何も起動していません")
             return
+        where = [f"パネル http://127.0.0.1:{PANEL_HTTP}"] if args.panel else []
+        if args.vr:
+            port = PORTS[args.vr]["vr"]
+            where.append(
+                f"VR ページ http://localhost:{port}/"
+                if args.vr_http
+                else f"VR ページ https://<この PC の IP>:{port}/"
+            )
         print(
-            f"\n全プロセス起動完了({len(procs)}個)。パネル http://127.0.0.1:{PANEL_HTTP}  ログ: {log_dir}\n終了: Ctrl+C"
+            f"\n全プロセス起動完了({len(procs)}個)。{'  '.join(where)}  ログ: {log_dir}\n終了: Ctrl+C"
         )
+        failed = False
         while True:
             time.sleep(2)
-            for name, proc, _ in procs:
+            for name, proc, f in procs:
                 if proc.poll() is not None:
                     print(
                         f"⚠ {name} が終了しました(code={proc.returncode})。ログ: {log_dir}"
                     )
+                    if proc.returncode:  # 理由をその場で見せる(ログの末尾)
+                        failed = True
+                        print(log_tail(f.name))
             procs = [(n_, p, f) for n_, p, f in procs if p.poll() is None]
             if not any("teleop" in n_ for n_, _, _ in procs):
                 print("teleop が全て終了したためランチャを終了します")
+                if failed:
+                    sys.exit(1)
                 return
     except KeyboardInterrupt:
         print("\n停止中...")
     finally:
-        stop_all(procs)
+        stop_all(procs, ctl_by_name)
 
 
 if __name__ == "__main__":

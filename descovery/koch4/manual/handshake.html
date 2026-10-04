@@ -73,7 +73,7 @@
 <tr><td>Koch リーダー</td><td>2</td><td>5V の AC アダプタ。較正済み</td></tr>
 <tr><td>Koch フォロワー</td><td>2</td><td>12V の AC アダプタ。較正済み。握手用の手の部品を付ける</td></tr>
 <tr><td>5 GHz のルータ</td><td>1</td><td>2 台の Mac だけを繋ぐ。インターネットは不要</td></tr>
-<tr><td>USB ケーブル（データ対応）</td><td>4</td><td>ハブを使うなら電源付き。4 口ともデータ対応のもの</td></tr>
+<tr><td>USB ケーブル（データ対応）</td><td>4</td><td>アームの基板の口は USB-C で、通信は USB 2.0 です。USB 2.0 用のデータ対応ケーブルで足り、長くするなら 4 m の認証品までが確実です。ハブを使うなら電源付きで、4 口ともデータ対応のもの</td></tr>
 </tbody>
 </table>
 
@@ -103,12 +103,13 @@
   <li>4 本とも腕を机に寝かせ、AC アダプタを挿す（リーダー 5V・フォロワー 12V）。</li>
   <li><strong>握手用の Mac</strong> で受け側を 2 つ起動する（端末を 2 つ開く）。
 <pre>cd twinarm/descovery
-uv run python koch4/koch4_follower_host.py --port ＜フォロワー A のポート＞ --id koch_follower_A --listen 9101 --grip-ma 500
-uv run python koch4/koch4_follower_host.py --port ＜フォロワー B のポート＞ --id koch_follower_B --listen 9102 --grip-ma 500</pre></li>
+./koch4/start.sh host A ＜フォロワー A のポート＞
+./koch4/start.sh host B ＜フォロワー B のポート＞</pre>
+  起動すると、操作者側の設定ファイルに書く宛先（この Mac の IP と番号）が表示されます。ポートは <code>uv run python koch4/koch4_dual_launch.py --list</code> で確かめて渡します。</li>
   <li><strong>操作者側の Mac</strong> で起動する。
 <pre>cd twinarm/descovery
 ./koch4/start.sh handshake</pre>
-  フォロワーが 1.5 秒かけてリーダーの姿勢に合流し、パネルがブラウザで開きます。</li>
+  フォロワーが 1.5 秒かけてリーダーの姿勢に合流し、パネルがブラウザで開きます。ペア A だけで握手する日は <code>./koch4/start.sh handshake --pair A</code>（ペア B を VR に使っていても同時に動かせます）。</li>
   <li>リーダーを動かし、フォロワーが付いてくることを 2 組とも確かめる。</li>
 </ol>
 </div>
@@ -141,13 +142,13 @@ uv run python koch4/koch4_follower_host.py --port ＜フォロワー B のポー
 </tbody>
 </table>
 <p>無線が安定しないときは、フォロワーを操作者側の Mac に USB で繋ぎ替えて、有線で起動します。設定ファイルは同じものを使えます。</p>
-<pre>uv run python koch4/koch4_dual_launch.py --follower wired --ff gripper --grip-ma 500</pre>
+<pre>./koch4/start.sh handshake --follower wired</pre>
 
 <!-- ===================================================== -->
 <h2 id="s6">6. 握る物と握力</h2>
 <ul>
   <li>フォロワーの握る力には上限（<code>--grip-ma</code>・既定 500 mA）を掛けています。上限が無いと、物を握ったままサーボが力を出し続けて過負荷で止まり、物を落とします。</li>
-  <li>握力が足りないときは 600、700 と上げ、止まりやすいときは 400、350 と下げます。操作者側は <code>GRIP_MA=400 ./koch4/start.sh handshake</code>、握手用の Mac は <code>--grip-ma 400</code>。</li>
+  <li>握力が足りないときは 600、700 と上げ、止まりやすいときは 400、350 と下げます。操作者側は <code>GRIP_MA=400 ./koch4/start.sh handshake</code>、握手用の Mac は <code>GRIP_MA=400 ./koch4/start.sh host A ＜ポート＞</code>。</li>
   <li>物を持たせるなら、卓球ボール（直径 40 mm）が安全です。ゴルフボールは重さと滑りやすさで限界に近く、落としやすくなります。指先に滑り止めのテープを貼ると持ちやすくなります。</li>
   <li>動きを穏やかにするには <code>--extra "--max-rel 15"</code> を付けて起動します（1 回に動く量の上限。既定 20）。</li>
 </ul>
@@ -158,6 +159,8 @@ uv run python koch4/koch4_follower_host.py --port ＜フォロワー B のポー
 <thead><tr><th style="width:32%">症状・赤い札</th><th>確かめること・直し方</th></tr></thead>
 <tbody>
 <tr><td>起動時に「ポートが存在しません」</td><td><code>--list</code> で今のポート名を確かめ、設定ファイルを直す。挿す口を変えていないか</td></tr>
+<tr><td>起動してすぐ「…が終了しました」と出る</td><td>すぐ下に <code>|</code> で始まる行（記録の末尾）が出る。そこに理由が書かれている</td></tr>
+<tr><td>「較正が、サーボ内の値とファイルで一致しません」</td><td>ポートの取り違え（A と B、リーダーとフォロワー）か、較正をやり直した後にファイルを入れ替えていない。設定ファイルのポートと id を確かめる。腕の中の値は書き換えずに止まっている</td></tr>
 <tr><td>フォロワーが動かない</td><td>握手用の Mac の受け側が動いているか。宛先の IP と 9101／9102。2 台が同じルータにいるか</td></tr>
 <tr><td>「…gripper エラー停止（過負荷）」</td><td>そのアームの AC アダプタを 10 秒抜いて入れ直す。繰り返すなら握力の上限を下げる</td></tr>
 <tr><td>「フォロワー握力が上限付近」</td><td>滑る・止まる前ぶれ。物を軽くするか、深く持たせる</td></tr>
@@ -190,6 +193,8 @@ uv run python koch4/koch4_follower_host.py --port ＜フォロワー B のポー
 <tr><td><a href="https://huggingface.co/docs/lerobot/lekiwi">LeRobot LeKiwi（Hugging Face）</a></td><td>§0 リーダーを手元の PC、ロボット側を別の PC にして通信で結ぶ構成</td></tr>
 <tr><td><a href="https://emanual.robotis.com/docs/en/dxl/x/xl330-m077/">ROBOTIS XL330-M077 e-Manual</a></td><td>§4・§7 握り返しの位置制御・電流の上限・温度</td></tr>
 <tr><td><a href="https://emanual.robotis.com/docs/en/dxl/x/xl330-m288/">ROBOTIS XL330-M288 e-Manual</a></td><td>§6 フォロワーの握る力の上限・過負荷の停止</td></tr>
+<tr><td><a href="https://www.wch.cn/products/CH343.html">WCH CH343（USB シリアル変換チップ）</a></td><td>§1 アームの基板の通信は USB 2.0（フルスピード）</td></tr>
+<tr><td><a href="https://files.waveshare.com/wiki/Bus_Servo_Adapter_A/Bus_Servo_Adapter_A.pdf">Waveshare Bus Servo Adapter (A) 回路図</a></td><td>§1 基板のチップは CH343P、USB-C の口に繋がるのは USB 2.0 の信号線だけ</td></tr>
 </tbody>
 </table>
 

@@ -92,7 +92,7 @@
 <h2 id="s3">3. 起動（毎回）</h2>
 <div class="step">
 <ol class="mb-0">
-  <li>リーダー B の AC アダプタ（5V）を挿す。腕は机に寝かせておく。</li>
+  <li>リーダー B の AC アダプタ（5V）を挿す。腕は机に寝かせておく。1 人で遊ぶときに使うのはリーダーだけで、フォロワー B は繋がなくて構いません。</li>
   <li>ゴーグルを USB-C ケーブルで Mac に繋ぐ。</li>
   <li>Mac で起動する。
 <pre>cd twinarm/descovery
@@ -102,7 +102,7 @@
   <li>初回と、ゴーグルの境界（ガーディアン）を引き直した後は、<a href="#s4">§4 の位置合わせ</a>をする。</li>
 </ol>
 </div>
-<p>先に実機なしで画面だけ見たいときは <code>./koch4/start.sh sim</code>（Mac のブラウザに模擬の腕と物体が出ます）。ゴーグルを繋ぎ直したときは <code>./koch4/start.sh quest</code>。</p>
+<p>先に実機なしで画面だけ見たいときは <code>./koch4/start.sh sim</code>（Mac のブラウザに模擬の腕と物体が出ます）。ゴーグルを繋ぎ直したときは <code>./koch4/start.sh quest</code>。握手（ペア A）を別の端末で動かしたままでも起動できます。</p>
 <div class="gate"><strong>関門 3</strong>: ゴーグルの中で、アームを動かすと半透明の分身が同じ姿勢で動く。左上の表示に「実機」「送信OK」と出る。</div>
 
 <!-- ===================================================== -->
@@ -312,7 +312,7 @@
 <ol class="mb-0">
   <li>Mac とゴーグルを同じ自前ルータに繋ぐ（会場のゲスト Wi-Fi は端末どうしが通信できないので使わない）。</li>
   <li>https で起動する（<code>--vr-http</code> を付けない）。
-<pre>uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --no-panel</pre></li>
+<pre>uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --no-panel --follower none</pre></li>
   <li>記録 <code>koch4/work/logs/dual_B_vr.log</code> に出る <code>https://＜Mac の IP＞:8444/</code> を、ゴーグルのブラウザに入力する。</li>
   <li>「この接続ではプライバシーが保護されません」と出たら、詳細設定 → アクセスする、で進む（最初の 1 回だけ）。</li>
 </ol>
@@ -325,7 +325,7 @@
 <p>物ごとの 幅（どこで指が止まるか）・硬さ（P）・押し返す力の上限（mA）・重さ（g）・跳ね方（0〜1）、物の置き場所（「ここに置く」）、机の大きさ、分身の位置。保存すると次回の起動にも使われます。</p>
 <h3>10.2 起動時に指定するもの</h3>
 <p>初めて重さを試すときは、上限を下げて起動し、向きを確かめてから上げます。</p>
-<pre>uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --vr-http --no-panel --extra "--vw-cap 60"</pre>
+<pre>./koch4/start.sh vr --extra "--vw-cap 60"</pre>
 <table class="table table-striped">
 <thead><tr><th style="width:34%">指定</th><th>意味</th><th style="width:18%">既定</th></tr></thead>
 <tbody>
@@ -348,6 +348,9 @@
 <tr><td>Quest が見えない（check に「端末が見えません」）</td><td>ケーブルがデータ対応か。ゴーグルの電源。開発者モードがオンか。ケーブルを挿し直してゴーグルを被り、許可の画面で「常に許可」</td></tr>
 <tr><td>ページが開かない</td><td><code>./koch4/start.sh quest</code> をやり直す。ゴーグルのブラウザに <code>http://localhost:8444/</code> と手で入れてもよい</td></tr>
 <tr><td>「AR表示」のボタンが出ない</td><td>アドレスが <code>http://localhost:8444/</code> か <code>https://…</code> か。<code>http://＜IP＞</code> では出ない</td></tr>
+<tr><td>起動してすぐ「…が終了しました」と出る</td><td>すぐ下に <code>|</code> で始まる行（記録の末尾）が出る。そこに理由が書かれている</td></tr>
+<tr><td>「three.module.js がありません」</td><td>ネットに繋がる場所で <code>./koch4/start.sh check</code> を 1 回実行する（描画ライブラリを取得する）</td></tr>
+<tr><td>「較正が、サーボ内の値とファイルで一致しません」</td><td>ポートの取り違え（A と B、リーダーとフォロワー）か、較正をやり直した後にファイルを入れ替えていない。設定ファイルのポートと id を確かめる</td></tr>
 <tr><td>分身が動かない・「未接続」の赤い帯</td><td>腕の制御が止まっている。Mac の端末と <code>koch4/work/logs/dual_B_teleop.log</code> を見る。ポートの書き間違い、AC アダプタ</td></tr>
 <tr><td>分身が実物とずれる</td><td>位置合わせ（§4）をやり直す。関節の曲がる向きが逆なら <kbd>E</kbd> で、その関節の向き（＋／−）と offset を直して保存</td></tr>
 <tr><td>握っても押し返さない</td><td>物が黄色く光っているか（光らないなら指先が届いていない）。<kbd>1</kbd>〜<kbd>3</kbd> で強制して壁だけ確かめる。記録に <code>[vwall] 接触</code> が出るか</td></tr>

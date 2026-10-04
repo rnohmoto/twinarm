@@ -1,36 +1,80 @@
 {
-  "joints": {
-    "shoulder_pan": {
-      "span_deg": 360.0,
-      "offset_deg": 3.1,
-      "sign": 1
+  "version": 2,
+  "arms": {
+    "B": {
+      "label": "リーダー B",
+      "model": "koch_leader",
+      "joints": {
+        "shoulder_pan": {
+          "span_deg": 360.0,
+          "offset_deg": 3.1,
+          "sign": 1
+        },
+        "shoulder_lift": {
+          "span_deg": 128.2,
+          "offset_deg": 20.7,
+          "sign": 1
+        },
+        "elbow_flex": {
+          "span_deg": 194.9,
+          "offset_deg": -97.5,
+          "sign": -1
+        },
+        "wrist_flex": {
+          "span_deg": 225.0,
+          "offset_deg": -10.4,
+          "sign": -1
+        },
+        "wrist_roll": {
+          "span_deg": 360.0,
+          "offset_deg": -72.0,
+          "sign": 1
+        }
+      },
+      "base": {
+        "x": 0.0,
+        "y": 0.75,
+        "z": -0.6,
+        "yaw_deg": 0.0
+      }
     },
-    "shoulder_lift": {
-      "span_deg": 128.2,
-      "offset_deg": 20.7,
-      "sign": 1
-    },
-    "elbow_flex": {
-      "span_deg": 194.9,
-      "offset_deg": -97.5,
-      "sign": -1
-    },
-    "wrist_flex": {
-      "span_deg": 225.0,
-      "offset_deg": -10.4,
-      "sign": -1
-    },
-    "wrist_roll": {
-      "span_deg": 360.0,
-      "offset_deg": -72.0,
-      "sign": 1
+    "F": {
+      "label": "フォロワー B(手)",
+      "model": "koch_follower",
+      "joints": {
+        "shoulder_pan": {
+          "span_deg": 180.0,
+          "offset_deg": 0.0,
+          "sign": 1
+        },
+        "shoulder_lift": {
+          "span_deg": 100.0,
+          "offset_deg": 0.0,
+          "sign": 1
+        },
+        "elbow_flex": {
+          "span_deg": 100.0,
+          "offset_deg": 0.0,
+          "sign": 1
+        },
+        "wrist_flex": {
+          "span_deg": 100.0,
+          "offset_deg": 0.0,
+          "sign": 1
+        },
+        "wrist_roll": {
+          "span_deg": 180.0,
+          "offset_deg": 0.0,
+          "sign": 1
+        }
+      },
+      "base": {
+        "x": 0.5,
+        "y": 0.75,
+        "z": -0.6,
+        "yaw_deg": 0.0
+      }
     }
-  },
-  "base": {
-    "x": 0.0,
-    "y": 0.75,
-    "z": -0.6,
-    "yaw_deg": 0.0
   },
   "objects": {
     "sponge": {
@@ -46,7 +90,8 @@
         -0.155,
         0.0,
         0.221
-      ]
+      ],
+      "bounce": 0.15
     },
     "ball": {
       "label": "ボール",
@@ -61,7 +106,8 @@
         0.0,
         0.0,
         0.27
-      ]
+      ],
+      "bounce": 0.65
     },
     "block": {
       "label": "鉄ブロック",
@@ -76,7 +122,18 @@
         0.155,
         0.0,
         0.221
-      ]
+      ],
+      "bounce": 0.05
     }
+  },
+  "scene": {
+    "desk": {
+      "x": 0.05,
+      "z": 0.05,
+      "w": 0.5,
+      "d": 0.4
+    },
+    "sound": true,
+    "ghost": "half"
   }
 }

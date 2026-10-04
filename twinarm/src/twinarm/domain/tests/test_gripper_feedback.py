@@ -317,3 +317,26 @@ def test_virtual_weight_releases_quickly() -> None:
 
     assert state.shoulder_ma == pytest.approx(50.0)
     assert state.elbow_ma == pytest.approx(25.0)
+
+
+@pytest.mark.unit
+def test_virtual_weight_scales_with_the_servo_torque_constant() -> None:
+    from twinarm.domain.gripper_feedback import (
+        VirtualWeightLaw,
+        VirtualWeightState,
+        virtual_weight_step,
+    )
+
+    m077 = VirtualWeightLaw(scale=0.12, cap_ma=400, alpha=1.0)
+    m288 = VirtualWeightLaw(scale=0.12, cap_ma=400, alpha=1.0, kt_nm_per_a=0.354)
+
+    leader = virtual_weight_step(
+        m077, VirtualWeightState(), engaged=True, mass_g=100.0, levers_m=(0.1, 0.1)
+    )
+    hand_follower = virtual_weight_step(
+        m288, VirtualWeightState(), engaged=True, mass_g=100.0, levers_m=(0.1, 0.1)
+    )
+
+    # same torque (0.0981 Nm): 672 mA * 0.12 = 80.6 mA on an M077, 0.146/0.354 of it on an M288
+    assert leader.elbow_ma == pytest.approx(80.6, abs=0.5)
+    assert hand_follower.elbow_ma == pytest.approx(80.6 * 0.146 / 0.354, abs=0.5)

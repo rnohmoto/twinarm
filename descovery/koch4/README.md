@@ -20,8 +20,9 @@ koch4/
 ├── koch4_web_panel.py     one browser panel for every pair: shared sliders broadcast to all pairs
 ├── koch4_live_plot.py     matplotlib telemetry viewer (unchanged copy of mock/v0)
 ├── koch4_calib_offset.py  leader/follower pose-offset check (torque off) — after overloads / drift
-├── koch4_vr_bridge.py     serves webxr/ to the headset, /state /config /contact, relays to the teleop
-├── webxr/index.html       three.js page: digital twin, objects (pick up / drop), editor mode (+ setup_assets.py)
+├── koch4_vr_bridge.py     serves webxr/ to the headset, /state /config /contact for one or two arms, relays to each teleop
+├── koch4_quest_usb.py     USB route: adb reverse + open http://localhost:<port>/ in Quest Browser (+ scrcpy mirror)
+├── webxr/index.html       three.js page: twins (1-2 arms), objects with physics (grab / drop / throw / bounce), in-headset calibration, editor (+ setup_assets.py)
 ├── config/                koch4_config.json (git-ignored; see .example), koch4_twin.json (saved by the editor)
 │   └── calibration/koch_follower/<id>.json, koch_leader/<id>.json   ← lerobot calibration
 ├── work/                  logs/ csv/ _certs/  (git-ignored)
@@ -39,13 +40,14 @@ Risk classes are the ones defined in [`../README.md`](../README.md).
 
 | Script | Purpose | Hardware risk | Extra I/O |
 | ------ | ------- | ------------- | --------- |
-| `koch4_teleop.py` | One pair. `--ff gripper --ff-style spring` (default; the 2026-09-04 fixes) / `--ff-style error` / `--ff arm` (untested on hardware) / `--ff vwall` (virtual wall, follower optional: `--follower-port none`) / `--vw` (virtual weight on `shoulder_lift` + `elbow_flex`, only while an object is grasped; `--vw-scale`, `--vw-cap` 120 mA, `--vw-invert`) / `--follower-grip-ma` (Goal_Current cap on the follower gripper against overload shutdowns). `--selftest` runs the laws with no hardware. | moves motors; force feedback and `--vw` put leader joints into current control; `vwall` holds the leader gripper in current-based position mode | UDP telemetry out (`--viz-port`, comma list), control in (`--ctl-port`), CSV in `work/csv/` |
-| `koch4_dual_launch.py` | `--list` ports+serials (read-only), `--init` config template, `--pair both` (default) / `A` / `B`, `--vr A|B` (+`--vw`) adds the bridge and forces that pair to `vwall`, `--grip-ma`, `--dry-run`. Ports: A 8765/8766 (+8769/8443), B 8767/8768 (+8770/8444), panel 8780. | launches `koch4_teleop.py` → moves motors | logs in `work/logs/dual_*.log` |
+| `koch4_teleop.py` | One pair. `--ff gripper --ff-style spring` (default; the 2026-09-04 fixes) / `--ff-style error` / `--ff arm` (untested on hardware) / `--ff vwall` (virtual wall, follower optional: `--follower-port none`) / `--vw` (virtual weight on `shoulder_lift` + `elbow_flex`, only while an object is grasped; `--vw-scale`, `--vw-cap` 120 mA, `--vw-invert`) / `--follower-grip-ma` (Goal_Current cap on the follower gripper against overload shutdowns). `--leader-type koch_follower` uses a Koch follower *moved by hand* as the input device (second player: arm joints torque-free, gripper wall only, weight on the elbow, M288 current scaling, `--arm-label`). `--selftest` runs the laws with no hardware. | moves motors; force feedback and `--vw` put leader joints into current control; `vwall` holds the leader gripper in current-based position mode | UDP telemetry out (`--viz-port`, comma list), control in (`--ctl-port`), CSV in `work/csv/` |
+| `koch4_dual_launch.py` | `--list` ports+serials (read-only), `--init` config template, `--pair both` (default) / `A` / `B`, `--vr A|B` (+`--vw`) adds the bridge and forces that pair to `vwall`, `--vr2` also starts that pair's follower as a hand-moved second input (ports 8771/8772/8773) and gives the bridge both arms, `--grip-ma`, `--dry-run`. Ports: A 8765/8766 (+8769/8443), B 8767/8768 (+8770/8444), panel 8780. | launches `koch4_teleop.py` → moves motors | logs in `work/logs/dual_*.log` |
 | `koch4_web_panel.py` | One page for all launched pairs: status chips and 4 graphs per pair, one row of sliders and mode buttons (OFF / gripper / arm / vwall) that go to every pair. | network only, but it commands live teleop sessions | HTTP `--http`, UDP in `--telemetry` (list), out `--ctl-port` (list) |
 | `koch4_live_plot.py` | matplotlib telemetry viewer. | network only | UDP in |
 | `koch4_calib_offset.py` | Torque off both arms, hold the same pose by hand, print raw ticks and normalized % per joint with the JSON fix to apply. Reads `config/calibration/`. | torque off (both arms) | reads calibration JSON |
 | `koch4_follower_host.py` | **Wireless follower.** Runs on the computer next to the follower (Raspberry Pi 4, or any Windows/Mac/Linux PC with lerobot): receives joint targets over UDP from the Mac's teleop (`--follower-port udp://<host>:9101`), drives lerobot's KochFollower, streams currents/positions/temperature/errors back. Holds the pose after 0.5 s without targets (torque kept), ramps back in after a gap; `--sim` needs no hardware. Same role as lerobot's LeKiwi host. | moves motors | UDP `--listen` (A 9101, B 9102) |
-| `koch4_vr_bridge.py` | Serves `webxr/`, republishes telemetry as `/state`, keeps `config/koch4_twin.json` behind `/config`, forwards `POST /contact` to the teleop and the twin joint map to it (for the weight FK). `--sim` needs no teleop. | network only, but it commands the leader's virtual wall and weight (clamped by the teleop; dropped after 3 s without a refresh) | HTTP(S) `--port`, UDP in `--telemetry`, out `--ctl-port` |
+| `koch4_vr_bridge.py` | Serves `webxr/`, republishes telemetry as `/state` (every arm; `--arms B,F` with one telemetry/control port per arm), keeps `config/koch4_twin.json` (v2: per-arm joints/base, objects with bounce, desk) behind `/config`, forwards `POST /contact {"arm","vwall"}` to that arm's teleop and the twin joint map to it (for the weight FK). `--sim` needs no teleop. | network only, but it commands the leader's virtual wall and weight (clamped by the teleop; dropped after 3 s without a refresh) | HTTP(S) `--port`, UDP in `--telemetry`, out `--ctl-port` |
+| `koch4_quest_usb.py` | USB route for the headset: finds adb, `adb reverse tcp:<port> tcp:<port>`, opens `http://localhost:<port>/` in Quest Browser (`--spectator`, `--mirror` = scrcpy, `--check` = status only). Needs developer mode once (CHECKLIST U0). | none (network only) | adb over USB |
 | `webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. | none | network (once) |
 
 ## Wireless follower (leader wired to the Mac, follower on its own computer)
@@ -75,9 +77,11 @@ uv run python koch4/koch4_dual_launch.py --list         # read-only: ports + USB
 uv run python koch4/koch4_dual_launch.py --init         # → config/koch4_config.json, fill it in
 uv run python koch4/koch4_dual_launch.py --pair A --ff gripper        # TEST 2 (staging)
 uv run python koch4/koch4_dual_launch.py --ff gripper --grip-ma 500   # TEST 4: both pairs (default)
-# VR is a separate track: one leader, wall + weight, page on https://<mac-ip>:8444/
+# VR is a separate track: one leader, wall + weight. USB route (no venue Wi-Fi): bridge over http + adb reverse
 python koch4/webxr/setup_assets.py
-uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw
+uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --vr-http      # page on http://localhost:8444/ in the headset
+uv run python koch4/koch4_quest_usb.py --port 8444                           # other terminal: adb reverse + open Quest Browser
+uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --vr-http --vr2  # two players: the pair's follower moved by hand
 ```
 
 Ports are supplied by the user (never guessed); leader and follower ports are not
@@ -102,23 +106,30 @@ hand; `koch4_teleop.py --selftest` checks the mirrored copy against the same vec
 
 ## VR page (`webxr/index.html`)
 
-- Objects come from `config/koch4_twin.json` (`/config`): touch width (normalized opening),
-  `p_gain`, `cap_ma`, `release`, `mass_g`, colour, kind, spot. A grasped object follows the
-  fingertips; on release it falls back to the desk. **R** / 「配置リセット」 puts every object
-  back on its spot (visible inside AR/VR through the DOM overlay).
-- **E** / 「編集」 opens the editor: per-joint span / offset / sign of the twin (when it does
-  not match the real arm), base position and yaw (AR alignment), per-object width / gain / cap /
-  mass and 「ここに置く」 (spot = current fingertip). 「保存」 writes the file and sends the joint
-  map to the teleop; the JSON can also be edited by hand.
+- One twin per arm from `config/koch4_twin.json` v2 (`arms: {B: {...}, F: {...}}`; a v1 file with
+  top-level `joints`/`base` is migrated to the first arm). Objects (`objects`, in the first arm's
+  frame) carry touch width, `p_gain`, `cap_ma`, `release`, `mass_g`, `bounce`, colour, kind, spot;
+  `scene` holds the desk size, sound and the AR ghost mode.
+- Physics: a grasped object follows the fingertips; on release it leaves with the fingertip
+  velocity of the last ~110 ms (capped at 5 m/s), falls under gravity with per-object drag, bounces
+  on the desk / floor with its `bounce` and friction, collides with the other objects, and sleeps
+  when slow. Impacts make a synthesized sound (S toggles). **R** / 「配置リセット」 puts every
+  object back on its spot.
+- **C** / 「位置合わせ」 (in the headset): touch the real fingertip midpoint with the controller tip
+  (or the index fingertip with hand tracking) and pull the trigger in 2-3 arm poses; the page
+  solves the base x/y/z/yaw by least squares (1 point = position, 2+ = yaw), shows the residual,
+  and 「確定」 saves it. `koch4SelfTest()` in the desktop console checks the solver.
+- **G** cycles how the twin is drawn in AR (solid / half-transparent / fingertip ring only).
+  **V** toggles the desktop view between the first-person preview (default, for the monitor) and
+  the orbit view. **Tab** selects the arm for keys 1/2/3 (force an object), 0 (clear), E (editor).
+- **E** / 「編集」 opens the editor: per-arm joint span / offset / sign and base, per-object
+  width / gain / cap / mass / bounce and 「ここに置く」, desk size, ghost mode, sound. 「保存」
+  writes the file and sends each arm's joint map to its teleop.
 - `?spectator=1` shows the same scene without sending contacts (desktop mirror next to the
-  headset; Meta casting or scrcpy show the headset's own view instead).
-- Alerts from the teleop (current cap held, follower grip near its cap, latched hardware
-  error such as overload, temperature derate/stop, weight cap, bus dropout, wall released
-  after a lost link) travel in the telemetry and appear as a red banner in the page and as
-  red chips on the panel; CHECKLIST.md lists what to do for each.
-- Keys 1/2/3 force an object (test the wall without moving the arm), 0 clears. The keys follow
-  the order of the objects in `koch4_twin.json`; the defaults go light to heavy: sponge, ball,
-  iron block (hardest wall, mass that saturates the weight law).
+  headset; MQDH Cast or scrcpy show the headset's own view instead).
+- Alerts from every teleop (prefixed `[B]` / `[F]` with two arms) appear as a red banner in the
+  page and as red chips on the panel; CHECKLIST.md lists what to do for each.
+- `window.koch4` exposes objects / arms / config for console checks.
 
 ## Graduating to `twinarm/`
 

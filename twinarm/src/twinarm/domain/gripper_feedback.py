@@ -275,7 +275,12 @@ def tip_levers(
 
 @dataclass(frozen=True)
 class VirtualWeightLaw:
-    """Render a grasped object's weight as current on the leader's lift and elbow."""
+    """Render a grasped object's weight as current on the leader's lift and elbow.
+
+    ``kt_nm_per_a`` is the torque constant of the joint servos: 0.146 for the
+    leader's XL330-M077, about 0.354 for an XL330-M288 (a Koch follower moved by
+    hand as a second input device), so the same weight asks for less current there.
+    """
 
     scale: float = 0.12
     cap_ma: int = 120
@@ -283,6 +288,7 @@ class VirtualWeightLaw:
     release: float = 0.5
     invert_shoulder: bool = False
     invert_elbow: bool = False
+    kt_nm_per_a: float = KT_NM_PER_A
 
 
 @dataclass(frozen=True)
@@ -294,7 +300,7 @@ class VirtualWeightState:
 
 
 def _weight_target_ma(law: VirtualWeightLaw, torque_nm: float, invert: bool) -> float:
-    physical_ma = torque_nm / KT_NM_PER_A * 1000.0
+    physical_ma = torque_nm / law.kt_nm_per_a * 1000.0
     target = max(min(physical_ma * law.scale, law.cap_ma), -law.cap_ma)
     return -target if invert else target
 

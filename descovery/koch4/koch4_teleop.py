@@ -9,6 +9,9 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
   * `--config-dir` / `--work-dir`: 較正 JSON・設定・ログを専用フォルダに置く
     （lerobot の calibration_dir を明示指定。~/.cache に散らばらない）
   * `--follower-port none`: リーダーのみ（VR 仮想反力デモ・フォロワー不要）
+  * `--leader-type koch_follower`: 入力装置がフォロワー機（手で動かす 2 人目用）。接続後に
+    腕 5 軸のトルクを抜き、gripper だけ Mode 5 の壁にする。重さは肘（XL330-M288）だけ
+    （肩の XL430 に電流制御は無い）。Kt と握りの上限は M288 用に自動で換算
   * `--ff vwall`: 仮想物体（VR ブリッジ or `--wall` 固定指定）の反力。壁の描画は
     サーボ内部の位置ループに任せ（Operating_Mode 5・Goal_Position=壁・Goal_Current=上限・
     Position_P_Gain=硬さ）、ホストは「壁に触れているか」だけを 30fps で切り替える
@@ -37,6 +40,8 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
       --ff gripper --panel --csv
   uv run python koch4/koch4_teleop.py --leader-port /dev/tty.usbmodemYYYY \
       --follower-port none --ff vwall --wall ball:45:800:300      # 壁を固定して手で確認
+  uv run python koch4/koch4_teleop.py --leader-port /dev/tty.usbmodemZZZZ --leader-id koch_follower_B
+      --leader-type koch_follower --follower-port none --ff vwall --vw --arm-label F   # 2 人目: フォロワー機を手で
   python koch4_teleop.py --selftest       # 制御則の自己診断（ハード・lerobot 不要）
 """
 
@@ -70,6 +75,29 @@ VW_JOINTS = [
     "shoulder_lift",
     "elbow_flex",
 ]  # 仮想重さを返すリーダー腕関節(どちらも XL330-M077)
+# 入力装置の機種差。koch_follower を手で動かす 2 人目用: 肩 2 軸は XL430-W250 で
+# 電流制御(Mode 0/5)が無いので重さは肘(M288)だけ。M288 のストールは M077 の約 2.4 倍
+# (0.52 vs 0.215 N*m @ 5V, 同じ 1.47 A)なので Kt が違い、握りの電流上限も同じ力になるよう縮める。
+DEVICE_MODELS = {
+    "koch_leader": {
+        "kt": 0.146,
+        "vw_joints": ["shoulder_lift", "elbow_flex"],
+        "wall_scale": 1.0,
+        "hand_joints": [],
+    },
+    "koch_follower": {
+        "kt": 0.354,
+        "vw_joints": ["elbow_flex"],
+        "wall_scale": 0.45,
+        "hand_joints": [
+            "shoulder_pan",
+            "shoulder_lift",
+            "elbow_flex",
+            "wrist_flex",
+            "wrist_roll",
+        ],
+    },
+}
 JOINT_SPAN_DEG = {
     "shoulder_pan": 180.0,
     "shoulder_lift": 100.0,
@@ -296,6 +324,7 @@ class VirtualWeightLaw:
     release: float = 0.5
     invert_shoulder: bool = False
     invert_elbow: bool = False
+    kt_nm_per_a: float = KT_NM_PER_A
 
 
 @dataclass(frozen=True)
@@ -307,7 +336,7 @@ class VirtualWeightState:
 
 
 def _weight_target_ma(law, torque_nm, invert):
-    physical_ma = torque_nm / KT_NM_PER_A * 1000.0
+    physical_ma = torque_nm / law.kt_nm_per_a * 1000.0
     target = max(min(physical_ma * law.scale, law.cap_ma), -law.cap_ma)
     return -target if invert else target
 
@@ -392,6 +421,9 @@ def selftest():
     vw = VirtualWeightLaw(scale=0.12, cap_ma=120, alpha=1.0)
     w = virtual_weight_step(vw, VirtualWeightState(), True, 100.0, (0.2, 0.1))
     assert w.shoulder_ma == 120.0 and 80.0 < w.elbow_ma < 81.0, w
+    m288 = VirtualWeightLaw(scale=0.12, cap_ma=400, alpha=1.0, kt_nm_per_a=0.354)
+    w2 = virtual_weight_step(m288, VirtualWeightState(), True, 100.0, (0.1, 0.1))
+    assert abs(w2.elbow_ma - 80.6 * 0.146 / 0.354) < 0.5, w2
     print(
         "selftest OK: spring/error/vwall/weight/thermal 制御則は twinarm domain と同じ値"
     )
@@ -442,6 +474,8 @@ def gripper_ticks(bus):
     g = cal.get("gripper")
     if g is None:
         return None
+    if int(getattr(g, "drive_mode", 0) or 0) == 1:  # 反転モーターは端が入れ替わる
+        return int(g.range_max), int(g.range_min)
     return int(g.range_min), int(g.range_max)
 
 
@@ -821,6 +855,55 @@ class RemoteFollower:
         }
 
 
+class HandFollower:
+    """A Koch follower moved by hand: the input device of a second player.
+
+    Wraps lerobot's KochFollower so the frame loop can treat it like KochLeader
+    (connect / disconnect / is_connected / ``get_action()`` with ``<motor>.pos``
+    normalized values / ``bus``). On connect the five arm joints are left
+    torque-free so a person can move the arm (hold it: a raised arm drops); the
+    gripper keeps its torque for the virtual wall (Mode 5). Risk class: torque
+    off (arm) + moves motors (gripper wall).
+    """
+
+    def __init__(self, follower, hand_joints):
+        self._follower = follower
+        self._hand_joints = list(hand_joints)
+
+    @property
+    def bus(self):
+        """The follower's MotorsBus (the frame loop reads/writes registers on it)."""
+        return self._follower.bus
+
+    @property
+    def is_connected(self):
+        """True while lerobot considers the follower connected."""
+        return self._follower.is_connected
+
+    def connect(self):
+        """Connect through lerobot (it enables torque), then free the arm joints."""
+        self._follower.connect()
+        self.free_arm()
+
+    def free_arm(self):
+        """Drop torque on the arm joints so the arm can be moved by hand."""
+        for j in self._hand_joints:
+            self._follower.bus.write("Torque_Enable", j, 0, normalize=False)
+        print(
+            f"[hand] 腕 {len(self._hand_joints)} 軸のトルクを抜きました"
+            "(手で動かせる。離すと落ちるので支えること)"
+        )
+
+    def disconnect(self):
+        """Disconnect through lerobot (its default drops torque on every motor)."""
+        self._follower.disconnect()
+
+    def get_action(self):
+        """Read the hand-moved pose as a leader-style action dict."""
+        pos = self._follower.bus.sync_read("Present_Position")
+        return {f"{m}.pos": float(v) for m, v in pos.items()}
+
+
 def check_hw_errors(dev, label):
     """Print any latched hardware error (overload etc.) on a bus."""
     try:
@@ -880,6 +963,29 @@ def build_parser():
     ap.add_argument("--follower-id", default="koch_follower_arm")
     ap.add_argument("--leader-port", default=None)
     ap.add_argument("--leader-id", default="koch_leader_arm")
+    ap.add_argument(
+        "--leader-type",
+        choices=list(DEVICE_MODELS),
+        default="koch_leader",
+        help="入力装置の機種。koch_follower=フォロワー機を手で動かす(2 人目・--follower-port none 必須)",
+    )
+    ap.add_argument(
+        "--arm-label",
+        default="",
+        help="テレメトリに載せる腕の名前(VR ページの表示と /contact の宛先。例 B / F)",
+    )
+    ap.add_argument(
+        "--wall-scale",
+        type=float,
+        default=None,
+        help="仮想壁の電流上限の倍率(未指定=機種既定 M077 1.0 / M288 0.45)",
+    )
+    ap.add_argument(
+        "--vw-kt",
+        type=float,
+        default=None,
+        help="重さ計算のトルク定数 N*m/A(未指定=機種既定 0.146 / 0.354)",
+    )
     ap.add_argument(
         "--config-dir",
         type=Path,
@@ -1064,6 +1170,18 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     leader_only = args.follower_port.lower() == LEADER_ONLY
     if leader_only and args.ff in ("gripper", "arm"):
         sys.exit("--follower-port none のとき使える --ff は off / vwall だけです")
+    model = DEVICE_MODELS[args.leader_type]
+    if args.leader_type != "koch_leader" and not leader_only:
+        sys.exit(
+            "--leader-type koch_follower は --follower-port none(手で動かす入力装置)でだけ使えます"
+        )
+    wall_scale = (
+        model["wall_scale"]
+        if args.wall_scale is None
+        else max(0.0, min(args.wall_scale, 2.0))
+    )
+    vw_kt = model["kt"] if args.vw_kt is None else max(0.05, args.vw_kt)
+    vw_joints = list(model["vw_joints"])  # 重さを書く関節(機種で違う)
     if args.ff_cap > FF_CAP_MAX_MA:
         args.ff_cap = FF_CAP_MAX_MA
         print(f"[ff] cap は安全のため最大{FF_CAP_MAX_MA}mAに制限しました")
@@ -1079,6 +1197,10 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         print(f"[vw] 重さ cap は安全のため最大{ARM_CAP_MAX_MA}mAに制限しました")
     guard = ThermalGuard()
     viz_ports = parse_ports(args.viz_port)
+    if args.wall is not None and wall_scale != 1.0:
+        args.wall = replace(
+            args.wall, cap_ma=round(args.wall.cap_ma * wall_scale)
+        )  # 機種差の換算(M288 は同じ電流で約 2.4 倍の力)
     if args.wall is not None and args.wall.cap_ma > args.ff_cap:
         args.wall = replace(
             args.wall, cap_ma=int(args.ff_cap)
@@ -1125,11 +1247,25 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 max_relative_target=float(args.max_rel) if args.max_rel > 0 else None,
             )
         )
-    teleop = KochLeader(
-        KochLeaderConfig(
-            port=args.leader_port, id=args.leader_id, calibration_dir=cal_l
+    if args.leader_type == "koch_follower":
+        teleop = HandFollower(
+            KochFollower(
+                KochFollowerConfig(
+                    port=args.leader_port, id=args.leader_id, calibration_dir=cal_f
+                )
+            ),
+            model["hand_joints"],
         )
-    )
+        print(
+            "[hand] ⚠ 入力装置=フォロワー機: 接続直後に腕のトルクが抜ける(腕を手で支えて起動)。"
+            f" 重さは {vw_joints} だけ・壁の電流上限 ×{wall_scale}・Kt={vw_kt}"
+        )
+    else:
+        teleop = KochLeader(
+            KochLeaderConfig(
+                port=args.leader_port, id=args.leader_id, calibration_dir=cal_l
+            )
+        )
     if robot is not None:
         robot.connect()
     teleop.connect()
@@ -1174,9 +1310,9 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         vwall_on = False
     vw_on = vwall_on and args.vw
     if vw_on:
-        setup_arm_ff(teleop, VW_JOINTS)
+        setup_arm_ff(teleop, vw_joints)
         print(
-            "[vw] ⚠ 仮想重さON: 握っている間だけ肩・肘に電流が出る。リーダーから手を離さない"
+            f"[vw] ⚠ 仮想重さON: 握っている間だけ {vw_joints} に電流が出る。腕から手を離さない"
         )
     wall = [args.wall]  # 現在の仮想物体(None=自由空間)
     wall_cmd = [None]  # 最後に書いた WallCommand
@@ -1270,6 +1406,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             cap_ma=args.vw_cap,
             invert_shoulder="shoulder_lift" in vw_invert,
             invert_elbow="elbow_flex" in vw_invert,
+            kt_nm_per_a=vw_kt,
         )
 
     def spring_law():
@@ -1302,7 +1439,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         """Drop the weight currents and free the lift/elbow joints."""
         nonlocal vw_on
         if vw_on:
-            release_arm(teleop.bus, VW_JOINTS)
+            release_arm(teleop.bus, vw_joints)
         vw_on = False
         vw_state[0] = VirtualWeightState()
         for j in VW_JOINTS:
@@ -1339,7 +1476,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             ff_anchor[0] = arm_gripper_ff(teleop, args)
             ff_on, vwall_on, wall_cmd[0] = False, True, None
             if args.vw:
-                setup_arm_ff(teleop, VW_JOINTS)
+                setup_arm_ff(teleop, vw_joints)
                 vw_on = True
         if new == "off" and (ff_on or vwall_on):
             release_gripper(teleop.bus)
@@ -1393,6 +1530,10 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 set_ff_mode(cmd["mode"])
             if "vwall" in cmd:
                 wall[0] = wall_from_message(cmd["vwall"])
+                if wall[0] is not None and wall_scale != 1.0:
+                    wall[0] = replace(
+                        wall[0], cap_ma=round(wall[0].cap_ma * wall_scale)
+                    )  # 機種差の換算
                 if wall[0] is not None and wall[0].cap_ma > args.ff_cap:
                     wall[0] = replace(
                         wall[0], cap_ma=int(args.ff_cap)
@@ -1527,7 +1668,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             "shoulder_lift": vw_state[0].shoulder_ma,
             "elbow_flex": vw_state[0].elbow_ma,
         }
-        for j in VW_JOINTS:
+        for j in vw_joints:
             out = round(outs[j])
             if abs(out - vw_out[j]) >= 3 or (out == 0 and vw_out[j] != 0):
                 teleop.bus.write("Goal_Current", j, out, normalize=False)
@@ -1600,6 +1741,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                     "rec": reconnects[0],
                     "n": n[0],
                     "leader_only": leader_only,
+                    "arm": args.arm_label,
+                    "device": args.leader_type,
                     "alerts": active_alerts(),
                     "hw": dict(hw_bits),
                     "link": (
@@ -1607,7 +1750,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                         if isinstance(robot, RemoteFollower)
                         else None
                     ),
-                    "vw": {j: vw_out[j] for j in VW_JOINTS} if vw_on else None,
+                    "vw": {j: vw_out[j] for j in vw_joints} if vw_on else None,
                     "vwall": (
                         {
                             "name": wall[0].name,
@@ -1714,7 +1857,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             setup_arm_ff(teleop, ARM_FF_JOINTS)
             ff_arm = True
         if vw_on:
-            setup_arm_ff(teleop, VW_JOINTS)
+            setup_arm_ff(teleop, vw_joints)
             vw_state[0] = VirtualWeightState()
             for j in VW_JOINTS:
                 vw_out[j] = 0
@@ -1763,7 +1906,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             if args.ff == "arm":
                 release_arm(teleop.bus)
             if vw_on:
-                release_arm(teleop.bus, VW_JOINTS)
+                release_arm(teleop.bus, vw_joints)
         except Exception:  # noqa: BLE001, S110 - the bus may already be gone
             pass
         if fcsv:

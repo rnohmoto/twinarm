@@ -9,6 +9,8 @@ Koch には lerobot 公式の bimanual 設定が無い（v0.6.1 に bi_koch な�
 固定ポート（2ペアで衝突しない）:
   ペアA: telemetry UDP 8765 / 制御 UDP 8766 / VR ブリッジ 8443（テレメトリ複製 8769）
   ペアB: telemetry UDP 8767 / 制御 UDP 8768 / VR ブリッジ 8444（テレメトリ複製 8770）
+  2 人目（--vr2: VR ペアのフォロワー機を手で動かす）: telemetry 8771 / 制御 8772 / 複製 8773
+    （ブリッジは同じ 1 本で腕 2 本 `--arms B,F`。ページには分身が 2 体出る）
   パネル: http://127.0.0.1:8780（1枚で全ペア）
 
 専用フォルダ（既定・`--config-dir` / `--work-dir` で変更可）:
@@ -24,6 +26,7 @@ Koch には lerobot 公式の bimanual 設定が無い（v0.6.1 に bi_koch な�
   uv run python koch4/koch4_dual_launch.py --ff gripper                # 2ペア同時(既定)
   uv run python koch4/koch4_dual_launch.py --pair A --ff gripper       # ペアA単独(段階テスト)
   uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw        # VR は別枠: ペアBだけ仮想反力＋重さ
+  uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --vr2  # 2 人: ペアBのフォロワー機も手で握る入力装置に
   uv run python koch4/koch4_dual_launch.py --dry-run                   # コマンドを表示するだけ
 
 設定ファイルのシリアル番号: /dev/tty.usbmodem* の名前はハブ差し替え・再起動で変わり得るので、
@@ -56,6 +59,9 @@ PORTS = {  # ペアごとの通信ポート割り当て(vrviz=ブリッジ専用
     "A": {"viz": 8765, "ctl": 8766, "vr": 8443, "vrviz": 8769},
     "B": {"viz": 8767, "ctl": 8768, "vr": 8444, "vrviz": 8770},
 }
+# --vr2 の 2 人目(VR ペアのフォロワー機を手で動かす teleop)。VR ペアは同時に 1 つなので 1 組
+HAND_PORTS = {"viz": 8771, "ctl": 8772, "vrviz": 8773}
+HAND_LABEL = "F"
 
 CONFIG_TEMPLATE = {
     "pairs": {
@@ -167,14 +173,33 @@ def pair_commands(pair, cfg, args, log_dir):
     lp_, warn1 = resolve_port(cfg, "leader")
     fp_, warn2 = cfg.get("follower_port", LEADER_ONLY), None
     host = cfg.get("follower_host")
-    if args.follower == "wireless" and host and not is_leader_only(fp_):
+    hand_port, warn3 = None, None
+    two_hands = args.vr == pair and args.vr2
+    if two_hands:
+        # 2 人目: このペアのフォロワー機は USB で Mac に繋ぎ、手で動かす入力装置になる。
+        # メインの teleop はリーダーのみ(フォロワーを動かさない)
+        if is_leader_only(fp_):
+            print(
+                f"[{pair}] ✗ --vr2 には config の follower_port(2 人目の機体)が要ります"
+            )
+            return []
+        hand_port, warn3 = resolve_port(cfg, "follower")
+        fp_ = LEADER_ONLY
+    elif args.follower == "wireless" and host and not is_leader_only(fp_):
         fp_ = str(host)  # udp://… → koch4_teleop.py が RemoteFollower で繋ぐ
         print(f"[{pair}] フォロワー無線 {fp_}（有線に戻す: --follower wired）")
     elif not is_leader_only(fp_):
         fp_, warn2 = resolve_port(cfg, "follower")
-    for w in (warn1, warn2):
+    for w in (warn1, warn2, warn3):
         if w:
             print(f"[{pair}] ⚠ {w}")
+    if two_hands and (
+        not hand_port or (not args.dry_run and not Path(str(hand_port)).exists())
+    ):
+        print(
+            f"[{pair}] ✗ 2 人目(フォロワー機)のポートが存在しません: {hand_port} — --list で確認して config を直してください"
+        )
+        return []
     if not lp_ or (not args.dry_run and not Path(lp_).exists()):
         print(
             f"[{pair}] ✗ leader ポートが存在しません: {lp_} — --list で確認して config を直してください"
@@ -217,6 +242,8 @@ def pair_commands(pair, cfg, args, log_dir):
         "--ff",
         ff,
     ]
+    if args.vr == pair:
+        cmd += ["--arm-label", pair]
     if args.vr == pair and args.vw:
         cmd += ["--vw"]
     if args.grip_ma is not None:
@@ -228,14 +255,54 @@ def pair_commands(pair, cfg, args, log_dir):
     if args.extra:
         cmd += args.extra.split()
     plan = [(f"{pair}-teleop", cmd, log_dir / f"dual_{pair}_teleop.log")]
+    arms, tele, ctl = [pair], [ports["vrviz"]], [ports["ctl"]]
+    if two_hands:
+        hand = [
+            sys.executable,
+            str(HERE / "koch4_teleop.py"),
+            "--leader-port",
+            str(hand_port),
+            "--leader-id",
+            cfg.get("follower_id", f"koch_follower_{pair}"),
+            "--leader-type",
+            "koch_follower",
+            "--follower-port",
+            LEADER_ONLY,
+            "--config-dir",
+            str(args.config_dir),
+            "--work-dir",
+            str(args.work_dir),
+            "--viz-port",
+            f"{HAND_PORTS['viz']},{HAND_PORTS['vrviz']}",
+            "--ctl-port",
+            str(HAND_PORTS["ctl"]),
+            "--ff",
+            "vwall",
+            "--arm-label",
+            HAND_LABEL,
+        ]
+        if args.vw:
+            hand += ["--vw"]
+        if args.lerobot_cache:
+            hand += ["--lerobot-cache"]
+        if args.csv:
+            hand += ["--csv"]
+        if args.extra:
+            hand += args.extra.split()
+        plan.append((f"{pair}-hand", hand, log_dir / f"dual_{pair}_hand.log"))
+        arms.append(HAND_LABEL)
+        tele.append(HAND_PORTS["vrviz"])
+        ctl.append(HAND_PORTS["ctl"])
     if args.vr == pair:
         cmd = [
             sys.executable,
             str(HERE / "koch4_vr_bridge.py"),
+            "--arms",
+            ",".join(arms),
             "--telemetry",
-            str(ports["vrviz"]),
+            ",".join(str(p) for p in tele),
             "--ctl-port",
-            str(ports["ctl"]),
+            ",".join(str(p) for p in ctl),
             "--port",
             str(ports["vr"]),
             "--config-dir",
@@ -251,17 +318,21 @@ def pair_commands(pair, cfg, args, log_dir):
 
 def panel_command(pairs, config, args):
     """One panel for every launched pair (shared sliders, broadcast control)."""
+    two_hands = bool(args.vr) and args.vr2  # 2 人目の teleop もパネルに載せる
+    hand_viz = [str(HAND_PORTS["viz"])] if two_hands else []
+    hand_ctl = [str(HAND_PORTS["ctl"])] if two_hands else []
+    hand_lbl = [HAND_LABEL] if two_hands else []
     cmd = [
         sys.executable,
         str(HERE / "koch4_web_panel.py"),
         "--http",
         str(PANEL_HTTP),
         "--telemetry",
-        ",".join(str(PORTS[p]["viz"]) for p in pairs),
+        ",".join([str(PORTS[p]["viz"]) for p in pairs] + hand_viz),
         "--ctl-port",
-        ",".join(str(PORTS[p]["ctl"]) for p in pairs),
+        ",".join([str(PORTS[p]["ctl"]) for p in pairs] + hand_ctl),
         "--labels",
-        ",".join(pairs),
+        ",".join(pairs + hand_lbl),
     ]
     cams = [
         c
@@ -307,6 +378,11 @@ def build_parser():
         "--vw",
         action="store_true",
         help="VR ペアで握った物体の重さを肩・肘に返す(--vw-cap 小から)",
+    )
+    ap.add_argument(
+        "--vr2",
+        action="store_true",
+        help="VR ペアのフォロワー機も手で動かす 2 人目の入力装置にする(teleop をもう 1 本・ブリッジは腕 2 本)",
     )
     ap.add_argument(
         "--vr-http", action="store_true", help="ブリッジを TLS なしで(adb reverse 方式)"
@@ -392,6 +468,8 @@ def main():
     pairs = ["A", "B"] if args.pair == "both" else [args.pair]
     if args.vr and args.vr not in pairs:
         sys.exit(f"--vr {args.vr} は起動するペアに含まれていません")
+    if args.vr2 and not args.vr:
+        sys.exit("--vr2 は --vr A|B と一緒に使います")
 
     plan = []
     if args.panel:

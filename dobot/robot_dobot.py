@@ -170,7 +170,9 @@ class PydobotRobot(RobotBase):
 
     @staticmethod
     def list_candidate_ports() -> list[str]:
-        """CP210x（Silicon Labs）または説明に Dobot を含むポートを列挙する（選びはしない）。
+        """CP210x（Silicon Labs）・CH9102（WCH 1A86:55D4）・説明に Dobot を含むポートを列挙する（選びはしない）。
+
+        USB-シリアル変換は個体で違う: 2026-10-05 に繋いだ機体（SN DT1426040100）は CH9102 だった。
 
         twinarm の実機規則: ポートは推測せず、ユーザーが渡す。ここは候補を見せるだけ。
         """
@@ -178,7 +180,7 @@ class PydobotRobot(RobotBase):
         cands = []
         for p in list_ports.comports():
             desc = f"{p.description} {p.manufacturer} {p.hwid}".lower()
-            if "cp210" in desc or "silicon labs" in desc or "dobot" in desc:
+            if "cp210" in desc or "silicon labs" in desc or "dobot" in desc or "1a86:55d4" in desc:
                 cands.append(p.device)
         return cands
 

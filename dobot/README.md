@@ -18,9 +18,13 @@ Magician can and cannot report) · [`manual/purchase.html`](manual/purchase.html
 
 ## Status
 
-Offline tests pass with no hardware (`uv run pytest`, 23 tests). `demo.py --dry-run` runs the whole
-pipeline against a synthetic frame and serves the browser panel. Real-arm and real-camera steps have
-**not** been run yet: the Magician is on hand but not connected, and the camera is not bought.
+Offline tests pass with no hardware (`uv run pytest`). `demo.py --dry-run` runs the whole
+pipeline against a synthetic frame and serves the browser panel. On 2026-10-05 the Magician was
+connected to the Mac for the first time: it answers on a CH9102 USB-serial port (not CP210x) as
+serial number `DT1426040100`, firmware 4.0.6, and accepts the suction command (`suction.py pulse`: read-back
+ON, then OFF). Whether the cup actually holds an object, arm motion (including `jog.py`, which has
+only run against the dry-run arm) and the camera pipeline have **not** been confirmed on the real
+bench yet.
 
 ## Quick start
 
@@ -29,7 +33,29 @@ cd dobot
 ./start.sh            # Mac/Linux: wizard if not configured yet, otherwise the demo panel (.\start.bat on Windows)
 ./start.sh dry        # no hardware: synthetic camera + recording robot, panel at http://127.0.0.1:8790
 ./start.sh check      # read-only: cameras, candidate ports, offline tests
+./start.sh suction --port /dev/cu.usbserial-XXXX   # suction ON/OFF panel only, at http://127.0.0.1:8791
 ```
+
+Suction alone (for filming; the arm does not move, homing is not needed):
+
+```bash
+uv run python suction.py --port /dev/cu.usbserial-XXXX panel    # two big buttons; Space toggles, O = on, F = off
+uv run python suction.py --port /dev/cu.usbserial-XXXX on       # also: off / status / pulse --seconds 3
+```
+
+The panel switches the pump off by itself after `--max-on-s` (300 s; 0 disables) and on exit.
+
+Controller for filming (**moves the arm**: forward/back, left/right, up/down in fixed steps, plus suction):
+
+```bash
+./start.sh jog --port /dev/cu.usbserial-XXXX        # or: uv run python jog.py --port ... ; --dry for no hardware
+```
+
+One press is one straight step of 1/5/10/20 mm; holding a button or key repeats steps one at a time, so
+the arm never travels more than one step after release. Keys: arrows = forward/back/left/right, W/S =
+up/down, Space = suction, Esc = stop. Targets go through the workspace guard in `config.json`; `--speed`
+(default 30 %) sets the PTP velocity ratio. Directions are in the robot frame and assume the arm was
+homed after power-on.
 
 Or step by step:
 
@@ -89,6 +115,8 @@ Risk classes: **read-only** (no motion), **moves arm** (commands motion), **came
 | `demo.py` | Demo runner: browser panel + dialog mode + attract loop. One worker thread owns camera and robot; the panel only queues commands. | **moves arm** with `--robot pydobot`; `--dry-run` never does |
 | `panel_web.py` | stdlib HTTP server: `/` page, `/stream` MJPEG, `/status` JSON, `POST /cmd`. | none |
 | `check_camera.py` | Enumerate cameras; open one, lock exposure/WB, measure brightness jitter, save a snapshot to `logs/`. | camera only |
+| `suction.py` | Suction pump ON/OFF only: `on` / `off` / `status` / `pulse` commands and a two-button browser panel (port 8791). Talks the Dobot protocol directly (immediate command, no queue, no pydobot). | **runs the pump**; never moves the arm; `--dry` touches nothing |
+| `jog.py` | Filming controller: browser panel (port 8791) with step moves on X/Y/Z, stop, alarm clear and suction ON/OFF. Reuses `suction.py`'s worker and panel; targets pass the workspace guard. | **moves arm** on every button press; `--dry` never does |
 | `check_robot.py` | List candidate ports (`--list`); connect and print pose; `--home` / `--round-trip` move the arm; `--dry` rehearses without hardware. | read-only by default; **moves arm** with flags |
 | `calibrate.py` | Eye-to-hand calibration: print ArUco markers (`--make-markers`), then fit pixels→robot XY into `assets/homography.json` while *you* jog the arm. | read-only |
 | `main.py` | CLI app (OpenCV window): `--tune` (camera only), `--dry-run`, or live with `--robot pydobot`. `demo.py` reuses its `build()`. | **moves arm** when `--robot pydobot` |
@@ -104,7 +132,7 @@ Risk classes: **read-only** (no motion), **moves arm** (commands motion), **came
 ```
 dobot/
   AGENTS.md  README.md  pyproject.toml  config.json
-  setup_wizard.py  demo.py  panel_web.py  main.py  check_camera.py  check_robot.py  calibrate.py
+  setup_wizard.py  demo.py  panel_web.py  main.py  check_camera.py  check_robot.py  calibrate.py  suction.py  jog.py
   camera.py  detect.py  planner.py  robot_dobot.py  rule_parser.py  llm_agent.py  asr.py  tts.py  config.py
   tests/           offline tests (pytest)
   manual/          first-time setup manual (index.html) + img/ photo slots

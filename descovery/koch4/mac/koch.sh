@@ -10,7 +10,7 @@
 # 同じフォルダの .command をダブルクリックしても同じ。3 つは同時に動かせる。止めるのは各窓で Ctrl+C。
 # どれも実機が動く・力が出る。ポートは koch4/config/koch4_config.json のものを使う（推測しない）。
 # 後ろに書いた引数はそのまま渡る（例: handshake --dry-run）。
-# 環境変数: ASSIST=摩擦アシストの関節（既定 elbow_flex,wrist_flex・空で無効）  ASSIST_CAP=上限 mA（既定 25）  MAX_REL=握手の追従リミッタ（既定 20。小さいほどフォロワーが遅れる）
+# 環境変数: ASSIST=摩擦アシストの関節（既定 elbow_flex,wrist_flex・空で無効）  ASSIST_CAP=上限 mA（既定 25）  MAX_REL=握手の追従リミッタ（既定 20。小さいほどフォロワーが遅れる）  KOCH_YES=1 で vr-follower の Enter 待ちを省く
 set -e
 here="$(cd "$(dirname "$0")" && pwd)"        # koch4/mac
 koch4="$(cd "$here/.." && pwd)"
@@ -93,8 +93,12 @@ case "$mode" in
     assist=()
     [ -n "$ASSIST" ] && assist=(--assist "$ASSIST" --assist-cap "$ASSIST_CAP")
     echo "VR 2 人目（フォロワー B: $port）。ページ http://localhost:${F_HTTP}/  摩擦アシスト: ${ASSIST:-なし}（上限 ${ASSIST_CAP} mA）"
-    echo "⚠ 接続直後と終了時にフォロワー B の腕の力が抜けます。腕を手で支えてから Enter"
-    read -r _
+    if [ "${KOCH_YES:-0}" = "1" ]; then
+      echo "⚠ 接続直後と終了時にフォロワー B の腕の力が抜けます（KOCH_YES=1: 確認なしで起動）"
+    else
+      echo "⚠ 接続直後と終了時にフォロワー B の腕の力が抜けます。腕を手で支えてから Enter"
+      read -r _
+    fi
     mkdir -p "$koch4/work/logs"
     "$PY" koch4/koch4_vr_bridge.py --arms F --telemetry 8773 --ctl-port 8772 --port "$F_HTTP" \
       --config-dir "$F_CONFIG" --work-dir "$koch4/work" --http >> "$koch4/work/logs/solo_F_vr.log" 2>&1 &

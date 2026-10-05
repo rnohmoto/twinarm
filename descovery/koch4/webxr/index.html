@@ -177,9 +177,67 @@ function buildObjects(){
     placeAtSpot(o);
     return o;
   });
+  buildTargets();
+}
+// ───────── 置く的（机の上の丸）: 物体を同じ色の丸の中にそっと置けたら OK。全部置けたらクリア。B で出す／消す ─────────
+// 投げ入れる遊びにすると実機を乱暴に振られるので、置く遊びにしている（ユーザー 10/5）。
+const TARGET_R = 0.032;                                  // 丸の半径 [m]（物体は幅 2〜3 cm）
+const TARGET_ARC = { r:0.15, deg:[40, 0, -40] };         // 丸の位置: 台座から 15 cm の弧。物体の並びと左右を入れ替える
+let targets = [], targetsOn = true, gameStart = 0, gameClear = 0;
+function buildTargets(){
+  const p = prim();
+  targets.forEach(t => t.mesh.parent && t.mesh.parent.remove(t.mesh));
+  targets = []; gameStart = gameClear = 0;
+  if (!p || !targetsOn) return;
+  objs.forEach((o, i) => {
+    const a = rad(TARGET_ARC.deg[i % TARGET_ARC.deg.length]), r = TARGET_ARC.r + (TARGET_ARC.deg[i % TARGET_ARC.deg.length] === 0 ? -0.01 : 0.01);
+    const mesh = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.RingGeometry(TARGET_R - 0.005, TARGET_R, 40), new THREE.MeshBasicMaterial({ color:new THREE.Color(o.cfg.color), side:THREE.DoubleSide }));
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(TARGET_R - 0.005, 40), new THREE.MeshBasicMaterial({ color:new THREE.Color(o.cfg.color), transparent:true, opacity:.22, side:THREE.DoubleSide }));
+    ring.rotation.x = disc.rotation.x = -Math.PI/2; mesh.add(ring, disc);
+    mesh.position.set(r * Math.sin(a), 0.002, r * Math.cos(a));
+    p.group.add(mesh);
+    targets.push({ o, mesh, ring, disc, ok:false });
+  });
+}
+function chime(freqs){
+  if (!CONFIG.scene.sound || !actx) return;
+  freqs.forEach((f, i) => { const t = actx.currentTime + i * 0.09, g = actx.createGain(); g.connect(actx.destination);
+    g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    const osc = actx.createOscillator(); osc.type = 'triangle'; osc.frequency.setValueAtTime(f, t); osc.connect(g); osc.start(t); osc.stop(t + 0.22); });
+}
+function stepTargets(){
+  if (!targets.length) return;
+  const now = performance.now();
+  if (!gameStart && objs.some(o => o.heldBy)) gameStart = now;          // 最初に何かを握ったら計時開始
+  for (const t of targets) {
+    const pos = t.o.mesh.position;
+    const inside = Math.hypot(pos.x - t.mesh.position.x, pos.z - t.mesh.position.z) < TARGET_R - 0.004;
+    const resting = !t.o.heldBy && t.o.asleep && pos.y - t.o.half < 0.012;   // 放して、机の上で止まっている
+    const ok = inside && resting;
+    if (ok && !t.ok) chime([660, 990]);
+    t.ok = ok;
+    const col = ok ? 0x22c55e : new THREE.Color(t.o.cfg.color).getHex();
+    t.ring.material.color.setHex(col); t.disc.material.color.setHex(col); t.disc.material.opacity = ok ? 0.55 : 0.22;
+  }
+  const done = targets.every(t => t.ok);
+  if (done && !gameClear && gameStart) { gameClear = now; chime([660, 880, 1100, 1320]); }
+  if (!done && gameClear && objs.every(o => !targets.find(t => t.o === o).ok)) { gameStart = gameClear = 0; }   // 全部どかしたら次の回
+}
+// 腕なしで確かめる: ?demo=place で開くと、1.2 秒後に全部の物体を丸の少し上から落とす
+if (new URLSearchParams(location.search).get('demo') === 'place') setTimeout(() => {
+  gameStart = performance.now();
+  for (const t of targets) { t.o.heldBy = null; t.o.asleep = false; t.o.v.set(0, 0, 0); t.o.spin.set(0, 0, 0); t.o.mesh.position.set(t.mesh.position.x, t.o.half + 0.03, t.mesh.position.z); }
+}, 1200);
+function targetHud(){
+  if (!targets.length) return '';
+  const n = targets.filter(t => t.ok).length;
+  const marks = targets.map(t => `${t.ok ? '✅' : '⬜'}${t.o.cfg.label}`).join(' ');
+  const time = gameClear ? ` <b>クリア！ ${((gameClear - gameStart) / 1000).toFixed(1)} 秒</b>` : gameStart ? ` ${((performance.now() - gameStart) / 1000).toFixed(0)} 秒` : '';
+  return `<br><b>置けた数 ${n}/${targets.length}</b> ${marks}${time}（同じ色の丸の中に置く）`;
 }
 function placeAtSpot(o){ o.mesh.position.set(o.cfg.spot[0], o.half + REST_LIFT, o.cfg.spot[2]); o.mesh.rotation.set(0,0,0); o.heldBy = null; o.v.set(0,0,0); o.spin.set(0,0,0); o.asleep = true; o.mesh.scale.set(1,1,1); }
-function resetPlacement(){ objs.forEach(placeAtSpot); Object.values(arms).forEach(a => setForced(a, null)); }
+function resetPlacement(){ gameStart = gameClear = 0; objs.forEach(placeAtSpot); Object.values(arms).forEach(a => setForced(a, null)); }
 
 // ───────── 音（Web Audio・物が当たったとき。重いほど低く、速いほど大きい） ─────────
 let actx = null;
@@ -371,6 +429,7 @@ function applyPose(tms){
   }
   for (const o of objs) stepPhysics(o, dt);
   collideObjects();
+  stepTargets();
   for (const o of objs) {
     const cand = Object.values(arms).some(a => a.current && a.current.name === o.name);
     o.mesh.material.emissive.setHex(o.heldBy ? 0x7f1d1d : cand ? 0x3f3f00 : 0x000000);
@@ -380,7 +439,8 @@ function applyPose(tms){
   const view = renderer.xr.isPresenting ? (arActive ? 'AR(パススルー)' : 'VR') : VIEW_NAMES[inlineView];
   hudMode.innerHTML = lines.join('<br>') + `<br>表示: ${view}` + (calib.on ? ' / <b>位置合わせ中</b>' : '') + (SPECTATOR ? ' / <b>観客モード</b>' : '')
     + (renderer.xr.isPresenting ? '' : ` / 画面: ${LAYOUT_NAMES[layout]}`)
-    + `<br>キー: 1-3 強制 0 解除 R 配置 E 編集 C 位置合わせ G 分身の見せ方 V 視点 M 画面の割り方 J 関節名 S 音 Tab 腕切替`;
+    + targetHud()
+    + `<br>キー: 1-3 強制 0 解除 R 配置 E 編集 C 位置合わせ G 分身の見せ方 V 視点 M 画面の割り方 J 関節名 B 置く的 S 音 Tab 腕切替`;
 }
 
 // ───────── インラインの視点: 一人称（モニタ向け・既定）／俯瞰オービット ─────────
@@ -608,6 +668,7 @@ addEventListener('keydown', e => {
   if (e.key === 'v' || e.key === 'V') { inlineView = VIEW_ORDER[(VIEW_ORDER.indexOf(inlineView) + 1) % VIEW_ORDER.length]; updateCam(); }
   if (e.key === 's' || e.key === 'S') { CONFIG.scene.sound = !CONFIG.scene.sound; }
   if (e.key === 'j' || e.key === 'J') { showNames = !showNames; }
+  if (e.key === 'b' || e.key === 'B') { targetsOn = !targetsOn; buildTargets(); }
   if (e.key === 'm' || e.key === 'M') { layout = LAYOUT_ORDER[(LAYOUT_ORDER.indexOf(layout) + 1) % LAYOUT_ORDER.length]; }
   if (e.key === 'Tab') { e.preventDefault(); selectNextArm(); }
   const i = parseInt(e.key, 10) - 1; if (i >= 0 && i < objs.length) setForced(arm, objs[i]);

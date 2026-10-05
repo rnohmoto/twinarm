@@ -341,3 +341,57 @@ def virtual_weight_step(
         shoulder_ma=(1.0 - alpha) * state.shoulder_ma + alpha * target_s,
         elbow_ma=(1.0 - alpha) * state.elbow_ma + alpha * target_e,
     )
+
+
+@dataclass(frozen=True)
+class HandAssistLaw:
+    """Cancel part of the gear friction of a joint that a person moves by hand.
+
+    A Koch follower used as a hand-moved input device has 288:1 gears (XL330-M288),
+    so it feels heavy even with no force commanded. The law adds a small current
+    along the measured motion: ``gain_ma_s`` mA per normalized unit/s above
+    ``deadband``, capped at ``cap_ma``. The cap must stay below the joint's own
+    friction, otherwise the joint keeps moving after the hand lets go; above
+    ``max_speed`` (nobody moves it that fast on purpose) the assist cuts out.
+    ``invert`` flips the current for a joint whose positive current lowers the
+    normalized position.
+    """
+
+    gain_ma_s: float = 1.5
+    cap_ma: int = 25
+    deadband: float = 5.0
+    max_speed: float = 300.0
+    alpha: float = 0.4
+    slew_ma: int = 8
+    invert: bool = False
+
+
+@dataclass(frozen=True)
+class HandAssistState:
+    """Last position, smoothed speed [normalized unit/s] and commanded current [mA]."""
+
+    position: float | None = None
+    speed: float = 0.0
+    command_ma: int = 0
+
+
+def hand_assist_step(
+    law: HandAssistLaw, state: HandAssistState, position: float, dt: float
+) -> HandAssistState:
+    """Advance the assist by one frame from the joint's normalized position."""
+    if state.position is None or dt <= 0.0:
+        return HandAssistState(position=position)
+    speed = (1.0 - law.alpha) * state.speed + law.alpha * (
+        position - state.position
+    ) / dt
+    magnitude = abs(speed)
+    if magnitude <= law.deadband or magnitude > law.max_speed:
+        target = 0.0
+    else:
+        target = min(law.gain_ma_s * (magnitude - law.deadband), law.cap_ma)
+        if (speed < 0.0) != law.invert:
+            target = -target
+    command = max(
+        min(target, state.command_ma + law.slew_ma), state.command_ma - law.slew_ma
+    )
+    return HandAssistState(position=position, speed=speed, command_ma=round(command))

@@ -31,6 +31,28 @@ prepare() {
   fi
 }
 
+ports_free() {  # ports_free <名前> <UDP 番号...> -- <TCP 番号...>: 使用中なら理由を出して止まる
+  local what="$1"; shift
+  "$PY" - "$@" <<'PYEOF' || { echo "⛔ $what は起動しません。同じものが既に動いているか、通し稽古（start.sh rehearse）の最中です。"; echo "   ./koch4/mac/koch.sh status で確認し、止めてからもう一度起動してください。"; exit 1; }
+import socket, sys
+kind, busy = socket.SOCK_DGRAM, []
+for a in sys.argv[1:]:
+    if a == "--":
+        kind = socket.SOCK_STREAM
+        continue
+    s = socket.socket(socket.AF_INET, kind)
+    try:
+        s.bind(("127.0.0.1", int(a)))
+    except OSError:
+        busy.append(("UDP " if kind == socket.SOCK_DGRAM else "TCP ") + a)
+    finally:
+        s.close()
+if busy:
+    print("使用中のポート: " + ", ".join(busy))
+    sys.exit(1)
+PYEOF
+}
+
 has_arg() { local want="$1"; shift; for a in "$@"; do [ "$a" = "$want" ] && return 0; done; return 1; }
 
 open_later() {  # open_later <秒> <URL>
@@ -48,12 +70,14 @@ mode="${1:-help}"
 case "$mode" in
   handshake)
     prepare
+    has_arg --dry-run "$@" || ports_free "握手" 8765 8766 -- 8780
     echo "握手（ペア A・差分反射式）。起動時にフォロワー A がリーダー A の姿勢へ 1.5 秒で動きます。パネル http://127.0.0.1:8780"
     exec "$PY" koch4/koch4_dual_launch.py --pair A --ff gripper --grip-ma 500 \
       --extra "--ff-style error --max-rel 10" "$@"
     ;;
   vr-leader)
     prepare
+    has_arg --dry-run "$@" || ports_free "VR 1 人目" 8768 8770 -- 8444
     echo "VR 1 人目（リーダー B）。ページ http://localhost:8444/"
     has_arg --dry-run "$@" || open_later 10 "http://localhost:8444/"
     exec "$PY" koch4/koch4_dual_launch.py --pair B --vr B --vw --vr-http --no-panel --follower none \
@@ -61,6 +85,7 @@ case "$mode" in
     ;;
   vr-follower)
     prepare
+    ports_free "VR 2 人目" 8772 8773 -- "$F_HTTP"
     port="$(follower_b_port)"
     assist=()
     [ -n "$ASSIST" ] && assist=(--assist "$ASSIST" --assist-cap "$ASSIST_CAP")

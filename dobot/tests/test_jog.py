@@ -20,11 +20,14 @@ from jog import (
     ID_QUEUE_FORCE_STOP,
     ID_QUEUE_START,
     PTP_MOVL_XYZ,
+    RANGE_ALARMS,
     ArmWorker,
     DryArm,
     MagicianArm,
     MotionStopped,
+    decode_alarms,
     jog_target,
+    joint_angles,
     make_panel,
     violation,
 )
@@ -92,7 +95,32 @@ def test_magician_arm_frames():
     assert struct.unpack("<B4f", params) == (PTP_MOVL_XYZ, 210.0, 10.0, 20.0, 0.0)
     arm.stop()
     assert [s[0] for s in ser.sent[-2:]] == [ID_QUEUE_FORCE_STOP, ID_QUEUE_CLEAR]
-    assert arm.has_alarm() is False
+    arm.clear_alarms()
+    assert ser.sent[-1][:2] == (20, 1)                                  # 解除は ID 20 への書き込み（21 では消えない）
+
+
+def test_decode_alarms_reads_bit_positions():
+    # 2026-10-05 に実機が返した値: 5 バイト目の bit2 = 0x22（動作中: 逆運動学の限界）
+    assert decode_alarms(bytes.fromhex("00000000040000000000000000000000")) == [0x22]
+    assert decode_alarms(bytes(16)) == []
+    assert 0x22 in RANGE_ALARMS and 0x50 not in RANGE_ALARMS
+
+
+def test_joint_angles_match_the_real_arm():
+    # 実機の GetPose が同時に返した位置と関節角（吸盤オフセット 59.7 mm）
+    for xyz, measured in (((266.9, 0.0, -39.6), (0.0, 57.0, 50.3)), ((228.4, 10.7, -11.9), (2.7, 37.6, 53.9))):
+        j = joint_angles(*xyz)
+        assert [round(j[k], 1) for k in ("J1", "J2", "J3")] == pytest.approx(measured, abs=0.11)
+    assert joint_angles(400.0, 0.0, 0.0) is None                        # 腕の長さでは届かない
+
+
+def test_jog_target_refuses_joint_range_inside_the_workspace_box():
+    close_to_base = (160.0, 0.0, 20.0, 0.0)                             # 箱の中だが後腕がほぼ鉛直
+    with pytest.raises(OutOfWorkspace, match="J2"):
+        jog_target(CFG, close_to_base, "x", -10)
+    with pytest.raises(OutOfWorkspace, match="J2"):
+        jog_target(CFG, close_to_base, "z", 20)
+    assert jog_target(CFG, close_to_base, "x", 10)[0] == 170.0
 
 
 def test_worker_jogs_one_step_and_sets_speed_once():
@@ -125,18 +153,57 @@ def test_worker_reports_a_move_that_never_arrives():
     class Stuck(DryArm):
         def move_linear(self, x, y, z, r):
             self.moves.append((x, y, z, r))  # 位置は変わらない
-            self.alarm = True
 
     now = [0.0]
     dev = Stuck()
     w = ArmWorker(dev, CFG, clock=lambda: now[0], sleep=lambda s: now.__setitem__(0, now[0] + s))
     w.start()
     try:
-        with pytest.raises(RuntimeError, match="アラーム"):
+        with pytest.raises(RuntimeError, match="届かなかった"):
             w.jog("x", 5)
-        assert dev.stops == 1 and "アラーム" in w.snapshot()["error"]
+        assert dev.stops == 1 and "届かなかった" in w.snapshot()["error"]
     finally:
         w.shutdown()
+
+
+def test_worker_recovers_from_a_range_alarm_and_logs_it(tmp_path):
+    class Limited(DryArm):
+        def move_linear(self, x, y, z, r):
+            self.moves.append((x, y, z, r))  # 本体が途中で止めた
+            self.alarm_codes = [0x22]
+
+    dev = Limited()
+    log = tmp_path / "jog.jsonl"
+    w = ArmWorker(dev, CFG, log_path=log)
+    w.start()
+    try:
+        with pytest.raises(RuntimeError, match="可動範囲の端"):
+            w.jog("x", 5)
+        snap = w.snapshot()
+        assert dev.stops == 1 and dev.alarm_codes == [] and snap["alarms"] == "" and "0x22" in snap["error"]
+    finally:
+        w.shutdown()
+    events = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    jog_event = next(e for e in events if e["event"] == "jog")
+    assert jog_event["from"][:3] == [200.0, 0.0, 50.0] and jog_event["target"] == [205.0, 0.0, 50.0]
+    assert "0x22" in jog_event["result"]
+    assert any(e["event"] == "alarms" and e["codes"] == ["0x22"] for e in events)
+
+
+def test_worker_keeps_a_serious_alarm_until_the_user_clears_it():
+    dev = DryArm()
+    dev.alarm_codes = [0x51]                                            # J2 脱調: 自動では解除しない
+    w = ArmWorker(dev, CFG)
+    w.start()
+    try:
+        with pytest.raises(RuntimeError, match="脱調"):
+            w.jog("x", 5)
+        assert dev.moves == [] and dev.alarm_codes == [0x51]
+        w.clear_alarms()
+        w.jog("x", 5)
+    finally:
+        w.shutdown()
+    assert len(dev.moves) == 1
 
 
 def test_stop_interrupts_a_move_and_drops_earlier_requests():

@@ -53,9 +53,13 @@ Controller for filming (**moves the arm**: forward/back, left/right, up/down in 
 
 One press is one straight step of 1/5/10/20 mm; holding a button or key repeats steps one at a time, so
 the arm never travels more than one step after release. Keys: arrows = forward/back/left/right, W/S =
-up/down, Space = suction, Esc = stop. Targets go through the workspace guard in `config.json`; `--speed`
-(default 30 %) sets the PTP velocity ratio. Directions are in the robot frame and assume the arm was
-homed after power-on.
+up/down, Space = suction, Esc = stop. Targets go through the workspace guard in `config.json` and a
+joint-range check (J2 0–85°, J3 −10–95°, computed from the pose; the model matches the angles the arm
+reports); `--speed` (default 30 %) sets the PTP velocity ratio. Directions are in the robot frame and
+assume the arm was homed after power-on. If the firmware still stops a move with a range alarm (for
+example 0x22, inverse-kinematics limit), the panel stops the queue, clears the alarm and says so; other
+alarms stay until "アラーム解除" is pressed. Every step is logged to `logs/jog_YYYYMMDD.jsonl` (pose,
+joint angles, target, result, alarm codes).
 
 Or step by step:
 

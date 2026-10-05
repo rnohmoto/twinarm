@@ -7,11 +7,14 @@ import pytest
 from twinarm.domain.gripper_feedback import (
     ErrorReflectionLaw,
     ErrorReflectionState,
+    HandAssistLaw,
+    HandAssistState,
     SpringLaw,
     SpringState,
     ThermalGuard,
     VirtualWall,
     error_reflection_step,
+    hand_assist_step,
     spring_step,
     thermal_derate,
     virtual_wall_step,
@@ -380,3 +383,84 @@ def test_virtual_weight_shoulder_can_be_a_pwm_actuator() -> None:
     assert flipped.shoulder_ma == pytest.approx(-150.0)
     # the elbow keeps the current law (M077 default): 0.2943 Nm -> 2016 mA * 0.12 -> cap 120
     assert heavy.elbow_ma == pytest.approx(120.0)
+
+
+# ---------------------------------------------------------------- hand assist
+
+
+def _assist_run(
+    law: HandAssistLaw, positions: list[float], dt: float = 1 / 30
+) -> HandAssistState:
+    state = HandAssistState()
+    for pos in positions:
+        state = hand_assist_step(law, state, pos, dt)
+    return state
+
+
+@pytest.mark.unit
+def test_hand_assist_is_zero_while_the_joint_rests() -> None:
+    law = HandAssistLaw(alpha=1.0, slew_ma=1000)
+
+    state = _assist_run(law, [10.0, 10.0, 10.05, 10.0])
+
+    assert state.command_ma == 0
+
+
+@pytest.mark.unit
+def test_hand_assist_first_frame_only_records_the_position() -> None:
+    law = HandAssistLaw(alpha=1.0, slew_ma=1000)
+
+    state = hand_assist_step(law, HandAssistState(), 55.0, 1 / 30)
+
+    assert state.command_ma == 0
+    assert state.position == 55.0
+
+
+@pytest.mark.unit
+def test_hand_assist_pushes_along_the_motion_and_saturates_at_cap() -> None:
+    law = HandAssistLaw(gain_ma_s=1.5, cap_ma=25, deadband=5.0, alpha=1.0, slew_ma=1000)
+
+    slow = _assist_run(law, [0.0, 0.5])  # 15 units/s -> 1.5 * (15 - 5) = 15 mA
+    fast = _assist_run(law, [0.0, 2.0])  # 60 units/s -> cap
+    back = _assist_run(law, [0.0, -2.0])
+
+    assert slow.command_ma == 15
+    assert fast.command_ma == 25
+    assert back.command_ma == -25
+
+
+@pytest.mark.unit
+def test_hand_assist_invert_flips_the_current() -> None:
+    law = HandAssistLaw(alpha=1.0, slew_ma=1000, invert=True)
+
+    state = _assist_run(law, [0.0, 2.0])
+
+    assert state.command_ma == -law.cap_ma
+
+
+@pytest.mark.unit
+def test_hand_assist_cuts_out_above_the_runaway_speed() -> None:
+    law = HandAssistLaw(alpha=1.0, slew_ma=1000, max_speed=300.0)
+
+    state = _assist_run(law, [0.0, 12.0])  # 360 units/s
+
+    assert state.command_ma == 0
+
+
+@pytest.mark.unit
+def test_hand_assist_limits_the_change_per_frame() -> None:
+    law = HandAssistLaw(cap_ma=25, alpha=1.0, slew_ma=8)
+
+    state = _assist_run(law, [0.0, 2.0])
+
+    assert state.command_ma == 8
+
+
+@pytest.mark.unit
+def test_hand_assist_ignores_a_stalled_clock() -> None:
+    law = HandAssistLaw(alpha=1.0, slew_ma=1000)
+    moving = _assist_run(law, [0.0, 2.0])
+
+    state = hand_assist_step(law, moving, 4.0, 0.0)
+
+    assert state.command_ma == 0

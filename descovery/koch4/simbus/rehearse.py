@@ -413,7 +413,18 @@ def vr2(r):
     """Two players: leader B plus follower B moved by hand (shoulder weight by PWM)."""
     r.change("FB", hand=True, object=None)
     r.write()
-    r.launch("--pair", "B", "--vr", "B", "--vw", "--vr-http", "--no-panel", "--vr2")
+    r.launch(
+        "--pair",
+        "B",
+        "--vr",
+        "B",
+        "--vw",
+        "--vr-http",
+        "--no-panel",
+        "--vr2",
+        "--extra",
+        "--assist elbow_flex,wrist_flex --assist-cap 25",
+    )
     up = wait_http(8444, "/state")
     r.check("ブリッジが応答", up)
     if not up:
@@ -476,6 +487,26 @@ def vr2(r):
         180 in wall and 400 not in wall,
         sorted(set(wall)),
     )
+    assist = [
+        x["value"]
+        for x in recs
+        if x["port"] == "FB"
+        and x.get("motor") == "wrist_flex"
+        and x.get("reg") == "Goal_Current"
+    ]
+    r.check(
+        "2 人目の摩擦アシスト: 手首の電流は上限 25 mA 以内",
+        bool(assist) and max(abs(v) for v in assist) <= 25,
+        sorted(set(assist)),
+    )
+    stray = [
+        x
+        for x in recs
+        if x["port"] == "LB"
+        and x.get("motor") == "wrist_flex"
+        and x.get("reg") == "Goal_Current"
+    ]
+    r.check("摩擦アシストはリーダーには出ない", not stray, len(stray))
     shoulder = (last.get("FB") or {}).get("shoulder_lift", {})
     restored = shoulder.get("mode") == 4 and shoulder.get("goal_pwm") == 885
     r.check("肩: 終了時に位置モードと PWM 上限 885 へ復帰", restored, shoulder)

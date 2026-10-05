@@ -54,6 +54,9 @@ twinarm の descovery/koch4 で VR を実機と Quest Pro で立ち上げます�
 | **通し稽古** `simbus/`（仮想の Dynamixel バス＋`rehearse.py` の 7 シナリオ）: lerobot 0.6.1 の実物の上で、ランチャ・teleop・ブリッジ・パネル・host を起動から終了まで通し、書込みの順序・EEPROM 書込みの拒否・終了時のトルクを検査する | ✅（10/4 夜） | 7 シナリオ・69 項目すべて通過 | Mac で 1 回（CHECKLIST S0）。**実機の挙動は分からない** |
 | **較正の不一致で止まる**: ランチャ配下では lerobot の問い（ENTER でファイルの値を EEPROM に書く）が見えないので、理由を出して終了する。EEPROM は書かない。端末で直接実行したときは従来どおり lerobot が尋ねる | ✅（10/4 夜） | 通し稽古 `mismatch` | 不一致が起きたとき |
 | **握手（A）と VR（B）の同時起動**（端末 2 つ・片方を止めても他方は続く）／VR 1 人はリーダーだけ（`--follower none`。フォロワーは繋がなくてよい）／子プロセスが異常終了したら理由（記録の末尾）を画面に出し、ランチャも異常終了を返す | ✅（10/4 夜） | 通し稽古 `fest`・`vr`・`mismatch` | 実機 |
+| **VR を 2 人が別々に**（10/5・Mac）: リーダー B とフォロワー B を別々の人が手で動かし、それぞれ自分の空間・自分の主観で掴む。ブリッジを腕ごとに 1 つ（1 人目 8444・2 人目 8443、2 人目の分身の設定は `config/solo_F/`）。入口は `mac/koch.sh`（`handshake`／`vr-leader`／`vr-follower`／`all`／`status`／`stop`）と、同じフォルダの `.command`（Finder でダブルクリック） | ✅（10/5） | — | Mac のブラウザ 2 枚で 2 本同時に動作（ユーザー確認: 2 人目の分身の向きと肩の可動域）。Quest 2 台は未接続。`.command` と `all` からの実機起動は未実施 |
+| **摩擦アシスト**（10/5）`--assist elbow_flex,wrist_flex`: 手で動かすフォロワー機は減速比 288:1 で、力を出していなくても重い（ユーザー報告 10/5）。動かしている向きへ小さな電流を足す（上限 `--assist-cap` 既定 25 mA・最大 80）。向きが逆なら `--assist-invert`。肩と土台（XL430）は対象外 | ✅（10/5） | — | domain テスト 7 件・通し稽古 `vr2`（手首の電流が上限以内・リーダーには出ない）。**実機未検証**（軽くなるか・手を離して止まるか・向き） |
+| **VR ページの関節名**（10/5）: 分身の各関節に名札（1 土台の回転〜6 グリッパ）、HUD に関節ごとの読み値と分身の角度。`J` で切替 | ✅（10/5） | — | 2 人目の分身合わせで使用（ユーザー） |
 | 分身の見せ方 G（実体／半透明／指先だけ・AR のとき）・一人称プレビュー V（モニタ用・既定）・観客ページ `?spectator=1` | ✅ | Chrome | — |
 | アラート（上限・過負荷停止・温度・重さ上限・通信断・壁解除・未接続→VR 赤帯／パネル赤チップ。2 本のときは `[B]` `[F]` 付き） | ✅ | sim で赤帯目視 | 実機で各条件 |
 | 腕 3 軸反力 `--ff arm` | ✅（旧実装） | — | 実機未検証（フェスでは使わない） |
@@ -126,6 +129,7 @@ uv run python koch4/koch4_dual_launch.py --init       # config/koch4_config.json
 ```
 握手用 Mac: フォロワーを USB で挿し `./koch4/start.sh host A <port>`（B は `host B <port>`）。起動時に、操作者側の設定に書く宛先（IP と 9101／9102）を表示する。
 操作者側 Mac: config の `follower_host` に `udp://<IP>:9101` → `uv run python koch4/koch4_dual_launch.py --ff gripper`。有線に戻す＝`--follower wired`。
+Mac でダブルクリック起動: `koch4/mac/` の `.command`（全部起動／握手 A／VR 1 人目／VR 2 人目／動作確認／全部停止）。中身は `./koch4/mac/koch.sh <名前>`。握手は差分反射式（`--ff-style error`・フリーなら戻らない。10/5 にユーザーが戻りバネ式を「フリーなのに戻るのはおかしい」と指摘）。
 握手: `./koch4/start.sh handshake`（ペア A だけなら `--pair A` を足す）。VR（USB・1 人）: `./koch4/start.sh vr`（＝`koch4_dual_launch.py --pair B --vr B --vw --vr-http --no-panel --follower none`＋12 秒後に `koch4_quest_usb.py --port 8444`）。
 VR（2 人）: `./koch4/start.sh vr2`（`--vr2` を足す。フォロワー機は接続直後にトルクが抜けるので手で支える）。初回の重さは `./koch4/start.sh vr2 --extra "--vw-cap 60 --vw-pwm-cap 80"` で。
 `git pull` が `koch4_twin.json` の手元の変更で止まったら `git stash` → `git pull`（旧形式の内容は新形式に読み込める）。

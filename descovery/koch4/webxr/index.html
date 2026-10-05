@@ -56,6 +56,9 @@ const DEFAULTS = {
 };
 let CONFIG = structuredClone(DEFAULTS);
 const JOINTS = ['shoulder_pan','shoulder_lift','elbow_flex','wrist_flex','wrist_roll'];
+// 画面に出す関節名（根本から 1〜5 番目のサーボ＋グリッパ）。J キーで表示を切替え
+const JOINT_NAMES = { shoulder_pan:'1 土台の回転', shoulder_lift:'2 肩', elbow_flex:'3 肘', wrist_flex:'4 手首の曲げ', wrist_roll:'5 手首の回転', gripper:'6 グリッパ' };
+let showNames = true;
 const GAP_MIN = 0.010, GAP_MAX = 0.040;                 // twin の指間隔 [m]（開き 0→100）
 const gapAt = w => GAP_MIN + (GAP_MAX - GAP_MIN) * w / 100;
 const REACH_MARGIN = 0.03;                              // 指先中点がこの距離まで寄れば「手の中」
@@ -85,6 +88,13 @@ const ARM_COLORS = { koch_leader: 0xd97706, koch_follower: 0x2563eb };
 const box = (w,h,d,m) => new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m);
 const cyl = (r,h,m) => new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,20), m);
 let arms = {};                                          // id -> twin
+function nameTag(text){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+  const g = c.getContext('2d'); g.fillStyle = 'rgba(15,23,42,.82)'; g.fillRect(0, 0, 512, 96);
+  g.fillStyle = '#fde68a'; g.font = 'bold 44px sans-serif'; g.textBaseline = 'middle'; g.fillText(text, 16, 50);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest:false }));
+  sp.scale.set(0.12, 0.0225, 1); sp.renderOrder = 10; return sp;
+}
 function makeArm(id, cfg){
   const mats = {
     base: new THREE.MeshStandardMaterial({ color:0xe2e8f0, roughness:.6 }),
@@ -110,7 +120,10 @@ function makeArm(id, cfg){
   const tipRing = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.003, 10, 28), new THREE.MeshBasicMaterial({ color: ARM_COLORS[cfg.model] ?? 0xd97706 }));
   tipRing.rotation.x = Math.PI/2; tipRing.position.y = 0.065; jWristR.add(tipRing);
   const meshes = []; group.traverse(o => { if (o.isMesh && o !== tipRing) meshes.push(o); });
-  return { id, cfg, group, jPan, jLift, jElbow, jWristF, jWristR, fingerL, fingerR, tip, tipRing, mats, meshes,
+  // 関節名の札（各関節の横。分身の見せ方 G の対象外）
+  const tags = [[jPan,'shoulder_pan'],[jLift,'shoulder_lift'],[jElbow,'elbow_flex'],[jWristF,'wrist_flex'],[jWristR,'wrist_roll'],[tip,'gripper']].map(([node, j]) => {
+    const t = nameTag(JOINT_NAMES[j]); t.position.set(0.085, 0, 0); node.add(t); return t; });
+  return { id, cfg, group, jPan, jLift, jElbow, jWristF, jWristR, fingerL, fingerR, tip, tipRing, mats, meshes, tags,
            forced:null, lastSent:null, lastSentAt:0, sendStatus: SPECTATOR ? '観客(送信なし)' : '未送信', current:null,
            hist:[] };
 }
@@ -321,6 +334,7 @@ function applyPose(tms){
     arm.jWristF.rotation.x = normToRad(jm, 'wrist_flex', s.pos.wrist_flex ?? 0);
     arm.jWristR.rotation.y = normToRad(jm, 'wrist_roll', s.pos.wrist_roll ?? 0);
     const half = gapAt(s.open) / 2; arm.fingerL.position.x = -half; arm.fingerR.position.x = half;
+    const tagsOn = showNames && !renderer.xr.isPresenting; for (const t of arm.tags) t.visible = tagsOn;
     arm.group.updateMatrixWorld(true);
     // 指先の位置（1 本目ローカル）と履歴（投げる速度用）
     arm.tip.getWorldPosition(tipW); p.group.worldToLocal(tipL.copy(tipW));
@@ -347,6 +361,9 @@ function applyPose(tms){
     const vwTxt = s.vw ? ` / 重さ ${Object.entries(s.vw).map(([j,v]) => `${j === 'shoulder_lift' ? '肩' : '肘'}${v}${s.vwUnit[j] || 'mA'}`).join('・')}` : '';
     const srcTxt = s.src === 'teleop' ? '実機' : s.src === 'sim' ? 'シミュレータ' : s.src === 'demo' ? '内蔵デモ' : '停止中';
     lines.push(`<span class="arm">${arm.id === selArm ? '▶' : '　'}${arm.id} ${arm.cfg.label}</span> ${srcTxt} 開き ${s.open.toFixed(0)} / ${objTxt}${vwTxt}` + (arm.forced ? ' <b>強制</b>' : '') + (SPECTATOR ? '' : ` / ${arm.sendStatus}`));
+    if (showNames && arm.id === (arms[selArm] ? selArm : primaryId())) {   // 関節ごとの読み値と分身の角度
+      for (const j of JOINTS) { const v = s.pos[j] ?? 0; lines.push(`　${JOINT_NAMES[j]} <span style="color:#94a3b8">${j}</span>: 読み値 ${v.toFixed(1)} → 分身 ${(normToRad(jm, j, v) * 180 / Math.PI).toFixed(0)}°`); }
+    }
   }
   for (const o of objs) stepPhysics(o, dt);
   collideObjects();
@@ -358,7 +375,7 @@ function applyPose(tms){
   alertBox.textContent = alerts.join('　|　');
   const view = renderer.xr.isPresenting ? (arActive ? 'AR(パススルー)' : 'VR') : (inlineView === 'fps' ? '一人称(モニタ用)' : '俯瞰');
   hudMode.innerHTML = lines.join('<br>') + `<br>表示: ${view}` + (calib.on ? ' / <b>位置合わせ中</b>' : '') + (SPECTATOR ? ' / <b>観客モード</b>' : '')
-    + `<br>キー: 1-3 強制 0 解除 R 配置 E 編集 C 位置合わせ G 分身の見せ方 V 視点 S 音 Tab 腕切替`;
+    + `<br>キー: 1-3 強制 0 解除 R 配置 E 編集 C 位置合わせ G 分身の見せ方 V 視点 J 関節名 S 音 Tab 腕切替`;
 }
 
 // ───────── インラインの視点: 一人称（モニタ向け・既定）／俯瞰オービット ─────────
@@ -520,6 +537,7 @@ addEventListener('keydown', e => {
   if (e.key === 'g' || e.key === 'G') cycleGhost();
   if (e.key === 'v' || e.key === 'V') { inlineView = inlineView === 'fps' ? 'orbit' : 'fps'; updateCam(); }
   if (e.key === 's' || e.key === 'S') { CONFIG.scene.sound = !CONFIG.scene.sound; }
+  if (e.key === 'j' || e.key === 'J') { showNames = !showNames; }
   if (e.key === 'Tab') { e.preventDefault(); selectNextArm(); }
   const i = parseInt(e.key, 10) - 1; if (i >= 0 && i < objs.length) setForced(arm, objs[i]);
 });
@@ -551,7 +569,7 @@ function buildEditor(){
   const hj = document.createElement('h3'); hj.textContent = `腕 ${arm.id} の関節（表示スパン°・オフセット°・向き）`; editor.appendChild(hj);
   JOINTS.forEach(j => {
     const m = arm.cfg.joints[j];
-    const d = document.createElement('div'); d.className = 'row'; d.innerHTML = `<label>${j}</label>`;
+    const d = document.createElement('div'); d.className = 'row'; d.innerHTML = `<label style="width:96px">${JOINT_NAMES[j]}</label>`;
     const span = document.createElement('input'); span.type = 'number'; span.step = 5; span.value = m.span_deg; span.title = 'span_deg'; span.oninput = () => { m.span_deg = parseFloat(span.value) || m.span_deg; };
     const off = document.createElement('input'); off.type = 'number'; off.step = 1; off.value = m.offset_deg; off.title = 'offset_deg'; off.oninput = () => { m.offset_deg = parseFloat(off.value) || 0; };
     const sg = document.createElement('select'); sg.innerHTML = '<option value="1">+</option><option value="-1">−</option>'; sg.value = String(m.sign); sg.onchange = () => { m.sign = parseInt(sg.value, 10); };

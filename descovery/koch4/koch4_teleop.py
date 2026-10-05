@@ -13,6 +13,10 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
     腕 5 軸のトルクを抜き、gripper だけ Mode 5 の壁にする。重さは肘（XL330-M288・電流制御）と
     肩（XL430-W250・電流制御が無いので PWM＝電圧制御モード。握っている間だけトルク ON）。
     Kt と握りの上限は M288 用に自動で換算。`--vw-pwm-cap 0` で肩の PWM を使わない
+  * `--assist elbow_flex,wrist_flex`: 上の入力装置の摩擦アシスト。減速比 288:1 の軸は力を
+    出していなくても重いので、動かしている向きへ小さな電流を足す（速度×`--assist-gain`・
+    上限 `--assist-cap` mA・不感帯・速すぎるときは切る）。向きが逆なら重くなるだけなので
+    `--assist-invert` で反転。実機未検証。上限は小さい値から
   * `--ff vwall`: 仮想物体（VR ブリッジ or `--wall` 固定指定）の反力。壁の描画は
     サーボ内部の位置ループに任せ（Operating_Mode 5・Goal_Position=壁・Goal_Current=上限・
     Position_P_Gain=硬さ）、ホストは「壁に触れているか」だけを 30fps で切り替える
@@ -120,6 +124,14 @@ FF_GRIPPER_P_GAIN = 800
 FF_CAP_MAX_MA = 900
 FF_CAP_WARN_MA = 500
 ARM_CAP_MAX_MA = 400
+ASSIST_JOINTS = [
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+]  # 手で動かすフォロワー機の XL330-M288(電流制御できる軸)
+ASSIST_CAP_MAX_MA = (
+    80  # 摩擦アシストの上限。関節の摩擦より大きいと手を離しても動き続ける
+)
 PWM_CAP_MAX = 400  # 肩 PWM の上限(885 = 100 %)。400 ≈ 45 % ≈ 0.68 N*m
 PWM_LIMIT_DEFAULT = 885
 MODE_PWM = 16
@@ -376,6 +388,58 @@ def virtual_weight_step(law, state, engaged, mass_g, levers_m):
     )
 
 
+@dataclass(frozen=True)
+class HandAssistLaw:
+    """Cancel part of the gear friction of a joint that a person moves by hand.
+
+    A Koch follower used as a hand-moved input device has 288:1 gears (XL330-M288),
+    so it feels heavy even with no force commanded. The law adds a small current
+    along the measured motion: ``gain_ma_s`` mA per normalized unit/s above
+    ``deadband``, capped at ``cap_ma``. The cap must stay below the joint's own
+    friction, otherwise the joint keeps moving after the hand lets go; above
+    ``max_speed`` (nobody moves it that fast on purpose) the assist cuts out.
+    ``invert`` flips the current for a joint whose positive current lowers the
+    normalized position.
+    """
+
+    gain_ma_s: float = 1.5
+    cap_ma: int = 25
+    deadband: float = 5.0
+    max_speed: float = 300.0
+    alpha: float = 0.4
+    slew_ma: int = 8
+    invert: bool = False
+
+
+@dataclass(frozen=True)
+class HandAssistState:
+    """Last position, smoothed speed [normalized unit/s] and commanded current [mA]."""
+
+    position: float | None = None
+    speed: float = 0.0
+    command_ma: int = 0
+
+
+def hand_assist_step(law, state, position, dt):
+    """Advance the assist by one frame from the joint's normalized position."""
+    if state.position is None or dt <= 0.0:
+        return HandAssistState(position=position)
+    speed = (1.0 - law.alpha) * state.speed + law.alpha * (
+        position - state.position
+    ) / dt
+    magnitude = abs(speed)
+    if magnitude <= law.deadband or magnitude > law.max_speed:
+        target = 0.0
+    else:
+        target = min(law.gain_ma_s * (magnitude - law.deadband), law.cap_ma)
+        if (speed < 0.0) != law.invert:
+            target = -target
+    command = max(
+        min(target, state.command_ma + law.slew_ma), state.command_ma - law.slew_ma
+    )
+    return HandAssistState(position=position, speed=speed, command_ma=round(command))
+
+
 # ================================================================ helpers
 
 
@@ -452,9 +516,20 @@ def selftest():
         light,
         heavy,
     )
+    assist = HandAssistLaw(alpha=1.0, slew_ma=1000)
+    a0 = hand_assist_step(assist, HandAssistState(), 0.0, 1 / 30)
+    slow = hand_assist_step(assist, a0, 0.5, 1 / 30)
+    fast = hand_assist_step(assist, a0, 2.0, 1 / 30)
+    wild = hand_assist_step(assist, a0, -12.0, 1 / 30)
+    assert (a0.command_ma, slow.command_ma, fast.command_ma, wild.command_ma) == (
+        0,
+        15,
+        25,
+        0,
+    ), (slow, fast, wild)
     selftest_pwm_joints()
     print(
-        "selftest OK: spring/error/vwall/weight/thermal 制御則は twinarm domain と同じ値"
+        "selftest OK: spring/error/vwall/weight/assist/thermal 制御則は twinarm domain と同じ値"
         "・肩 PWM の書込み順序"
     )
 
@@ -1311,6 +1386,35 @@ def build_parser():
         help="重さの向きが逆の関節をカンマ列挙(shoulder_lift,elbow_flex)",
     )
     ap.add_argument(
+        "--assist",
+        default="",
+        help="摩擦アシストを入れる関節をカンマ列挙(elbow_flex,wrist_flex,wrist_roll)。"
+        "--leader-type koch_follower のときだけ有効",
+    )
+    ap.add_argument(
+        "--assist-cap",
+        type=int,
+        default=25,
+        help=f"摩擦アシストの電流上限[mA](最大{ASSIST_CAP_MAX_MA})。小さい値から",
+    )
+    ap.add_argument(
+        "--assist-gain",
+        type=float,
+        default=1.5,
+        help="摩擦アシストの強さ[mA/(正規化unit/s)]",
+    )
+    ap.add_argument(
+        "--assist-deadband",
+        type=float,
+        default=5.0,
+        help="摩擦アシストの不感帯[正規化unit/s](止まっているときに出さない)",
+    )
+    ap.add_argument(
+        "--assist-invert",
+        default="",
+        help="アシストで逆に重くなる関節をカンマ列挙で反転",
+    )
+    ap.add_argument(
         "--follower-grip-ma",
         type=int,
         default=None,
@@ -1421,6 +1525,16 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         vw_joints = [j for j in vw_joints if j not in pwm_spec]
         pwm_spec = {}
     cur_joints = [j for j in vw_joints if j not in pwm_spec]  # 電流制御で重さを書く軸
+    assist_joints = [
+        j for j in (x.strip() for x in args.assist.split(",")) if j in ASSIST_JOINTS
+    ]
+    if assist_joints and args.leader_type != "koch_follower":
+        print(
+            "[assist] 摩擦アシストは --leader-type koch_follower のときだけ(この腕では無効)"
+        )
+        assist_joints = []
+    args.assist_cap = max(0, min(args.assist_cap, ASSIST_CAP_MAX_MA))
+    assist_invert = {x.strip() for x in args.assist_invert.split(",") if x.strip()}
     if args.ff_cap > FF_CAP_MAX_MA:
         args.ff_cap = FF_CAP_MAX_MA
         print(f"[ff] cap は安全のため最大{FF_CAP_MAX_MA}mAに制限しました")
@@ -1553,6 +1667,12 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         print(
             f"[vw] ⚠ 仮想重さON: 握っている間だけ {vw_joints} に力が出る。腕から手を離さない"
         )
+    if assist_joints:
+        setup_arm_ff(teleop, assist_joints)
+        print(
+            f"[assist] ⚠ 摩擦アシストON {assist_joints}: 動かした向きへ最大 {args.assist_cap}mA。"
+            "手を離して動き続けるなら --assist-cap を下げる"
+        )
     wall = [args.wall]  # 現在の仮想物体(None=自由空間)
     wall_cmd = [None]  # 最後に書いた WallCommand
     wall_expire = [
@@ -1575,6 +1695,11 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     reconnects = [0]
     vw_state = [VirtualWeightState()]
     vw_out = {j: 0 for j in VW_JOINTS}
+    assist_state = {j: HandAssistState() for j in assist_joints}
+    assist_out = dict.fromkeys(assist_joints, 0)  # 法則が出した電流
+    # 重さと別に自分で書いた電流(None=重さ側が書いている)
+    assist_sent: dict[str, int | None] = dict.fromkeys(assist_joints, 0)
+    assist_t = [None]
     twin_map = {j: JointMap(JOINT_SPAN_DEG[j]) for j in JOINT_SPAN_DEG}
     alerts = {}  # key -> (text, expire_monotonic): パネル・VR HUD に出す警告
     hw_bits = {"L": 0, "F": 0}
@@ -1682,12 +1807,46 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             )
         wall_cmd[0] = cmd
 
+    def rearm_assist(joints):
+        """Put assist joints back in zero-current control (after a release or reconnect)."""
+        if joints:
+            setup_arm_ff(teleop, joints)
+        for j in joints:
+            assist_state[j], assist_out[j], assist_sent[j] = HandAssistState(), 0, 0
+        assist_t[0] = None
+
+    def assist_feedback(action):
+        """One frame of friction assist on the hand-moved joints."""
+        now = time.perf_counter()
+        dt = 0.0 if assist_t[0] is None else now - assist_t[0]
+        assist_t[0] = now
+        weight_owns = cur_joints if (vw_on and vwall_on) else []
+        for j in assist_joints:
+            law = HandAssistLaw(
+                gain_ma_s=args.assist_gain,
+                cap_ma=args.assist_cap,
+                deadband=args.assist_deadband,
+                invert=j in assist_invert,
+            )
+            assist_state[j] = hand_assist_step(
+                law, assist_state[j], float(action.get(f"{j}.pos", 0.0)), dt
+            )
+            out = assist_out[j] = assist_state[j].command_ma
+            if j in weight_owns:  # 重さと同じレジスタ: weight_feedback が足して書く
+                assist_sent[j] = None
+                continue
+            last = assist_sent[j]
+            if last is None or abs(out - last) >= 2 or (out == 0 and last != 0):
+                teleop.bus.write("Goal_Current", j, out, normalize=False)
+                assist_sent[j] = out
+
     def stop_weight():
         """Drop the weight currents and free the lift/elbow joints."""
         nonlocal vw_on
         if vw_on:
             release_arm(teleop.bus, cur_joints)
             pwm.release()
+            rearm_assist([j for j in cur_joints if j in assist_joints])
         vw_on = False
         vw_state[0] = VirtualWeightState()
         for j in VW_JOINTS:
@@ -1924,6 +2083,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             ):  # XL430: PWM(トルク ON/OFF の順序は PwmWeightJoints が持つ)
                 vw_out[j] = pwm.write(j, out)
                 continue
+            out += assist_out.get(j, 0)  # 摩擦アシスト(同じ Goal_Current に足す)
             if abs(out - vw_out[j]) >= 3 or (out == 0 and vw_out[j] != 0):
                 teleop.bus.write("Goal_Current", j, out, normalize=False)
                 vw_out[j] = out
@@ -2084,6 +2244,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             check_follower_grip_alert(cur)
             if remote_follower:
                 check_link_alert()
+        if assist_joints:
+            assist_feedback(action)
         if ff_on:
             gripper_feedback(action, cur, fpos)
         elif vwall_on:
@@ -2125,6 +2287,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             vw_state[0] = VirtualWeightState()
             for j in VW_JOINTS:
                 vw_out[j] = 0
+        rearm_assist(assist_joints)
         apply_follower_grip_cap(robot, args.follower_grip_ma)
         spring[0], erefl[0], ff_ma[0], wall_cmd[0] = (
             SpringState(),
@@ -2172,6 +2335,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             if vw_on:
                 release_arm(teleop.bus, cur_joints)
                 pwm.release()
+            if assist_joints:
+                release_arm(teleop.bus, assist_joints)
         except Exception:  # noqa: BLE001, S110 - the bus may already be gone
             pass
         if fcsv:

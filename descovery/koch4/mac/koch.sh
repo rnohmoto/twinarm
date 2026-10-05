@@ -52,6 +52,8 @@ for a in sys.argv[1:]:
         kind = socket.SOCK_STREAM
         continue
     s = socket.socket(socket.AF_INET, kind)
+    if kind == socket.SOCK_STREAM:  # 止めた直後の TIME_WAIT を「使用中」と数えない
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         s.bind(("127.0.0.1", int(a)))
     except OSError:
@@ -96,11 +98,12 @@ run_hand() {  # run_hand <名前> <機種> <腕の役> <ブリッジ HTTP> <テ�
   "$PY" koch4/koch4_vr_bridge.py --arms "$label" --models "$model" --telemetry "$viz" --ctl-port "$ctl" --port "$http" \
     --config-dir "$cfg" --work-dir "$koch4/work" --http >> "$koch4/work/logs/solo_${label}_vr.log" 2>&1 &
   bridge=$!
-  trap 'kill "$bridge" 2>/dev/null || true' EXIT
+  trap 'kill "$bridge" 2>/dev/null || true' EXIT INT TERM HUP   # 窓を閉じても Ctrl+C でもブリッジを残さない
   open_later 10 "http://localhost:${http}/"
   "$PY" koch4/koch4_teleop.py --leader-port "$port" --leader-id "koch_${role}_${PAIR}" --leader-type "$model" \
     --follower-port none --config-dir "$koch4/config" --work-dir "$koch4/work" \
-    --viz-port "$viz" --ctl-port "$ctl" --ff vwall --arm-label "$label" --vw --vw-cap 60 --vw-invert "$inv" "$@"
+    --viz-port "$viz" --ctl-port "$ctl" --ff vwall --arm-label "$label" --vw --vw-cap 60 --vw-invert "$inv" "$@" || true
+  kill "$bridge" 2>/dev/null || true
 }
 
 usage() { sed -n '2,16p' "$here/koch.sh" | sed 's/^# \{0,1\}//'; }

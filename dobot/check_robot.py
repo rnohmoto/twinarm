@@ -47,7 +47,7 @@ def main(argv=None) -> int:
 
     if args.list:
         cands = PydobotRobot.list_candidate_ports()
-        print("候補ポート:", ", ".join(cands) if cands else "なし（CP210x ドライバ・ケーブル・電源を確認）")
+        print("候補ポート:", ", ".join(cands) if cands else "なし（ケーブル・電源・ドライバを確認。Mac は種類を読めないことがあるので ls /dev/cu.usbserial-* も見る）")
         print("→ 使うポートは --port で明示する（自動では選ばない）")
         return 0
 

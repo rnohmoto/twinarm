@@ -338,7 +338,7 @@ function applyPose(tms){
     arm.jWristF.rotation.x = normToRad(jm, 'wrist_flex', s.pos.wrist_flex ?? 0);
     arm.jWristR.rotation.y = normToRad(jm, 'wrist_roll', s.pos.wrist_roll ?? 0);
     const half = gapAt(s.open) / 2; arm.fingerL.position.x = -half; arm.fingerR.position.x = half;
-    const tagsOn = showNames && !renderer.xr.isPresenting && inlineView !== 'macro';   // 接写では名札が物体を隠す for (const t of arm.tags) t.visible = tagsOn;
+    const tagsOn = showNames && !renderer.xr.isPresenting && inlineView !== 'macro' && inlineView !== 'hand';   // 接写・手先カメラでは名札が邪魔 for (const t of arm.tags) t.visible = tagsOn;
     arm.group.updateMatrixWorld(true);
     // 指先の位置（1 本目ローカル）と履歴（投げる速度用）
     arm.tip.getWorldPosition(tipW); p.group.worldToLocal(tipL.copy(tipW));
@@ -385,14 +385,13 @@ function applyPose(tms){
 
 // ───────── インラインの視点: 一人称（モニタ向け・既定）／俯瞰オービット ─────────
 // V で切替え。URL に ?view=top のように書くと、その視点で開く（モニタを並べるとき。観客ページ ?spectator=1 と併用）
-const VIEW_NAMES = { fps:'一人称(モニタ用)', top:'俯瞰(指先に連動)', macro:'接写(物体の前・固定)', orbit:'俯瞰(ドラッグで回す)' };
-const VIEW_ORDER = ['fps', 'top', 'macro', 'orbit'];
+const VIEW_NAMES = { fps:'一人称(モニタ用)', hand:'手先カメラ', top:'俯瞰(真上・固定)', macro:'接写(物体の前・固定)', orbit:'俯瞰(ドラッグで回す)' };
+const VIEW_ORDER = ['fps', 'hand', 'top', 'macro', 'orbit'];
 const viewParam = new URLSearchParams(location.search).get('view');
 let inlineView = VIEW_ORDER.includes(viewParam) ? viewParam : 'fps';
 const camTip = new THREE.Vector3(), camGoal = new THREE.Vector3(), camLook = new THREE.Vector3();
-let camFollow = null, followStamp = -1;
-// 画面の割り方（M で切替え・?layout=）: pip=主画面＋右に小窓 2 つ（俯瞰・接写） / split=俯瞰と接写を左右に / single=主画面だけ
-const LAYOUT_NAMES = { pip:'主画面＋小窓(俯瞰・接写)', split:'俯瞰｜接写', single:'1 画面' };
+// 画面の割り方（M で切替え・?layout=）: pip=主画面＋右に小窓 2 つ（手先カメラ・接写） / split=手先カメラと接写を左右に / single=主画面だけ
+const LAYOUT_NAMES = { pip:'主画面＋小窓(手先カメラ・接写)', split:'手先カメラ｜接写', single:'1 画面' };
 const LAYOUT_ORDER = ['pip', 'split', 'single'];
 const layoutParam = new URLSearchParams(location.search).get('layout');
 let layout = LAYOUT_ORDER.includes(layoutParam) ? layoutParam : (viewParam ? 'single' : 'pip');
@@ -411,14 +410,14 @@ function renderInline(){
   paneA.style.display = paneB.style.display = 'none';
   if (layout === 'split') {
     const w = Math.floor(W / 2);
-    setTags(false); drawPane(camTop, 'top', paneA, 0, 0, w, H); drawPane(camMacro, 'macro', paneB, w, 0, W - w, H); setTags(null);
+    setTags(false); drawPane(camTop, 'hand', paneA, 0, 0, w, H); drawPane(camMacro, 'macro', paneB, w, 0, W - w, H); setTags(null);
     renderer.setScissorTest(false); return;
   }
   camera.aspect = W / H; camera.updateProjectionMatrix();
   renderer.render(scene, camera);
   if (layout === 'pip') {
     const w = Math.round(Math.min(W * 0.30, 420)), h = Math.round(w * 0.68), m = 10;
-    setTags(false); drawPane(camTop, 'top', paneA, W - w - m, H - h - m, w, h); drawPane(camMacro, 'macro', paneB, W - w - m, H - 2*h - 2*m, w, h); setTags(null);
+    setTags(false); drawPane(camTop, 'hand', paneA, W - w - m, H - h - m, w, h); drawPane(camMacro, 'macro', paneB, W - w - m, H - 2*h - 2*m, w, h); setTags(null);
     renderer.setScissorTest(false);
   }
 }
@@ -437,14 +436,18 @@ function placeCam(camera, inlineView){   // 指定のカメラを、指定の視
     camera.lookAt(b.x + 0.20*fx, b.y + 0.05, b.z + 0.20*fz);
     return;
   }
-  if (inlineView === 'top' && p) {   // 真上から。指先を追い、腕が伸びる向きが画面の上
-    const yawR = rad(b.yaw_deg);
-    p.tip.getWorldPosition(camTip);
-    if (!camFollow) camFollow = camTip.clone(); else if (followStamp !== lastFrame) camFollow.lerp(camTip, 0.12);
-    followStamp = lastFrame;
-    camera.up.set(Math.sin(yawR), 0, Math.cos(yawR));
-    camera.position.set(camFollow.x, b.y + 0.60, camFollow.z);
-    camera.lookAt(camFollow.x, b.y, camFollow.z);
+  if (inlineView === 'top') {   // 真上から・固定（動くと酔う）。台座の 15 cm 先を中心に、腕が伸びる向きが画面の上
+    const yawR = rad(b.yaw_deg), fx = Math.sin(yawR), fz = Math.cos(yawR);
+    camera.up.set(fx, 0, fz);
+    camera.position.set(b.x + 0.15*fx, b.y + 0.75, b.z + 0.15*fz);
+    camera.lookAt(b.x + 0.15*fx, b.y, b.z + 0.15*fz);
+    return;
+  }
+  if (inlineView === 'hand' && p) {   // 手先カメラ: 手の甲の少し上・後ろから指先の先を見る（手首と一緒に動く）
+    p.group.updateMatrixWorld(true);
+    camGoal.set(0, -0.03, -0.05); camLook.set(0, 0.16, 0.01); camTip.set(0, 0, -1);
+    p.jWristR.localToWorld(camGoal); p.jWristR.localToWorld(camLook); camTip.transformDirection(p.jWristR.matrixWorld);
+    camera.up.copy(camTip); camera.position.copy(camGoal); camera.lookAt(camLook);
     return;
   }
   if (inlineView === 'macro' && p && objs.length) {   // 物体の向こう側の低い位置に固定して、近づく指先を正面から

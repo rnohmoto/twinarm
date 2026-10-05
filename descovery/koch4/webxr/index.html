@@ -334,7 +334,7 @@ function applyPose(tms){
     arm.jWristF.rotation.x = normToRad(jm, 'wrist_flex', s.pos.wrist_flex ?? 0);
     arm.jWristR.rotation.y = normToRad(jm, 'wrist_roll', s.pos.wrist_roll ?? 0);
     const half = gapAt(s.open) / 2; arm.fingerL.position.x = -half; arm.fingerR.position.x = half;
-    const tagsOn = showNames && !renderer.xr.isPresenting; for (const t of arm.tags) t.visible = tagsOn;
+    const tagsOn = showNames && !renderer.xr.isPresenting && inlineView !== 'macro';   // 接写では名札が物体を隠す for (const t of arm.tags) t.visible = tagsOn;
     arm.group.updateMatrixWorld(true);
     // 指先の位置（1 本目ローカル）と履歴（投げる速度用）
     arm.tip.getWorldPosition(tipW); p.group.worldToLocal(tipL.copy(tipW));
@@ -373,20 +373,44 @@ function applyPose(tms){
   }
   alertBox.style.display = alerts.length ? 'block' : 'none';
   alertBox.textContent = alerts.join('　|　');
-  const view = renderer.xr.isPresenting ? (arActive ? 'AR(パススルー)' : 'VR') : (inlineView === 'fps' ? '一人称(モニタ用)' : '俯瞰');
+  const view = renderer.xr.isPresenting ? (arActive ? 'AR(パススルー)' : 'VR') : VIEW_NAMES[inlineView];
   hudMode.innerHTML = lines.join('<br>') + `<br>表示: ${view}` + (calib.on ? ' / <b>位置合わせ中</b>' : '') + (SPECTATOR ? ' / <b>観客モード</b>' : '')
     + `<br>キー: 1-3 強制 0 解除 R 配置 E 編集 C 位置合わせ G 分身の見せ方 V 視点 J 関節名 S 音 Tab 腕切替`;
 }
 
 // ───────── インラインの視点: 一人称（モニタ向け・既定）／俯瞰オービット ─────────
-let inlineView = 'fps';
+// V で切替え。URL に ?view=top のように書くと、その視点で開く（モニタを並べるとき。観客ページ ?spectator=1 と併用）
+const VIEW_NAMES = { fps:'一人称(モニタ用)', top:'俯瞰(指先に連動)', macro:'接写(物体の前・固定)', orbit:'俯瞰(ドラッグで回す)' };
+const VIEW_ORDER = ['fps', 'top', 'macro', 'orbit'];
+const viewParam = new URLSearchParams(location.search).get('view');
+let inlineView = VIEW_ORDER.includes(viewParam) ? viewParam : 'fps';
+const camTip = new THREE.Vector3(), camGoal = new THREE.Vector3(), camLook = new THREE.Vector3();
+let camFollow = null;
 let yaw = 0.6, pitch = 0.35, dist = 0.9, dragging = false, px = 0, py = 0;
 function updateCam(){
+  camera.up.set(0, 1, 0); if (inlineView !== 'top') camFollow = null;
   const p = prim(); const b = p ? p.cfg.base : { x:0, y:0.75, z:-0.6, yaw_deg:0 };
   if (inlineView === 'fps') {   // 操作者の頭の位置から: 台座の後ろ 40 cm・上 40 cm に立ち、腕が伸びる向き（腕のローカル +z）を見る
     const yawR = rad(b.yaw_deg), fx = Math.sin(yawR), fz = Math.cos(yawR);
     camera.position.set(b.x - 0.40*fx, b.y + 0.40, b.z - 0.40*fz);
     camera.lookAt(b.x + 0.20*fx, b.y + 0.05, b.z + 0.20*fz);
+    return;
+  }
+  if (inlineView === 'top' && p) {   // 真上から。指先を追い、腕が伸びる向きが画面の上
+    const yawR = rad(b.yaw_deg);
+    p.tip.getWorldPosition(camTip);
+    if (!camFollow) camFollow = camTip.clone(); else camFollow.lerp(camTip, 0.12);
+    camera.up.set(Math.sin(yawR), 0, Math.cos(yawR));
+    camera.position.set(camFollow.x, b.y + 0.60, camFollow.z);
+    camera.lookAt(camFollow.x, b.y, camFollow.z);
+    return;
+  }
+  if (inlineView === 'macro' && p && objs.length) {   // 物体の向こう側の低い位置に固定して、近づく指先を正面から
+    camLook.set(0, 0, 0);
+    for (const o of objs) { camLook.x += o.cfg.spot[0] / objs.length; camLook.z += o.cfg.spot[2] / objs.length; }
+    camGoal.set(camLook.x, 0.08, camLook.z + 0.20); camLook.y = 0.035;
+    p.group.localToWorld(camGoal); p.group.localToWorld(camLook);
+    camera.position.copy(camGoal); camera.lookAt(camLook);
     return;
   }
   const target = new THREE.Vector3(b.x, b.y + 0.1, b.z + 0.05);
@@ -397,7 +421,7 @@ renderer.domElement.addEventListener('pointerdown', e => { dragging = true; px =
 addEventListener('pointerup', () => dragging = false);
 addEventListener('pointermove', e => {
   if (!dragging || renderer.xr.isPresenting) return;
-  if (inlineView === 'fps') return;
+  if (inlineView !== 'orbit') return;
   yaw -= (e.clientX - px) * 0.005; pitch = Math.min(1.4, Math.max(-0.2, pitch + (e.clientY - py) * 0.005));
   px = e.clientX; py = e.clientY; updateCam();
 });
@@ -535,7 +559,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Escape' && calib.on) { loadConfig(); stopCalib(false); }
   if (e.key === 'Backspace' && calib.on) undoCalibPoint();
   if (e.key === 'g' || e.key === 'G') cycleGhost();
-  if (e.key === 'v' || e.key === 'V') { inlineView = inlineView === 'fps' ? 'orbit' : 'fps'; updateCam(); }
+  if (e.key === 'v' || e.key === 'V') { inlineView = VIEW_ORDER[(VIEW_ORDER.indexOf(inlineView) + 1) % VIEW_ORDER.length]; updateCam(); }
   if (e.key === 's' || e.key === 'S') { CONFIG.scene.sound = !CONFIG.scene.sound; }
   if (e.key === 'j' || e.key === 'J') { showNames = !showNames; }
   if (e.key === 'Tab') { e.preventDefault(); selectNextArm(); }

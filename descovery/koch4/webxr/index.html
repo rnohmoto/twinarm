@@ -9,6 +9,8 @@
   #hud { position:fixed; top:10px; left:10px; z-index:10; color:#e2e8f0; background:rgba(15,23,42,.72);
          padding:8px 12px; border-radius:8px; font-size:13px; line-height:1.5; pointer-events:none; max-width:72vw; }
   #hud b { color:#fbbf24; }
+  .pane { position:fixed; z-index:9; display:none; box-sizing:border-box; border:1px solid #64748b; pointer-events:none; }
+  .pane span { position:absolute; left:6px; bottom:4px; font-size:12px; color:#e2e8f0; background:rgba(15,23,42,.72); padding:1px 6px; border-radius:4px; }
   #hud .arm { color:#93c5fd; }
   #alert { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:12; display:none; max-width:80vw;
            background:rgba(127,29,29,.92); color:#fff; border:2px solid #f87171; border-radius:10px; padding:10px 16px;
@@ -37,6 +39,8 @@
 <div id="alert"></div>
 <div id="calib"></div>
 <div id="editor"></div>
+<div id="paneA" class="pane"><span></span></div>
+<div id="paneB" class="pane"><span></span></div>
 <div id="btns"></div>
 <script type="module">
 import * as THREE from './three.module.js';
@@ -375,7 +379,8 @@ function applyPose(tms){
   alertBox.textContent = alerts.join('　|　');
   const view = renderer.xr.isPresenting ? (arActive ? 'AR(パススルー)' : 'VR') : VIEW_NAMES[inlineView];
   hudMode.innerHTML = lines.join('<br>') + `<br>表示: ${view}` + (calib.on ? ' / <b>位置合わせ中</b>' : '') + (SPECTATOR ? ' / <b>観客モード</b>' : '')
-    + `<br>キー: 1-3 強制 0 解除 R 配置 E 編集 C 位置合わせ G 分身の見せ方 V 視点 J 関節名 S 音 Tab 腕切替`;
+    + (renderer.xr.isPresenting ? '' : ` / 画面: ${LAYOUT_NAMES[layout]}`)
+    + `<br>キー: 1-3 強制 0 解除 R 配置 E 編集 C 位置合わせ G 分身の見せ方 V 視点 M 画面の割り方 J 関節名 S 音 Tab 腕切替`;
 }
 
 // ───────── インラインの視点: 一人称（モニタ向け・既定）／俯瞰オービット ─────────
@@ -385,10 +390,46 @@ const VIEW_ORDER = ['fps', 'top', 'macro', 'orbit'];
 const viewParam = new URLSearchParams(location.search).get('view');
 let inlineView = VIEW_ORDER.includes(viewParam) ? viewParam : 'fps';
 const camTip = new THREE.Vector3(), camGoal = new THREE.Vector3(), camLook = new THREE.Vector3();
-let camFollow = null;
+let camFollow = null, followStamp = -1;
+// 画面の割り方（M で切替え・?layout=）: pip=主画面＋右に小窓 2 つ（俯瞰・接写） / split=俯瞰と接写を左右に / single=主画面だけ
+const LAYOUT_NAMES = { pip:'主画面＋小窓(俯瞰・接写)', split:'俯瞰｜接写', single:'1 画面' };
+const LAYOUT_ORDER = ['pip', 'split', 'single'];
+const layoutParam = new URLSearchParams(location.search).get('layout');
+let layout = LAYOUT_ORDER.includes(layoutParam) ? layoutParam : (viewParam ? 'single' : 'pip');
+const camTop = new THREE.PerspectiveCamera(60, 1, 0.01, 30), camMacro = new THREE.PerspectiveCamera(60, 1, 0.01, 30);
+const paneA = document.getElementById('paneA'), paneB = document.getElementById('paneB');
+function drawPane(cam, view, pane, x, y, w, h){   // x,y は左下原点（three.js の viewport）
+  cam.aspect = w / h; cam.updateProjectionMatrix(); placeCam(cam, view);
+  renderer.setViewport(x, y, w, h); renderer.setScissor(x, y, w, h); renderer.setScissorTest(true);
+  renderer.render(scene, cam);
+  pane.style.display = 'block'; pane.style.left = x + 'px'; pane.style.top = (innerHeight - y - h) + 'px'; pane.style.width = w + 'px'; pane.style.height = h + 'px';
+  pane.firstChild.textContent = VIEW_NAMES[view];
+}
+function renderInline(){
+  const W = innerWidth, H = innerHeight;
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, W, H);
+  paneA.style.display = paneB.style.display = 'none';
+  if (layout === 'split') {
+    const w = Math.floor(W / 2);
+    setTags(false); drawPane(camTop, 'top', paneA, 0, 0, w, H); drawPane(camMacro, 'macro', paneB, w, 0, W - w, H); setTags(null);
+    renderer.setScissorTest(false); return;
+  }
+  camera.aspect = W / H; camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+  if (layout === 'pip') {
+    const w = Math.round(Math.min(W * 0.30, 420)), h = Math.round(w * 0.68), m = 10;
+    setTags(false); drawPane(camTop, 'top', paneA, W - w - m, H - h - m, w, h); drawPane(camMacro, 'macro', paneB, W - w - m, H - 2*h - 2*m, w, h); setTags(null);
+    renderer.setScissorTest(false);
+  }
+}
+let tagsWere = true;
+function setTags(on){   // 小窓では名札を出さない（null で元に戻す）
+  for (const a of Object.values(arms)) for (const t of a.tags) { if (on === null) t.visible = tagsWere; else { tagsWere = t.visible; t.visible = on; } }
+}
 let yaw = 0.6, pitch = 0.35, dist = 0.9, dragging = false, px = 0, py = 0;
-function updateCam(){
-  camera.up.set(0, 1, 0); if (inlineView !== 'top') camFollow = null;
+function updateCam(){ placeCam(camera, inlineView); }
+function placeCam(camera, inlineView){   // 指定のカメラを、指定の視点に置く（主画面と小窓で共用）
+  camera.up.set(0, 1, 0);
   const p = prim(); const b = p ? p.cfg.base : { x:0, y:0.75, z:-0.6, yaw_deg:0 };
   if (inlineView === 'fps') {   // 操作者の頭の位置から: 台座の後ろ 40 cm・上 40 cm に立ち、腕が伸びる向き（腕のローカル +z）を見る
     const yawR = rad(b.yaw_deg), fx = Math.sin(yawR), fz = Math.cos(yawR);
@@ -399,7 +440,8 @@ function updateCam(){
   if (inlineView === 'top' && p) {   // 真上から。指先を追い、腕が伸びる向きが画面の上
     const yawR = rad(b.yaw_deg);
     p.tip.getWorldPosition(camTip);
-    if (!camFollow) camFollow = camTip.clone(); else camFollow.lerp(camTip, 0.12);
+    if (!camFollow) camFollow = camTip.clone(); else if (followStamp !== lastFrame) camFollow.lerp(camTip, 0.12);
+    followStamp = lastFrame;
     camera.up.set(Math.sin(yawR), 0, Math.cos(yawR));
     camera.position.set(camFollow.x, b.y + 0.60, camFollow.z);
     camera.lookAt(camFollow.x, b.y, camFollow.z);
@@ -408,7 +450,8 @@ function updateCam(){
   if (inlineView === 'macro' && p && objs.length) {   // 物体の向こう側の低い位置に固定して、近づく指先を正面から
     camLook.set(0, 0, 0);
     for (const o of objs) { camLook.x += o.cfg.spot[0] / objs.length; camLook.z += o.cfg.spot[2] / objs.length; }
-    camGoal.set(camLook.x, 0.08, camLook.z + 0.20); camLook.y = 0.035;
+    const back = 0.20 * Math.max(1, 1.3 / camera.aspect);   // 縦長の枠では少し引いて、物体が全部入るように
+    camGoal.set(camLook.x, 0.08 * back / 0.20, camLook.z + back); camLook.y = 0.035;
     p.group.localToWorld(camGoal); p.group.localToWorld(camLook);
     camera.position.copy(camGoal); camera.lookAt(camLook);
     return;
@@ -562,6 +605,7 @@ addEventListener('keydown', e => {
   if (e.key === 'v' || e.key === 'V') { inlineView = VIEW_ORDER[(VIEW_ORDER.indexOf(inlineView) + 1) % VIEW_ORDER.length]; updateCam(); }
   if (e.key === 's' || e.key === 'S') { CONFIG.scene.sound = !CONFIG.scene.sound; }
   if (e.key === 'j' || e.key === 'J') { showNames = !showNames; }
+  if (e.key === 'm' || e.key === 'M') { layout = LAYOUT_ORDER[(LAYOUT_ORDER.indexOf(layout) + 1) % LAYOUT_ORDER.length]; }
   if (e.key === 'Tab') { e.preventDefault(); selectNextArm(); }
   const i = parseInt(e.key, 10) - 1; if (i >= 0 && i < objs.length) setForced(arm, objs[i]);
 });
@@ -677,7 +721,10 @@ window.koch4 = {
 const _buildObjects = buildObjects;
 buildObjects = function(){ _buildObjects(); buildButtons(); };
 addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
-renderer.setAnimationLoop((t) => { if (!renderer.xr.isPresenting) updateCam(); applyPose(t); renderer.render(scene, camera); });
+renderer.setAnimationLoop((t) => {
+  if (renderer.xr.isPresenting) { paneA.style.display = paneB.style.display = 'none'; applyPose(t); renderer.render(scene, camera); return; }
+  updateCam(); applyPose(t); renderer.setViewport(0, 0, innerWidth, innerHeight); renderInline();
+});
 </script>
 </body>
 </html>

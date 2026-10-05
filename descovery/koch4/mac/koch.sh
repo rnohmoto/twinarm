@@ -22,6 +22,8 @@ F_CONFIG="$koch4/config/solo_F"              # 2 人目の分身の設定（1 �
 ASSIST="${ASSIST-elbow_flex,wrist_flex}"
 ASSIST_CAP="${ASSIST_CAP:-25}"
 MAX_REL="${MAX_REL:-20}"
+# 2 人目の重さの向き。分身の向きが「反転」の関節（肘）は電流も反転する（1 人目の肘と同じ。10/5 ユーザー報告: 反転なしだと持ち上げる向きに引かれる）
+F_VW_INVERT="${F_VW_INVERT-elbow_flex}"
 
 prepare() {
   command -v uv >/dev/null 2>&1 || { echo "uv が見つかりません。https://docs.astral.sh/uv/ の手順で入れてください"; exit 1; }
@@ -103,6 +105,7 @@ case "$mode" in
     "$PY" koch4/koch4_teleop.py --leader-port "$port" --leader-id koch_follower_B --leader-type koch_follower \
       --follower-port none --config-dir "$koch4/config" --work-dir "$koch4/work" \
       --viz-port 8773 --ctl-port 8772 --ff vwall --arm-label F --vw --vw-cap 60 --vw-pwm-cap 80 \
+      --vw-invert "$F_VW_INVERT" \
       ${assist[@]+"${assist[@]}"} "$@"
     ;;
   all)

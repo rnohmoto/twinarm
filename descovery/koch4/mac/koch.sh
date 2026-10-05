@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Koch 4 本: 握手（ペア A）と VR 2 人（ペア B の 2 本を別々の人が手で動かす）を Mac で起動する
 #   ./koch4/mac/koch.sh              使い方を表示
-#   ./koch4/mac/koch.sh handshake    握手: ペア A・差分反射式（フリーなら戻らない）・握力上限 500 mA・追従リミッタ 10
+#   ./koch4/mac/koch.sh handshake    握手: ペア A・差分反射式（フリーなら戻らない）・握力上限 500 mA・追従リミッタ 20
 #   ./koch4/mac/koch.sh vr-leader    VR 1 人目: リーダー B を手で。ページ http://localhost:8444/
 #   ./koch4/mac/koch.sh vr-follower  VR 2 人目: フォロワー B を手で（別の空間）。ページ http://localhost:8443/
 #   ./koch4/mac/koch.sh all          上の 3 つを、ターミナルの窓 3 枚で起動する
@@ -10,7 +10,7 @@
 # 同じフォルダの .command をダブルクリックしても同じ。3 つは同時に動かせる。止めるのは各窓で Ctrl+C。
 # どれも実機が動く・力が出る。ポートは koch4/config/koch4_config.json のものを使う（推測しない）。
 # 後ろに書いた引数はそのまま渡る（例: handshake --dry-run）。
-# 環境変数: ASSIST=摩擦アシストの関節（既定 elbow_flex,wrist_flex・空で無効）  ASSIST_CAP=上限 mA（既定 25）
+# 環境変数: ASSIST=摩擦アシストの関節（既定 elbow_flex,wrist_flex・空で無効）  ASSIST_CAP=上限 mA（既定 25）  MAX_REL=握手の追従リミッタ（既定 20。小さいほどフォロワーが遅れる）
 set -e
 here="$(cd "$(dirname "$0")" && pwd)"        # koch4/mac
 koch4="$(cd "$here/.." && pwd)"
@@ -21,6 +21,7 @@ F_HTTP=8443                                  # 2 人目のページ（1 人目�
 F_CONFIG="$koch4/config/solo_F"              # 2 人目の分身の設定（1 人目と別のファイル）
 ASSIST="${ASSIST-elbow_flex,wrist_flex}"
 ASSIST_CAP="${ASSIST_CAP:-25}"
+MAX_REL="${MAX_REL:-20}"
 
 prepare() {
   command -v uv >/dev/null 2>&1 || { echo "uv が見つかりません。https://docs.astral.sh/uv/ の手順で入れてください"; exit 1; }
@@ -73,7 +74,7 @@ case "$mode" in
     has_arg --dry-run "$@" || ports_free "握手" 8765 8766 -- 8780
     echo "握手（ペア A・差分反射式）。起動時にフォロワー A がリーダー A の姿勢へ 1.5 秒で動きます。パネル http://127.0.0.1:8780"
     exec "$PY" koch4/koch4_dual_launch.py --pair A --ff gripper --grip-ma 500 \
-      --extra "--ff-style error --max-rel 10" "$@"
+      --extra "--ff-style error --max-rel $MAX_REL" "$@"
     ;;
   vr-leader)
     prepare

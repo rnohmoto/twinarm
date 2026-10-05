@@ -383,10 +383,10 @@ let inlineView = 'fps';
 let yaw = 0.6, pitch = 0.35, dist = 0.9, dragging = false, px = 0, py = 0;
 function updateCam(){
   const p = prim(); const b = p ? p.cfg.base : { x:0, y:0.75, z:-0.6, yaw_deg:0 };
-  if (inlineView === 'fps') {   // 操作者の頭の位置から（台座の 55 cm 手前・45 cm 上）
-    const yawR = rad(b.yaw_deg);
-    camera.position.set(b.x + 0.55*Math.sin(yawR), b.y + 0.45, b.z + 0.55*Math.cos(yawR));
-    camera.lookAt(b.x, b.y + 0.08, b.z);
+  if (inlineView === 'fps') {   // 操作者の頭の位置から: 台座の後ろ 40 cm・上 40 cm に立ち、腕が伸びる向き（腕のローカル +z）を見る
+    const yawR = rad(b.yaw_deg), fx = Math.sin(yawR), fz = Math.cos(yawR);
+    camera.position.set(b.x - 0.40*fx, b.y + 0.40, b.z - 0.40*fz);
+    camera.lookAt(b.x + 0.20*fx, b.y + 0.05, b.z + 0.20*fz);
     return;
   }
   const target = new THREE.Vector3(b.x, b.y + 0.1, b.z + 0.05);

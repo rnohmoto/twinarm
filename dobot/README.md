@@ -76,7 +76,13 @@ answer `y`):
 ```bash
 uv run python setup_wizard.py             # 1 camera · 2 robot · 3 markers · 4 calibrate · 5 zones · 6 heights · 7 detect · 8 smoke test
 uv run python demo.py --config config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
+uv run python demo.py --config config.json --robot magician --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm   # direct protocol + stop lane
 ```
+
+`--robot magician` (`robot_magician.py`) talks the Dobot protocol directly instead of pydobot: the e-stop button sets
+the stop event on the HTTP thread at once, and the worker thread, polling the queue index inside its own motion wait,
+sends ForceStop → Clear → pump-off itself. Motion speed is `robot.speed_pct` (percent, default 30). Not yet run on the
+real arm; the stop timing and the two-stage suction release need confirming on hardware.
 
 Then open http://127.0.0.1:8790 (camera with detection boxes, what was heard → intent → reply,
 robot state, buttons: send text / mic / home / tidy / e-stop / resume / attract loop).
@@ -116,7 +122,7 @@ Risk classes: **read-only** (no motion), **moves arm** (commands motion), **came
 | Script | Purpose | Hardware risk |
 | ------ | ------- | ------------- |
 | `setup_wizard.py` | Guided first-time setup: camera + exposure lock, port + homing check, ArUco markers, calibration, zone teaching (hand-guide with the forearm unlock key), per-object `z_pick`, detection tuning, smoke test. Saves `config.json` after each step. | reads only by default; **moves arm** only after `y` (home / smoke test) |
-| `demo.py` | Demo runner: browser panel + dialog mode + attract loop. One worker thread owns camera and robot; the panel only queues commands. | **moves arm** with `--robot pydobot`; `--dry-run` never does |
+| `demo.py` | Demo runner: browser panel + dialog mode + attract loop. One worker thread owns camera and robot; the panel only queues commands (the e-stop button additionally sets the stop event on the HTTP thread). | **moves arm** with `--robot pydobot` / `--robot magician`; `--dry-run` never does |
 | `panel_web.py` | stdlib HTTP server: `/` page, `/stream` MJPEG, `/status` JSON, `POST /cmd`. | none |
 | `check_camera.py` | Enumerate cameras; open one, lock exposure/WB, measure brightness jitter, save a snapshot to `logs/`. | camera only |
 | `suction.py` | Suction pump ON/OFF only: `on` / `off` / `status` / `pulse` commands and a two-button browser panel (port 8791). Talks the Dobot protocol directly (immediate command, no queue, no pydobot). | **runs the pump**; never moves the arm; `--dry` touches nothing |
@@ -125,11 +131,12 @@ Risk classes: **read-only** (no motion), **moves arm** (commands motion), **came
 | `calibrate.py` | Eye-to-hand calibration: print ArUco markers (`--make-markers`), then fit pixels→robot XY into `assets/homography.json` while *you* jog the arm. | read-only |
 | `main.py` | CLI app (OpenCV window): `--tune` (camera only), `--dry-run`, or live with `--robot pydobot`. `demo.py` reuses its `build()`. | **moves arm** when `--robot pydobot` |
 | `robot_dobot.py` | pydobot wrapper with workspace guard (AABB + reach annulus), emergency stop, dry-run robot; refuses to guess a port. | **moves arm** with `--live` |
+| `robot_magician.py` | Direct-protocol backend (`--robot magician`, built on `jog.py`/`suction.py`): queue-index motion wait that watches the e-stop event, ForceStop → Clear → pump-off halt lane, two-stage suction release (both immediate commands), alarm read before and during motion. No pydobot. | **moves arm** with `--robot magician` |
 | `camera.py` / `detect.py` / `planner.py` | UVC/RealSense/file camera with exposure lock and read-back; HSV + shape detection; TaskExecutor (observe → select → pick and place, tidy up, zone slots). | camera / via robot |
 | `rule_parser.py` / `llm_agent.py` | Japanese rule parser (offline) / Claude tool-use agent (enum-only arguments, no coordinates from the LLM; tools: list_objects, pick_and_place, tidy_up, go_home, stop). | none |
 | `asr.py` / `tts.py` | Push-to-talk faster-whisper / VOICEVOX-say-SAPI. Optional extras. | none |
 | `config.py` | Dataclasses + JSON (`python config.py config.json` writes the defaults). | none |
-| `tests/` | Offline tests: detection incl. shapes, homography, parsing, guards, executor, panel HTTP, demo runner, wizard helpers. | none |
+| `tests/` | Offline tests: detection incl. shapes, homography, parsing, guards, executor, panel HTTP, demo runner, wizard helpers, stop lane (fake arm + dry-run panel e-stop). | none |
 
 ## Layout
 

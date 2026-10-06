@@ -432,8 +432,18 @@ class DemoRunner:
         self._publish(dets, status)
 
     # ------------------------------------------------------------------ run
+    def _on_panel_command(self, cmd: dict) -> None:
+        """パネルの HTTP スレッドで呼ばれる。非常停止だけは Event を立てて表示を即時に変える（シリアルは触らない。
+        ForceStop の送出はワーカーが移動待ちの中で行う）。コマンド自体はこれまでどおりワーカーのキューへ積む。"""
+        if cmd.get("type") == "estop":
+            self.robot.estop.set()
+            self.attract_on = False
+            self.state.update(state="estop", reply="止まります。", mode="dialog")
+            self.state.push_event("非常停止（受付）")
+        self.queue.put(cmd)
+
     def start_panel(self, port: int | None = None) -> int:
-        self._panel = PanelServer(self.state, self.queue.put, port=port or self.cfg.demo.panel_port,
+        self._panel = PanelServer(self.state, self._on_panel_command, port=port or self.cfg.demo.panel_port,
                                   stream_fps=self.cfg.demo.stream_fps)
         p = self._panel.start()
         self.state.push_event(f"パネル起動 http://127.0.0.1:{p}")
@@ -508,7 +518,7 @@ def parse_args(argv=None):
     ap.add_argument("--config", default=str(HERE / "config.json"))
     ap.add_argument("--dry-run", action="store_true", help="カメラ=合成画像・ロボット=記録のみ")
     ap.add_argument("--no-llm", action="store_true", help="ルールベース解析のみ")
-    ap.add_argument("--robot", choices=["dry", "pydobot"], default=None)
+    ap.add_argument("--robot", choices=["dry", "pydobot", "magician"], default=None)
     ap.add_argument("--port", default=None, help="Magician のシリアルポート（推測しない）")
     ap.add_argument("--camera-index", default=None)
     ap.add_argument("--attract", action="store_true", help="自動ループを最初から ON")

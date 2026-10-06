@@ -57,6 +57,10 @@ class EmergencyStop(Exception):
     pass
 
 
+class MotionError(RuntimeError):
+    """移動が正常に終わらなかった（magician バックエンド。停止手順 ForceStop→Clear→ポンプ停止は送信済み）。"""
+
+
 @dataclass
 class WorkspaceGuard:
     cfg: RobotConfig
@@ -146,8 +150,16 @@ class DryRunRobot(RobotBase):
         return self._pose
 
     def _move(self, x, y, z, r, wait):
+        # 模擬の移動中も estop を見る（実機の移動待ちと同じ分岐。停止は 1 区間を待たずに効く）
         if self.sim_move_s:
-            time.sleep(self.sim_move_s)
+            end = time.monotonic() + self.sim_move_s
+            while True:
+                if self.estop.is_set():
+                    raise EmergencyStop("estop during simulated move")
+                left = end - time.monotonic()
+                if left <= 0:
+                    break
+                time.sleep(min(0.02, left))
         self._pose = (x, y, z, r)
 
     def _ee(self, on):
@@ -279,6 +291,10 @@ def make_robot(cfg: RobotConfig) -> RobotBase:
         return DryRunRobot(cfg)
     if cfg.backend == "pydobot":
         return PydobotRobot(cfg)
+    if cfg.backend == "magician":
+        # 遅延 import（jog.py が本モジュールを import するため）
+        from robot_magician import MagicianRobot
+        return MagicianRobot(cfg)
     raise ValueError(f"unknown robot backend: {cfg.backend}")
 
 

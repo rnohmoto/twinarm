@@ -36,7 +36,7 @@ class CameraConfig:
 
 @dataclass
 class RobotConfig:
-    backend: str = "dry"             # dry | pydobot
+    backend: str = "dry"             # dry | pydobot | magician（公式プロトコル直接・停止レーン対応: robot_magician.py）
     port: str | None = None          # None=未指定（推測しない。--port か setup_wizard で書く）
     end_effector: str = "suction"    # suction | gripper
     ee_settle_s: float = 0.6         # 吸着/把持が効くまでの待ち
@@ -44,8 +44,14 @@ class RobotConfig:
     z_pick: float = -30.0            # 物体上面に吸盤が当たる高さ（既定。物ごとの値は ObjectSpec.z_pick）
     z_place: float = -25.0           # 置くときの高さ
     r: float = 0.0                   # 手先回転（吸盤では未使用）
-    velocity: float = 150.0          # pydobot speed(velocity, acceleration)
+    velocity: float = 150.0          # pydobot speed(velocity, acceleration)（pydobot バックエンドのみ）
     acceleration: float = 150.0
+    # magician バックエンド（robot_magician.py）
+    speed_pct: float = 30.0          # PTP 共通パラメータの速度比・加速度比（%・1〜100。低速から始めて M3 の実測で決める）
+    move_timeout_s: float = 10.0     # 1 区間の移動で index が進まないとき、ForceStop して諦めるまでの秒数
+    poll_s: float = 0.03             # 移動待ちで index と estop を見る間隔
+    alarm_poll_s: float = 0.25       # 移動待ちでアラームを読む間隔
+    ee_release_blow_s: float = 0.2   # 吸着 OFF の 1 段目（排気）の秒数。0 なら排気せずポンプ停止だけ
     # 作業範囲ガード（ベース原点=mm）。Magician のリーチ 320mm（公式）と根元干渉域を避ける
     x_min: float = 150.0
     x_max: float = 300.0

@@ -115,6 +115,9 @@ class DemoConfig:
     temp_adc_fullscale_v: float = 3.3  # ADC のフルスケール電圧（3.3 か 5.0。check_robot.py --adc で確認）
     temp_stop_c: float = 60.0        # これ以上で自動動作を休止
     temp_resume_c: float = 50.0      # これ未満で再開
+    # 声の UI（voice_front）: 聞き取った文と解釈を表示してから実行する（robotics 裁定 ②）
+    confirm_auto_run_s: float = 2.0  # 自動実行までの秒数。0＝表示して即実行・負＝常に Enter／はい を待つ
+    confirm_ask_ambiguous: bool = True  # 曖昧な発話（否定・複数・直前参照・リセット）は「これですか？」と確認してから
     panel_port: int = 8790           # ブラウザ UI（http://127.0.0.1:8790）
     stream_fps: int = 8
     jpeg_quality: int = 70
@@ -142,7 +145,15 @@ class ASRConfig:
     sample_rate: int = 16000
     max_record_s: float = 6.0        # push-to-talk の最長録音
     silence_rms: float = 0.01        # 無音判定（正規化振幅）
-    silence_hold_s: float = 0.8      # 無音がこの秒数続いたら録音終了
+    silence_hold_s: float = 0.8      # 無音がこの秒数続いたら録音終了（旧 API record() 用）
+    # 押している間だけ録音（PushToTalkRecorder.start/stop）
+    preroll_s: float = 0.4           # 押す少し前から含める（語頭の欠け防止）
+    postroll_s: float = 0.3          # 離した後も少し録る（語尾の欠け防止）
+    # 受理の判定（judge_transcript）。しきい値は faster-whisper の既定と同じ。実発話で決める
+    min_avg_logprob: float = -1.0    # これ未満は「聞き取りに自信がありません」
+    max_no_speech_prob: float = 0.6  # これ超かつ avg_logprob が低ければ無音扱い
+    hallucination_phrases: list[str] = field(default_factory=lambda: [
+        "ご視聴ありがとうございました", "ご視聴ありがとうございます", "チャンネル登録"])  # 無音で Whisper が出す決まり文句
 
 
 @dataclass

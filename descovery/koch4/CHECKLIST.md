@@ -211,6 +211,7 @@ uv run python koch4/koch4_dual_launch.py --follower wired --ff gripper    # USB 
 
 ### U0 — 開発者モードと adb（展示の 1〜2 週間前に）
 図解の手順は `manual/quest_setup.html`（Meta アカウントの作り方 → アプリ → 初期設定 → 開発者の登録 → 開発者モード → Mac と接続）。
+0. 借用機は組織管理のゴーグルでないこと（管理者が個人アカウントの追加や開発者モードを無効にしていることがある。借り先に確認）。SMS を使うなら国と通信会社の対応を確認
 1. 展示専用の Meta アカウント（会社メール）でヘッドセットを初期設定（Meta アカウントは必須・Facebook は不要）
 2. developers.meta.com で開発者組織（チーム）を作り、アカウントを検証（SMS の 2 段階認証か支払い方法。PayPal 不可・18 歳以上）。2026 年は Meta の回答で「組織の検証（Admin Verification＝身分証・2 分）」まで求められた例があるので、そこまで済ませる
 3. Meta Horizon アプリ → ヘッドセット → ヘッドセット設定 → 開発者モード ON

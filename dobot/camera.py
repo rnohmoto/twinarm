@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import sys
 import time
 from pathlib import Path
 
@@ -102,7 +103,15 @@ class OpenCVCamera(CameraBase):
         idx = self.cfg.index
         if isinstance(idx, str) and idx.isdigit():
             idx = int(idx)
-        self.cap = cv2.VideoCapture(idx)
+        self.cap = None
+        if sys.platform == "win32" and isinstance(idx, int):
+            # Windows は DirectShow を明示する。MSMF は自動露出の値の意味が違い（0 以外＝自動）、
+            # 自動 WB と色温度に対応せず、読み戻しも現在値でない（OpenCV のソースで確認・2026-10）
+            cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                self.cap = cap
+        if self.cap is None:
+            self.cap = cv2.VideoCapture(idx)
         if not self.cap.isOpened():
             raise RuntimeError(f"OpenCVCamera: cannot open index {idx}")
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.cfg.width)
@@ -117,7 +126,9 @@ class OpenCVCamera(CameraBase):
     # CAP_PROP_AUTO_EXPOSURE の値はバックエンドで意味が違う（実機で必ず --tune の絵と actual_props() で確認）
     #   V4L2 (Linux):   1=manual, 3=auto (aperture priority)
     #   DSHOW / MSMF (Windows), AVFOUNDATION (mac): 0.25=manual, 0.75=auto が慣例
-    _AE = {"V4L2": (1, 3), "DSHOW": (0.25, 0.75), "MSMF": (0.25, 0.75), "AVFOUNDATION": (0.25, 0.75)}
+    #   DSHOW: cvRound(v)==1 が自動・それ以外が手動（0.25→手動・0.75→自動）。自動露出の読み戻しは非対応で -1 が返る
+    #   MSMF:  0 以外が自動（0.25 も自動になる）→ 手動は 0・自動は 1。読み戻しは現在値でなく既定値
+    _AE = {"V4L2": (1, 3), "DSHOW": (0.25, 0.75), "MSMF": (0, 1), "AVFOUNDATION": (0.25, 0.75)}
 
     def _apply_exposure_wb(self) -> None:
         import cv2
@@ -132,10 +143,14 @@ class OpenCVCamera(CameraBase):
         # 第一候補が読み戻しで効いていなければ代替値も試す。最終判断は --tune の絵で行う
         candidates = [manual, 0.25, 1, 0] if not self.cfg.auto_exposure else [auto, 0.75, 3, 1]
         applied = None
+        self.auto_exposure_readback = None
         for v in candidates:
-            cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, v)
+            ok = bool(cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, v))
             got = cap.get(cv2.CAP_PROP_AUTO_EXPOSURE)
-            if abs(got - v) < 1e-3:
+            self.auto_exposure_readback = got
+            # 書き込みが受理され、読み戻しが一致するか（DSHOW のように）読み戻し非対応（負値）なら効いたとみなす。
+            # 最終判断は check_camera の明るさの揺れ（std・drift）で行う
+            if ok and (abs(got - v) < 1e-3 or got < 0):
                 applied = v
                 break
         if not self.cfg.auto_exposure:
@@ -160,9 +175,10 @@ class OpenCVCamera(CameraBase):
         if self.cfg.auto_focus:
             cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
             return
-        ok = cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+        ok = bool(cap.set(cv2.CAP_PROP_AUTOFOCUS, 0))
         got = cap.get(cv2.CAP_PROP_AUTOFOCUS)
-        if ok and abs(got) < 1e-3:
+        # 読み戻しの意味はバックエンドで違う: V4L2/MSMF は 0=手動・1=自動、DSHOW はフラグ（2=手動・1 や 3=自動）、非対応は負値
+        if ok and (got < 0 or round(got) in (0, 2)):
             self.auto_focus_applied = 0
         if self.cfg.focus is not None:
             cap.set(cv2.CAP_PROP_FOCUS, float(self.cfg.focus))

@@ -48,7 +48,8 @@ def judge(stats: dict, props: dict, applied, focus_applied=None) -> list[str]:
         notes.append("手動露出が効いていません（auto_exposure の書き込みが読み戻せない）。"
                      "macOS ならメーカーツールで固定、Windows なら別の値を試す")
     else:
-        notes.append(f"手動露出の設定値 {applied} が効いています（読み戻し一致）")
+        notes.append(f"手動露出の設定値 {applied} を書き込めました（読み戻し一致か、DirectShow のように読み戻し非対応）。"
+                     "効いたかは下の明るさの揺れで判断")
     if stats["n"] >= 5:
         if stats["std"] > 3.0 or abs(stats["drift"]) > 5.0:
             notes.append(f"明るさが揺れています（std={stats['std']:.1f} drift={stats['drift']:+.1f}）"

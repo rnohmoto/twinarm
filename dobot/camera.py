@@ -94,6 +94,8 @@ class OpenCVCamera(CameraBase):
     def __init__(self, cfg: CameraConfig):
         self.cfg = cfg
         self.cap = None
+        self.auto_exposure_applied = None
+        self.auto_focus_applied = None
 
     def open(self) -> None:
         import cv2
@@ -108,6 +110,7 @@ class OpenCVCamera(CameraBase):
         self.cap.set(cv2.CAP_PROP_FPS, self.cfg.fps)
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self._apply_exposure_wb()
+        self._apply_focus()
         for _ in range(max(0, self.cfg.warmup_frames)):
             self.cap.read()
 
@@ -145,6 +148,25 @@ class OpenCVCamera(CameraBase):
         else:
             cap.set(cv2.CAP_PROP_AUTO_WB, 1)
 
+    def _apply_focus(self) -> None:
+        """AF を止める（既定）。focus が指定されていればその位置に固定する。
+
+        効いたかは set の戻り値と読み戻しで判定し auto_focus_applied に残す（0=止まった・None=効いていない）。
+        AVFoundation（mac）は受け付けないので None のまま → メーカーツールか OS 側で固定する（manual §3）。
+        """
+        import cv2
+        cap = self.cap
+        self.auto_focus_applied = None
+        if self.cfg.auto_focus:
+            cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+            return
+        ok = cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+        got = cap.get(cv2.CAP_PROP_AUTOFOCUS)
+        if ok and abs(got) < 1e-3:
+            self.auto_focus_applied = 0
+        if self.cfg.focus is not None:
+            cap.set(cv2.CAP_PROP_FOCUS, float(self.cfg.focus))
+
     def read(self) -> np.ndarray:
         ok, frame = self.cap.read()
         if not ok or frame is None:
@@ -164,6 +186,7 @@ class OpenCVCamera(CameraBase):
             "fps": c.get(cv2.CAP_PROP_FPS), "auto_exposure": c.get(cv2.CAP_PROP_AUTO_EXPOSURE),
             "exposure": c.get(cv2.CAP_PROP_EXPOSURE), "auto_wb": c.get(cv2.CAP_PROP_AUTO_WB),
             "wb_temperature": c.get(cv2.CAP_PROP_WB_TEMPERATURE),
+            "auto_focus": c.get(cv2.CAP_PROP_AUTOFOCUS), "focus": c.get(cv2.CAP_PROP_FOCUS),
         }
 
     def close(self) -> None:

@@ -27,6 +27,8 @@ class CameraConfig:
     exposure: float = -6.0           # OpenCV CAP_PROP_EXPOSURE（Windows: 2^n 秒・Linux: 100µs単位で機種依存）
     auto_wb: bool = False
     wb_temperature: int = 4500       # CAP_PROP_WB_TEMPERATURE
+    auto_focus: bool = False         # 展示では固定（AF が動くと像の倍率と画素→mm がずれる）。mac は OpenCV から触れない
+    focus: int | None = None         # CAP_PROP_FOCUS（C920/C922 系: 0〜250・5 刻み・0 が遠）。None なら AF を止めた位置のまま
     rotation_deg: int = 0            # 0/90/180/270（俯瞰の向き合わせ）
     warmup_frames: int = 10          # 露出安定待ち
     mirror: bool = False             # 鏡越しに撮る（内蔵カメラ＋ミラークリップ）→ 左右反転して鏡像を戻す

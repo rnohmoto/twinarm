@@ -84,8 +84,15 @@ the stop event on the HTTP thread at once, and the worker thread, polling the qu
 sends ForceStop → Clear → pump-off itself. Motion speed is `robot.speed_pct` (percent, default 30). Not yet run on the
 real arm; the stop timing and the two-stage suction release need confirming on hardware.
 
-Then open http://127.0.0.1:8790 (camera with detection boxes, what was heard → intent → reply,
-robot state, buttons: send text / mic / home / tidy / e-stop / resume / attract loop).
+Then open http://127.0.0.1:8790 (camera with detection boxes, the voice card, what was heard → intent → reply,
+robot state, buttons: send text / home / tidy / e-stop / resume / attract loop).
+
+Voice UI (`voice_front.py`, robotics T13 Step 2/3/5): hold the big mic button or the Space key while you speak;
+on release the panel shows what was heard and the interpretation, then runs it after `demo.confirm_auto_run_s`
+(default 2 s; Enter runs at once, Esc cancels). An ambiguous utterance (negation, two objects, "that one",
+"reset") is shown with 「これですか？」 and waits for Enter/Esc. Stop words (「止まって」「待って」 …) trigger the
+e-stop lane at once. Needs the `voice` extras (faster-whisper + sounddevice); without a mic, type into the
+聞き取り box and press 「文字で試す」 to rehearse the same flow in `--dry-run`.
 
 Read-only checks used inside the wizard are also standalone:
 
@@ -133,10 +140,11 @@ Risk classes: **read-only** (no motion), **moves arm** (commands motion), **came
 | `robot_dobot.py` | pydobot wrapper with workspace guard (AABB + reach annulus), emergency stop, dry-run robot; refuses to guess a port. | **moves arm** with `--live` |
 | `robot_magician.py` | Direct-protocol backend (`--robot magician`, built on `jog.py`/`suction.py`): queue-index motion wait that watches the e-stop event, ForceStop → Clear → pump-off halt lane, two-stage suction release (both immediate commands), alarm read before and during motion. No pydobot. | **moves arm** with `--robot magician` |
 | `camera.py` / `detect.py` / `planner.py` | UVC/RealSense/file camera with exposure lock and read-back; HSV + shape detection; TaskExecutor (observe → select → pick and place, tidy up, zone slots). | camera / via robot |
-| `rule_parser.py` / `llm_agent.py` | Japanese rule parser (offline) / Claude tool-use agent (enum-only arguments, no coordinates from the LLM; tools: list_objects, pick_and_place, tidy_up, go_home, stop). | none |
-| `asr.py` / `tts.py` | Push-to-talk faster-whisper / VOICEVOX-say-SAPI. Optional extras. | none |
+| `rule_parser.py` / `llm_agent.py` | Japanese rule parser (offline; flags ambiguous utterances and takes the last-named object after a negation; wider stop words; home before tidy) / Claude tool-use agent (enum-only arguments, no coordinates from the LLM; tools: list_objects, pick_and_place, tidy_up, go_home, stop). | none |
+| `asr.py` / `tts.py` | Hold-to-talk recorder (ring buffer with pre/post-roll, no Enter) + faster-whisper with per-segment confidence and a hallucination/confidence gate / VOICEVOX-say-SAPI. Optional extras. | none |
+| `voice_front.py` | Voice dialog state machine on its own ASR thread: record → transcribe → rule parse → show heard text + interpretation → countdown run, 「これですか？」 for ambiguous ones, stop words → e-stop lane. Hands only confirmed intents to the worker. | none (serial untouched) |
 | `config.py` | Dataclasses + JSON (`python config.py config.json` writes the defaults). | none |
-| `tests/` | Offline tests: detection incl. shapes, homography, parsing, guards, executor, panel HTTP, demo runner, wizard helpers, stop lane (fake arm + dry-run panel e-stop). | none |
+| `tests/` | Offline tests: detection incl. shapes, homography, parsing, guards, executor, panel HTTP, demo runner, wizard helpers, stop lane (fake arm + dry-run panel e-stop), voice UI (fake mic stream, transcript gate, 99-utterance parser regression in `tests/data/`, dialog state machine, panel round trip). | none |
 
 ## Layout
 

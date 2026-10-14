@@ -323,7 +323,7 @@ def test_voice_front_low_confidence_and_no_mic():
     front.ptt_stop()
     assert wait_for(lambda: front.phase == "failed") and not got
     assert "もう一度" in state.snapshot()["voice"]["message"]
-    front2, state2, got2, _ = _front(cfg, TextASR())             # マイクのない構成
+    front2, state2, _got2, _ = _front(cfg, TextASR())             # マイクのない構成
     front2.ptt_start()
     assert wait_for(lambda: front2.phase == "failed") and "マイク" in state2.snapshot()["voice"]["message"]
 

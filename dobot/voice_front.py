@@ -137,7 +137,7 @@ class VoiceFront:
         if rec is not None:
             try:
                 rec.close()
-            except Exception:  # noqa: BLE001 — 終了時は握りつぶす
+            except Exception:  # noqa: BLE001, S110 — 終了時は握りつぶす
                 pass
 
     # ------------------------------------------------------------ ASR スレッド

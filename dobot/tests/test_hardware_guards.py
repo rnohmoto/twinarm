@@ -50,6 +50,23 @@ def test_brightness_stats_detects_drift():
     assert s["drift"] == 20.0 and s["std"] > 3.0
 
 
+def test_judge_reports_autofocus_state():
+    base = {"n": 10, "mean": 110.0, "std": 0.5, "drift": 0.2}
+    props = {"width": 1280.0, "height": 720.0, "fps": 30.0, "backend": "DSHOW", "auto_focus": 1.0, "focus": 0.0}
+    notes = judge(base, props, applied=0.25, focus_applied=None)
+    assert any("オートフォーカスが止まっていません" in n for n in notes)
+    ok = judge(base, {**props, "auto_focus": 0.0}, applied=0.25, focus_applied=0)
+    assert any("オートフォーカス OFF が効いています" in n for n in ok)
+    quiet = judge(base, {k: v for k, v in props.items() if k not in ("auto_focus", "focus")}, applied=0.25)
+    assert not any("オートフォーカス" in n for n in quiet)   # 読み戻しが無いカメラでは何も言わない
+
+
+def test_camera_config_focus_defaults_lock_autofocus():
+    from config import CameraConfig
+    cfg = CameraConfig()
+    assert cfg.auto_focus is False and cfg.focus is None
+
+
 def test_judge_flags_unlocked_exposure_and_jitter():
     props = {"width": 1280.0, "height": 720.0, "fps": 30.0, "backend": "AVFOUNDATION"}
     notes = judge({"n": 10, "mean": 110.0, "std": 6.0, "drift": 12.0}, props, applied=None)

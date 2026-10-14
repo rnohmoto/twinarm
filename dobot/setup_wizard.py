@@ -104,6 +104,7 @@ class Wizard:
         idx = ask("使うカメラ番号", str(self.cfg.camera.index if cams else 0))
         self.cfg.camera.index = int(idx) if idx.isdigit() else idx
         self.cfg.camera.auto_exposure = False
+        self.cfg.camera.auto_focus = False
         self.cfg.camera.mirror = ask("鏡（ミラークリップ）越しに撮りますか y/n", "y" if self.cfg.camera.mirror else "n").strip().lower().startswith("y")
         cur_ref = ",".join(str(v) for v in self.cfg.camera.reference_roi) if self.cfg.camera.reference_roi else ""
         ref = ask("露出を固定できないカメラ（Mac 内蔵・iPhone）ならグレーカードの範囲: p=画面でドラッグして選ぶ／x,y,w,h／空=使わない", cur_ref)

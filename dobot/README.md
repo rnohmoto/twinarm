@@ -28,6 +28,10 @@ bench yet.
 
 ## Quick start
 
+Bench session with Claude Code on the fest Mac (role D): paste the prompt in
+[`../docs/fest_start_prompts.md`](../docs/fest_start_prompts.md) section 4 D. It walks M0 (link-up and
+stop), M1/M2 (camera lock and calibration), M3 (20 cycles), then voice, and asks you for the port.
+
 ```bash
 cd dobot
 ./start.sh            # Mac/Linux: wizard if not configured yet, otherwise the demo panel (.\start.bat on Windows)

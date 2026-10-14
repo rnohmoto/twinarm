@@ -215,7 +215,7 @@ uv run python koch4/koch4_dual_launch.py --follower wired --ff gripper    # USB 
 2. developers.meta.com で開発者組織（チーム）を作り、アカウントを検証（SMS の 2 段階認証か支払い方法。PayPal 不可・18 歳以上）。2026 年は Meta の回答で「組織の検証（Admin Verification＝身分証・2 分）」まで求められた例があるので、そこまで済ませる
 3. Meta Horizon アプリ → ヘッドセット → ヘッドセット設定 → 開発者モード ON
 4. Mac: `brew install --cask android-platform-tools`（または Meta Quest Developer Hub）
-5. データ対応の USB-C ケーブルで Quest を Mac に挿し、ヘッドセットを被って「USB デバッグを許可」→「常に許可」（予備の Mac でも）
+5. データ対応の USB-C ケーブルで Quest を Mac に挿し、ヘッドセットを被る → 設定 → 開発者 → **MTP 通知 ON**（Meta の手順 2026-08 版の段階）→「USB デバッグを許可」→「常に許可」（許可は Mac×ヘッドセットの組ごと。予備の Mac・2 台目以降のヘッドセットでも）
 6. `uv run python koch4/koch4_quest_usb.py --check` → `✓ <serial>: 接続済み`
 7. 給電: Quest Pro のバッテリーは公称 1〜2 時間・付属の 45W ドックで満充電に約 2 時間 → **バッテリーだけでは 1 日もたない**。構成は 4 つ:
    A. USB のまま（Mac から給電。Mac の USB は 45W 充電器より弱く、減りが遅くなるだけのことがある）→ まず 30 分測る（`./koch4/start.sh check` が残量 % を出す）

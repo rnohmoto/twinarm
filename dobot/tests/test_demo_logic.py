@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -166,3 +167,33 @@ def test_wizard_helpers():
 def test_parse_args_shapes_for_main_build():
     a = parse_args(["--dry-run", "--camera-index", "1"])
     assert isinstance(a, SimpleNamespace) and a.camera_index == 1 and a.keyboard is True and a.text is None and a.tune is False
+
+
+def test_round_trip_moves_within_workspace_and_returns_home(tmp_path):
+    runner = _runner(tmp_path)
+    try:
+        runner.robot.log.clear()
+        runner.handle_command({"type": "round_trip"})
+        snap = runner.state.snapshot()
+        assert snap["state"] == "idle" and "往復" in snap["reply"], snap
+        moves = [m for m in runner.robot.log if m.startswith("move_to")]
+        assert len(moves) >= 3                                   # 退避点 2 つ以上 + home
+        assert tuple(runner.robot.pose()) == tuple(runner.cfg.robot.home_xyzr)
+        assert runner.guard.motion_s(time.time()) > 0            # 動いた時間が熱の予算に積まれる
+    finally:
+        runner.shutdown()
+
+
+def test_round_trip_stops_on_estop_and_reports(tmp_path):
+    runner = _runner(tmp_path)
+    try:
+        runner.robot.sim_move_s = 0.3
+        threading.Timer(0.1, lambda: runner.handle_command({"type": "estop"})).start()
+        t0 = time.monotonic()
+        runner.handle_command({"type": "round_trip"})
+        assert time.monotonic() - t0 < 0.6                        # 1 区間を待たずに止まる
+        snap = runner.state.snapshot()
+        assert snap["state"] == "estop" and "止" in snap["reply"], snap
+        assert "ESTOP" in runner.robot.log and runner.robot.log.count("home") < 2   # 往復は完走していない
+    finally:
+        runner.shutdown()

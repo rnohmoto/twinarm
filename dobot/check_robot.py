@@ -78,11 +78,7 @@ def main(argv=None) -> int:
             rb.home()
             print("home:", cfg.home_xyzr)
         if args.round_trip:
-            x0, y0, z0, r0 = cfg.home_xyzr
-            rb.home()
-            rb.move_to(x0 + 30, y0 + 40, cfg.z_safe, r0)
-            rb.move_to(x0 + 30, y0 - 40, cfg.z_safe, r0)
-            rb.home()
+            rb.round_trip()
             print("round-trip done (within workspace guard)")
     finally:
         rb.disconnect()

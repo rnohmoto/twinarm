@@ -3,7 +3,7 @@
   GET  /          … 画面（HTML 1 枚。JS が /status を 0.5 秒ごとに読む）
   GET  /stream    … multipart/x-mixed-replace の MJPEG（注釈つきの最新フレーム）
   GET  /status    … JSON（モード・状態・発話・意図・返事・検出数・カメラ/ロボットの状態・イベント）
-  POST /cmd       … JSON {"type": "say"|"listen"|"home"|"estop"|"resume"|"tidy"|"attract"|"quit", ...}
+  POST /cmd       … JSON {"type": "say"|"listen"|"home"|"round_trip"|"estop"|"resume"|"tidy"|"attract"|"quit", ...}
                      声の UI: "ptt_start"|"ptt_stop"（押した／離した）|"heard"（文字を聞き取りとして）|"confirm"|"cancel"
 
 設計: パネルはロボットに直接触れない。コマンドは demo.py のワーカーに渡すだけ（1 本のスレッドが実機を持つ）。
@@ -102,6 +102,7 @@ PAGE_HTML = """<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
    <button onclick="say()">送る</button>
    <div style="margin-top:8px">
     <button class="ghost" onclick="cmd({type:'home'})">ホーム</button>
+    <button class="ghost" onclick="cmd({type:'round_trip'})">往復（試運転）</button>
     <button class="warn" onclick="cmd({type:'tidy'})">片付け（元に戻す）</button>
     <button class="ghost" onclick="cmd({type:'loop'})">ループ ×3</button>
     <button class="danger" onclick="cmd({type:'estop'})">非常停止</button>

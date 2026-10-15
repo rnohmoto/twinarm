@@ -255,3 +255,46 @@ def test_calibration_pick_target_prefers_clicked_object():
     assert pick_target([], None) is None
     assert pick_target(centers, None) == (100.0, 100.0)            # クリック無し → 先頭（面積順）
     assert pick_target(centers, (480.0, 310.0)) == (500.0, 300.0)  # クリック → 最も近い物
+
+
+def test_opencv_camera_read_retries_until_deadline():
+    # C922 は開いた直後の数秒・設定変更の直後にフレームを返さないことがある（実機 2026-10-15 で較正が2回即死）。
+    # read() は瞬断では諦めず、読めない状態が READ_RETRY_S 続いたときだけ raise する。
+    import numpy as np
+    import pytest
+
+    from camera import OpenCVCamera
+
+    class FlakyCap:
+        def __init__(self, fail_first: int):
+            self.fail_first = fail_first
+            self.calls = 0
+
+        def read(self):
+            self.calls += 1
+            if self.calls <= self.fail_first:
+                return False, None
+            return True, np.zeros((8, 8, 3), dtype=np.uint8)
+
+    cam = OpenCVCamera(CameraConfig(warmup_frames=0))
+    cam.READ_RETRY_S = 1.0
+    cam.READ_RETRY_INTERVAL_S = 0.01
+    cam.cap = FlakyCap(fail_first=5)
+    assert cam.read().shape == (8, 8, 3)        # 5回の失敗を乗り越えて読める
+
+    cam.cap = FlakyCap(fail_first=10_000)
+    cam.READ_RETRY_S = 0.05
+    with pytest.raises(RuntimeError):           # 読めないままなら期限で raise
+        cam.read()
+
+
+def test_calibration_space_transition_two_phase():
+    from calibrate import space_transition
+    # 検出なし・ロックなし → 何もしない
+    assert space_transition(None, None) == ("noop", None)
+    # 検出あり・ロックなし → ピクセルをロック（腕はまだどいている）
+    assert space_transition(None, (320.0, 240.0)) == ("lock", (320.0, 240.0))
+    # ロック済みなら、腕が物を隠して検出が消えていても（target=None）記録できる
+    assert space_transition((320.0, 240.0), None) == ("record", (320.0, 240.0))
+    # ロック済みのときは新しい検出より記録を優先（ロックした点が座標になる）
+    assert space_transition((320.0, 240.0), (500.0, 300.0)) == ("record", (320.0, 240.0))

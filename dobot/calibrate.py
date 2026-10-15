@@ -155,14 +155,30 @@ def pick_target(centers: Sequence[tuple[float, float]],
     return min(centers, key=lambda c: (c[0] - click[0]) ** 2 + (c[1] - click[1]) ** 2)
 
 
+def space_transition(locked: tuple[float, float] | None,
+                     target: tuple[float, float] | None) -> tuple[str, tuple[float, float] | None]:
+    """物モードの space の状態遷移。1 回目=ピクセルをロック、2 回目=pose と対にして記録。
+
+    腕を物の真上に合わせた時点では物が吸盤の影に隠れて検出が消えるため、検出が生きている
+    うちにピクセルを確定し、ロボット姿勢はその後で読む。ロック済みなら target は見ない。
+    """
+    if locked is not None:
+        return ("record", locked)
+    if target is not None:
+        return ("lock", target)
+    return ("noop", None)
+
+
 def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool = True,
                             object_spec=None, min_area: int = 400, max_area: int = 60000) -> PixelToRobot:
     """実機用。camera.read() の画像に対し、ArUco 中心（または 目印の物・クリック点）へロボットを合わせ pose を読む。
 
     robot は robot_dobot.RobotBase（pose() が (x,y,z,r)）。robot=None なら XY を手入力。
-    object_spec（config.ObjectSpec）を渡すと、マーカーの代わりにその物（例: 消しゴム）の中心を目標にする:
-    物を置く → 吸盤の先端をその中心へ → space、を場所を変えて 4 回以上。複数見えるときはクリックした物。
-    キー: [space]=現在の pose を対応点として記録 / [c]=クリック点モードでクリック / [q]=終了して保存
+    object_spec（config.ObjectSpec）を渡すと、マーカーの代わりにその物（例: 青ブロック）の中心を目標にする。
+    俯瞰カメラでは腕を合わせた瞬間に物が隠れるので 2 段階: 腕をどけたまま space でピクセルをロック →
+    吸盤の先端をその点へ手で合わせ、もう一度 space で pose を読んで対にする。場所を変えて 4 回以上。
+    複数見えるときはクリックした物。
+    キー: [space]=ロック→記録 / [u]=ロック取り消し / [c]=クリック点モードでクリック / [q]=終了して保存
     """
     import cv2
     pairs: list[Pair] = []
@@ -180,6 +196,7 @@ def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool
     cv2.namedWindow(win)
     cv2.setMouseCallback(win, on_mouse)
     current_target: tuple[float, float] | None = None
+    locked_pt: tuple[float, float] | None = None
     marker_ids: list[int] = []
     while True:
         frame = camera.read()
@@ -202,9 +219,13 @@ def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool
             for u, v in centers:
                 cv2.circle(vis, (int(u), int(v)), 6, (0, 255, 255), 2)
             current_target = pick_target(centers, click_pt[0] if click_pt else None)
-            if current_target:
+            if locked_pt is not None:
+                cv2.circle(vis, (int(locked_pt[0]), int(locked_pt[1])), 12, (255, 0, 255), 3)
+                cv2.putText(vis, f"LOCKED: move tool tip to the magenta circle, SPACE records pose ([u]=cancel) ({len(pairs)}/4+)",
+                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2)
+            elif current_target:
                 cv2.circle(vis, (int(current_target[0]), int(current_target[1])), 10, (0, 200, 0), 2)
-                cv2.putText(vis, f"{object_spec.name}: move tool tip to its centre, then SPACE ({len(pairs)}/4+)",
+                cv2.putText(vis, f"{object_spec.name}: keep the arm away, SPACE locks this point ({len(pairs)}/4+)",
                             (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2)
             else:
                 cv2.putText(vis, f"{object_spec.name} not seen - place it in view", (10, 30),
@@ -219,7 +240,23 @@ def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool
         k = cv2.waitKey(30) & 0xFF
         if k == ord("q"):
             break
-        if k == ord(" ") and current_target is not None:
+        if k == ord("u") and object_spec is not None:
+            locked_pt = None
+        if k == ord(" ") and object_spec is not None:
+            action, pt = space_transition(locked_pt, current_target)
+            if action == "lock":
+                locked_pt = pt
+                click_pt.clear()
+                print("pixel locked", pt, "- now move the tool tip there, SPACE again")
+            elif action == "record":
+                if robot is not None:
+                    x, y, *_ = robot.pose()
+                else:
+                    x, y = map(float, input("robot X,Y [mm]: ").split(","))
+                pairs.append(Pair(pt[0], pt[1], x, y, f"pt{len(pairs)}"))
+                locked_pt = None
+                print("recorded", pairs[-1])
+        elif k == ord(" ") and current_target is not None:
             if robot is not None:
                 x, y, *_ = robot.pose()
             else:

@@ -183,15 +183,20 @@ class OpenCVCamera(CameraBase):
         if self.cfg.focus is not None:
             cap.set(cv2.CAP_PROP_FOCUS, float(self.cfg.focus))
 
+    # C922 は開いた直後の数秒・外部アプリの設定変更の直後にフレームを返さないことがある
+    # （実機 2026-10-15: 較正が初回 read で2回即死）。瞬断では諦めず、この秒数読めなければ raise
+    READ_RETRY_S = 3.0
+    READ_RETRY_INTERVAL_S = 0.1
+
     def read(self) -> np.ndarray:
-        ok, frame = self.cap.read()
-        if not ok or frame is None:
-            # 1回だけ再試行（USBの瞬断対策）
-            time.sleep(0.05)
+        deadline = time.monotonic() + self.READ_RETRY_S
+        while True:
             ok, frame = self.cap.read()
-            if not ok or frame is None:
+            if ok and frame is not None:
+                return _postprocess(frame, self.cfg)
+            if time.monotonic() >= deadline:
                 raise RuntimeError("OpenCVCamera: frame read failed")
-        return _postprocess(frame, self.cfg)
+            time.sleep(self.READ_RETRY_INTERVAL_S)
 
     def actual_props(self) -> dict:
         import cv2

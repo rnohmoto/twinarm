@@ -22,9 +22,11 @@ Offline tests pass with no hardware (`uv run pytest`). `demo.py --dry-run` runs 
 pipeline against a synthetic frame and serves the browser panel. On 2026-10-05 the Magician was
 connected to the Mac for the first time: it answers on a CH9102 USB-serial port (not CP210x) as
 serial number `DT1426040100`, firmware 4.0.6, and accepts the suction command (`suction.py pulse`: read-back
-ON, then OFF). Whether the cup actually holds an object, arm motion (including `jog.py`, which has
-only run against the dry-run arm) and the camera pipeline have **not** been confirmed on the real
-bench yet.
+ON, then OFF). On 2026-10-15 (fest Mac D bench, C922 overhead) the user confirmed on the real arm: `jog.py` step
+moves, the workspace guard refusing x > 300, Esc stopping a held move, the cup holding a wood block;
+`demo.py --robot magician` homed at start, and the stop lane (往復（試運転） → 非常停止 → 停止解除 →
+ホーム) was accepted within the same second in the panel events. Camera lock on the Mac, calibration
+(wizard 3–8) and the 20-cycle run are still open.
 
 ## Quick start
 
@@ -85,8 +87,9 @@ uv run python demo.py --config config.json --robot magician --port /dev/tty.usbs
 
 `--robot magician` (`robot_magician.py`) talks the Dobot protocol directly instead of pydobot: the e-stop button sets
 the stop event on the HTTP thread at once, and the worker thread, polling the queue index inside its own motion wait,
-sends ForceStop → Clear → pump-off itself. Motion speed is `robot.speed_pct` (percent, default 30). Not yet run on the
-real arm; the stop timing and the two-stage suction release need confirming on hardware.
+sends ForceStop → Clear → pump-off itself. Motion speed is `robot.speed_pct` (percent, default 30). First run on the
+real arm on 2026-10-15 (home at start, e-stop during 往復 accepted at once); the two-stage suction
+release still needs confirming with an object.
 
 Then open http://127.0.0.1:8790 (camera with detection boxes, the voice card, what was heard → intent → reply,
 robot state, buttons: send text / home / tidy / e-stop / resume / attract loop).

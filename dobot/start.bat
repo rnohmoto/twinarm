@@ -14,7 +14,7 @@ if errorlevel 1 (
   echo uv not found. Install it from https://docs.astral.sh/uv/ and run this script again.
   exit /b 1
 )
-uv sync -q
+uv sync -q --inexact
 
 set MODE=%1
 if "%MODE%"=="" (

@@ -14,7 +14,7 @@ if ! command -v uv >/dev/null 2>&1; then
   echo "uv が見つかりません。https://docs.astral.sh/uv/ の手順でインストールしてから再実行してください。"
   exit 1
 fi
-uv sync -q
+uv sync -q --inexact   # keep the voice/llm extras installed by "uv sync --extra voice --extra llm"
 
 open_url() {
   local url="$1"

@@ -247,3 +247,11 @@ def test_camera_postprocess_mirror_and_gray_card():
     # カードが真っ黒（見えていない）なら補正しない
     dark = np.zeros((20, 40, 3), np.uint8)
     assert _postprocess(dark, CameraConfig(backend="file", reference_roi=[0, 0, 5, 5])).max() == 0
+
+
+def test_calibration_pick_target_prefers_clicked_object():
+    from calibrate import pick_target
+    centers = [(100.0, 100.0), (500.0, 300.0)]
+    assert pick_target([], None) is None
+    assert pick_target(centers, None) == (100.0, 100.0)            # クリック無し → 先頭（面積順）
+    assert pick_target(centers, (480.0, 310.0)) == (500.0, 300.0)  # クリック → 最も近い物

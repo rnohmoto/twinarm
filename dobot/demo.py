@@ -346,6 +346,17 @@ class DemoRunner:
                 self.busy.clear()
             self.state.update(reply=r.message, state="idle")
             self.state.push_event(r.message)
+        elif t == "round_trip":
+            t0 = time.time()
+            self.busy.set()
+            self.state.update(state="moving")
+            try:
+                r = self.executor.round_trip()
+            finally:
+                self.busy.clear()
+                self.guard.record(t0, time.time())
+            self.state.update(reply=r.message, state="estop" if self.robot.estop.is_set() else "idle")
+            self.state.push_event(r.message)
         elif t == "tidy":
             t0, picks0 = time.time(), self.executor.stats["picks_ok"] + self.executor.stats["picks_fail"]
             self.busy.set()

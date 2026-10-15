@@ -201,6 +201,16 @@ class TaskExecutor:
             return Result(False, "ホームに戻れませんでした。", {"error": str(e)})
         return Result(True, "ホームに戻りました。")
 
+    def round_trip(self) -> Result:
+        """作業域内を 1 往復して home へ（試運転・非常停止の試験用）。"""
+        try:
+            self.robot.round_trip()
+        except EmergencyStop as e:
+            return Result(False, "往復の途中で止めました。", {"error": str(e)})
+        except (OutOfWorkspace, MotionError) as e:
+            return Result(False, "往復できませんでした。", {"error": str(e)})
+        return Result(True, "往復してホームに戻りました。")
+
     def stop(self) -> Result:
         self.robot.stop()
         return Result(True, "止まります。")

@@ -49,6 +49,10 @@ def thermistor_c(adc: int, r_pullup: float = 4700.0, r25: float = 100000.0, beta
     return 1.0 / inv_t - 273.15
 
 
+ROUND_TRIP_DX = 30.0   # 往復の退避点: home から前へ (mm)
+ROUND_TRIP_DY = 40.0   # 往復の退避点: home から左右へ (mm)
+
+
 class OutOfWorkspace(Exception):
     pass
 
@@ -129,6 +133,15 @@ class RobotBase:
         except NotImplementedError:
             pass
         self.move_to(x, y, z, r)
+
+    def round_trip(self) -> None:
+        """作業域内を 1 往復して home へ（吸着は使わない）。非常停止の試験と疎通確認用。"""
+        x0, y0, _z0, r0 = self.cfg.home_xyzr
+        self.log.append("round_trip")
+        self.home()
+        self.move_to(x0 + ROUND_TRIP_DX, y0 + ROUND_TRIP_DY, self.cfg.z_safe, r0)
+        self.move_to(x0 + ROUND_TRIP_DX, y0 - ROUND_TRIP_DY, self.cfg.z_safe, r0)
+        self.home()
 
     def stop(self) -> None:
         self.estop.set()

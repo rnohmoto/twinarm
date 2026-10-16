@@ -11,7 +11,7 @@ sys.path.insert(0, str(HERE.parent))
 
 from calibrate import Pair, PixelToRobot
 from config import AppConfig
-from setup_wizard import place_zone
+from setup_wizard import place_zone, zone_fits_workspace
 from zones_view import click_to_zone, render, workspace_outline, zone_overlay
 
 
@@ -61,3 +61,16 @@ def test_render_draws_on_a_copy():
     frame = np.zeros((720, 1280, 3), np.uint8)
     vis = render(frame, cfg.zones, 0, p2r, cfg.robot, dirty=True)
     assert vis.shape == frame.shape and vis.any() and not frame.any()
+
+
+def test_click_to_zone_refuses_a_centre_whose_slots_fall_outside_the_workspace():
+    # 2026-10-16 のベンチ: tray_right を y=-142 に置いたら 2×2 スロット（±15 mm）の先頭が y=-157 で作業域
+    # （y_min=-150）の外になり、planner は先頭スロットから使うので右トレイへの配置が毎回失敗する。
+    p2r, cfg = _p2r(), AppConfig.default()
+    zones = list(cfg.zones)
+    i = [z.name for z in zones].index("tray_right")
+    same, ok, msg = click_to_zone(zones, i, 1208, 380, p2r, cfg.robot)   # u=1208 → y=-142、v=380 → x=215
+    assert not ok and same == zones and "内側" in msg
+    new, ok2, _ = click_to_zone(zones, i, 1176, 380, p2r, cfg.robot)     # u=1176 → y=-134 → スロット -149 は内
+    assert ok2 and new[i].y == -134.0 and all(sy >= -150 for _, sy in new[i].slots)
+    assert zone_fits_workspace(same[i], cfg.robot) and not zone_fits_workspace(place_zone(same[i], 215, -142), cfg.robot)

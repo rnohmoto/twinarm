@@ -25,7 +25,7 @@ sys.path.insert(0, str(HERE))
 from calibrate import PixelToRobot
 from config import AppConfig, RobotConfig, Zone
 from robot_dobot import WorkspaceGuard
-from setup_wizard import place_zone, save_config_with_backup
+from setup_wizard import place_zone, save_config_with_backup, zone_fits_workspace
 
 # BGR。置き場ごとに色を変える（選択中は太線）
 ZONE_COLORS = [(0, 220, 255), (0, 165, 255), (0, 200, 0), (255, 0, 255), (255, 200, 0), (200, 200, 200)]
@@ -58,7 +58,7 @@ def workspace_outline(robot: RobotConfig, p2r: PixelToRobot) -> list[tuple[int, 
 
 def click_to_zone(zones: Sequence[Zone], index: int, u: float, v: float, p2r: PixelToRobot,
                   robot: RobotConfig) -> tuple[list[Zone], bool, str]:
-    """クリック位置を zones[index] の新しい中心にしたリストを返す。腕の作業域の外なら元のまま（ok=False）。"""
+    """クリック位置を zones[index] の新しい中心にしたリストを返す。中心かスロットが腕の作業域の外なら元のまま（ok=False）。"""
     x, y = p2r.to_robot(u, v)
     zone = zones[index]
     z = zone.z_place if zone.z_place is not None else robot.z_place
@@ -67,6 +67,9 @@ def click_to_zone(zones: Sequence[Zone], index: int, u: float, v: float, p2r: Pi
                                     f"（x {robot.x_min:.0f}〜{robot.x_max:.0f}, y {robot.y_min:.0f}〜{robot.y_max:.0f},"
                                     f" 届く距離 {robot.reach_min:.0f}〜{robot.reach_max:.0f} mm）")
     new = place_zone(zone, x, y)
+    if not zone_fits_workspace(new, robot):
+        return list(zones), False, (f"{zone.name}: 中心 ({x:.0f},{y:.0f}) は入りますが、置く位置（スロット）が"
+                                    "腕の作業域の外に出ます。もう少し内側をクリックしてください")
     return [new if i == index else q for i, q in enumerate(zones)], True, \
         f"{zone.name} = ({new.x}, {new.y})  slots={len(new.slots)}"
 

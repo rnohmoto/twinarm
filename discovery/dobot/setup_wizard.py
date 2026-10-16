@@ -24,7 +24,7 @@ for _s in (sys.stdout, sys.stderr):
     except Exception:  # noqa: BLE001
         pass
 
-from config import AppConfig, Zone
+from config import AppConfig, RobotConfig, Zone
 
 STEPS = ["カメラ", "ロボット", "マーカー印刷と配置", "キャリブレーション", "置き場の座標", "物の高さ", "検出の確認", "試運転"]
 
@@ -59,6 +59,18 @@ def place_zone(zone: Zone, x: float, y: float) -> Zone:
     if zone.name == "start":
         return replace(zone, x=cx, y=cy, slots=grid_slots(cx, cy, 45.0, 40.0, 2, 3))
     return replace(zone, x=cx, y=cy, slots=grid_slots(cx, cy, 30.0, 30.0, 2, 2))
+
+
+def zone_fits_workspace(zone: Zone, robot: RobotConfig) -> bool:
+    """中心と置く位置（スロット）が全部、腕の作業域（WorkspaceGuard）に入っているか。
+
+    planner はスロットを先頭から使い、作業域の外なら配置が失敗する。中心が入っていてもスロットは外に出うる
+    （2026-10-16: tray_right を y=-142 に置いたら先頭スロットが y=-157 で y_min=-150 の外）。
+    """
+    from robot_dobot import WorkspaceGuard
+    z = zone.z_place if zone.z_place is not None else robot.z_place
+    guard = WorkspaceGuard(robot)
+    return guard.inside(zone.x, zone.y, z) and all(guard.inside(sx, sy, z) for sx, sy in zone.slots)
 
 
 def save_config_with_backup(cfg: AppConfig, path: Path) -> Path | None:
@@ -242,6 +254,8 @@ class Wizard:
                 x, y, _ = self.pose_xy()
                 z = place_zone(z, x, y)
                 print(f"    {z.name} = ({z.x}, {z.y})  slots={len(z.slots)}")
+                if not zone_fits_workspace(z, self.cfg.robot):
+                    print("    ! 置く位置の一部が腕の作業域の外です。もう少し内側に合わせてやり直してください")
             zones.append(z)
         self.cfg.zones = zones
         # 置くときは吸盤をそのまま z_place まで下げる（物の厚みは planner が足さない）ので、物をつかんだ状態で測る

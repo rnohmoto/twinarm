@@ -298,3 +298,39 @@ def test_calibration_space_transition_two_phase():
     assert space_transition((320.0, 240.0), None) == ("record", (320.0, 240.0))
     # ロック済みのときは新しい検出より記録を優先（ロックした点が座標になる）
     assert space_transition((320.0, 240.0), (500.0, 300.0)) == ("record", (320.0, 240.0))
+
+
+def test_calibration_space_record_is_debounced_after_lock():
+    # 2026-10-16 のベンチ: 6 点中 2 点のロボット座標が「腕を脇へどけた姿勢」のままだった（RMS 54 mm）。
+    # Space を長めに押すと 30 ms のループでロック→記録が連続発火し、腕を動かす前の pose が記録される。
+    # ロックから一定時間は記録を受け付けない。
+    from calibrate import space_transition
+    locked = (320.0, 240.0)
+    assert space_transition(locked, None, since_lock_s=0.06) == ("wait", locked)
+    assert space_transition(locked, None, since_lock_s=0.5) == ("wait", locked)
+    assert space_transition(locked, None, since_lock_s=1.0) == ("record", locked)
+    assert space_transition(locked, None, since_lock_s=0.06, min_gap_s=0.0) == ("record", locked)
+    assert space_transition(None, locked, since_lock_s=0.0) == ("lock", locked)  # ロック自体は待たない
+
+
+def test_calibration_pairs_persist_after_each_record():
+    # 2026-10-15 のベンチで 4 点記録後に calibrate が落ち、点が全部消えた（q までメモリ上にしかなかった）。
+    # 1 点ごとにサイドカーへ書き、再起動時に読み戻せること。
+    import tempfile
+
+    from calibrate import drop_last_pair, load_pairs, pairs_sidecar, record_pair
+
+    out = Path(tempfile.mkdtemp()) / "assets" / "homography.json"
+    side = pairs_sidecar(out)
+    assert side == out.parent / "homography.pairs.json"
+    assert load_pairs(side) == []                      # 無ければ空（初回）
+
+    p1 = record_pair([], (100.0, 200.0), (210.0, -40.0), side)
+    p2 = record_pair(p1, (300.0, 200.0), (210.0, 40.0), side)
+    assert len(p1) == 1 and len(p2) == 2               # 元のリストは変更されない
+    assert p2[1].label == "pt1"
+    assert load_pairs(side) == p2                      # 落ちてもここまで残る
+
+    p3 = drop_last_pair(p2, side)                      # 間違えた点は d で捨てる
+    assert p3 == p1 and load_pairs(side) == p1
+    assert drop_last_pair([], side) == []              # 空のときは何もしない

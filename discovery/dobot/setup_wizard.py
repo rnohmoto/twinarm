@@ -244,11 +244,12 @@ class Wizard:
                 print(f"    {z.name} = ({z.x}, {z.y})  slots={len(z.slots)}")
             zones.append(z)
         self.cfg.zones = zones
-        a = ask("  トレイの底に吸盤が触れる高さまで下げたら Enter（z_place を決める）/ s=スキップ", "")
+        # 置くときは吸盤をそのまま z_place まで下げる（物の厚みは planner が足さない）ので、物をつかんだ状態で測る
+        a = ask("  物を吸盤に付けたまま、その物がトレイの底に触れる高さまで下げたら Enter（z_place を決める）/ s=スキップ", "")
         if a.lower() != "s":
             _, _, zz = self.pose_xy()
-            self.cfg.robot.z_place = round(zz + 3.0, 1)
-            print(f"    z_place = {self.cfg.robot.z_place}（底 +3mm）")
+            self.cfg.robot.z_place = round(zz + 2.0, 1)
+            print(f"    z_place = {self.cfg.robot.z_place}（物の底が面の 2mm 上で離す）")
         self.save()
 
     def step6_heights(self) -> None:

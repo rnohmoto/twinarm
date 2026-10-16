@@ -313,8 +313,8 @@ class Wizard:
         self.save()
         print("\n=== 設定のまとめ ===")
         print(summarize(self.cfg, self.homography_path))
-        print("\n次: uv run python demo.py --config config.json --robot pydobot --port", self.cfg.robot.port,
-              "--camera-index", self.cfg.camera.index, "--no-llm   → http://127.0.0.1:%d" % self.cfg.demo.panel_port)
+        print(f"\n次: ./start.sh demo（または uv run python demo.py --config config.json --no-llm）"
+              f"  → http://127.0.0.1:{self.cfg.demo.panel_port}  ロボットは config.json の backend={self.cfg.robot.backend}")
 
     def close(self) -> None:
         try:

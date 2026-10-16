@@ -171,6 +171,8 @@ class DemoRunner:
         self.voice = VoiceFront(cfg, self.state, submit=self.queue.put, parse=lambda t: parse(t, cfg),
                                 asr_factory=self._make_asr, last_object=lambda: self.rule_agent.last_object,
                                 on_stop=self._voice_stop, on_activity=self._touch, logger=logger)
+        if not getattr(args, "dry_run", False):
+            self.voice.warmup()   # 初回のモデル読み込み（ダウンロード）を最初の押下まで待たせない
         if hasattr(logger, "listeners"):
             logger.listeners.append(self._on_event)
         cam_info = {"backend": cfg.camera.backend, "index": str(cfg.camera.index)}

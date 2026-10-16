@@ -594,12 +594,15 @@ def parse_args(argv=None):
     ap.add_argument("--no-panel", action="store_true")
     ap.add_argument("--once", default=None, help="この 1 発話だけ処理して終了")
     ap.add_argument("--seconds", type=float, default=None, help="この秒数で自動終了（動作確認用）")
+    ap.add_argument("--keyboard", action="store_true",
+                    help="マイクを使わず文字入力だけにする（パネルの入力欄・端末）。既定はマイク（config の asr.engine）")
     args = ap.parse_args(argv)
     if args.camera_index is not None and str(args.camera_index).isdigit():
         args.camera_index = int(args.camera_index)
-    # main.build が見る属性を揃える（demo は常にキーボード/パネル入力・OpenCV パネルは使わない）
+    # main.build が見る属性を揃える（OpenCV パネルは使わない）。keyboard は --keyboard のときだけ True:
+    # 以前は常に True で build が asr.engine を "text" に書き換え、パネルのマイクが一度も使えなかった（2026-10-16）
     d = dict(vars(args))
-    d.update(text=None, keyboard=True, tune=False)
+    d.update(text=None, tune=False)
     return SimpleNamespace(**d)
 
 

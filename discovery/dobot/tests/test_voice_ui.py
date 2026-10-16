@@ -351,7 +351,8 @@ def _runner(tmp_path) -> DemoRunner:
     cfg.log_dir = str(tmp_path / "logs")
     cfg.demo.confirm_auto_run_s = 0.05
     cfg.save(tmp_path / "config.json")
-    args = parse_args(["--dry-run", "--no-llm", "--no-panel", "--config", str(tmp_path / "config.json")])
+    # --keyboard: 文字入力だけの構成（マイク無し）を試す。無いと config の asr.engine（Whisper）を実際に読みに行く
+    args = parse_args(["--dry-run", "--no-llm", "--no-panel", "--keyboard", "--config", str(tmp_path / "config.json")])
     return DemoRunner(args)
 
 

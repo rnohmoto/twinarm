@@ -175,7 +175,9 @@ def test_wizard_keeps_a_configured_hardware_backend():
 
 def test_parse_args_shapes_for_main_build():
     a = parse_args(["--dry-run", "--camera-index", "1"])
-    assert isinstance(a, SimpleNamespace) and a.camera_index == 1 and a.keyboard is True and a.text is None and a.tune is False
+    assert isinstance(a, SimpleNamespace) and a.camera_index == 1 and a.text is None and a.tune is False
+    # keyboard は既定 False: True だと main.build が asr.engine を "text" にしてパネルのマイクが使えない（2026-10-16）
+    assert a.keyboard is False and parse_args(["--keyboard"]).keyboard is True
 
 
 def test_round_trip_moves_within_workspace_and_returns_home(tmp_path):

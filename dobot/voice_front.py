@@ -92,6 +92,7 @@ class VoiceFront:
         self._timer = None
         self.asr: ASRBase | None = None
         self.phase = "idle"
+        self._ptt_down = False   # パネルのボタンが押されたままか（モデル読み込み中に離されたら録音にしない）
         self.gen = 0
         self.intent: Intent | None = None
         self.view: dict = {"phase": "idle", "heard": "", "proposal": "", "question": "", "message": "",
@@ -102,10 +103,16 @@ class VoiceFront:
     # ------------------------------------------------------- panel 側（速い）
     def ptt_start(self) -> None:
         self.on_activity()
+        self._ptt_down = True
         self._put(("start",))
+
+    def warmup(self) -> None:
+        """音声モデルを先に読み込む（初回はダウンロード）。demo の起動時に呼ぶ。できたらパネルに出す。"""
+        self._put(("warmup",))
 
     def ptt_stop(self) -> None:
         self.on_activity()
+        self._ptt_down = False
         self._put(("stop",))
 
     def heard(self, text: str, run_now: bool = False) -> None:
@@ -162,9 +169,31 @@ class VoiceFront:
             self.asr = self.asr_factory()
         return self.asr
 
+    SLOW_ASR_LOAD_S = 1.0   # これより長く読み込みにかかった押下は録音にしない（指はもう離れている）
+
+    def _prepare_asr(self, then: str) -> float:
+        """モデルの読み込みはパネルから見えるようにする（2026-10-16: 初回ダウンロード中は何も出ず「効かない」ように見えた）。
+        戻り値は読み込みにかかった秒数。"""
+        self._set(message="音声モデルを準備しています（初回はダウンロードで数分かかることがあります）…")
+        t0 = time.monotonic()
+        self._ensure_asr()
+        self._set(message=then)
+        self.logger({"ev": "asr_ready", "load_s": round(time.monotonic() - t0, 1)})
+        return time.monotonic() - t0
+
     def _handle(self, job: tuple) -> None:
         kind = job[0]
+        if kind == "warmup":
+            if self.asr is None and self.asr_factory is not None:
+                self._prepare_asr("声の準備ができました。")
+            return
         if kind == "start":
+            if self.asr is None and self.asr_factory is not None:
+                load_s = self._prepare_asr("声の準備ができました。")
+                if not self._ptt_down and load_s > self.SLOW_ASR_LOAD_S:
+                    # 長い読み込みの間に離された: この押下は録音にせず、押し直してもらう（一瞬で読めたなら通常どおり）
+                    self._set(message="声の準備ができました。もう一度押してください。")
+                    return
             asr = self._ensure_asr()
             rec = getattr(asr, "rec", None)
             if rec is None:

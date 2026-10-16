@@ -13,6 +13,7 @@ import argparse
 import shutil
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -23,7 +24,7 @@ for _s in (sys.stdout, sys.stderr):
     except Exception:  # noqa: BLE001
         pass
 
-from config import AppConfig
+from config import AppConfig, Zone
 
 STEPS = ["カメラ", "ロボット", "マーカー印刷と配置", "キャリブレーション", "置き場の座標", "物の高さ", "検出の確認", "試運転"]
 
@@ -45,6 +46,29 @@ def grid_slots(cx: float, cy: float, dx: float = 50.0, dy: float = 40.0, nx: int
     xs = [cx + (i - (nx - 1) / 2) * dx for i in range(nx)]
     ys = [cy + (j - (ny - 1) / 2) * dy for j in range(ny)]
     return [[round(x, 1), round(y, 1)] for x in xs for y in ys]
+
+
+def place_zone(zone: Zone, x: float, y: float) -> Zone:
+    """中心を (x,y) にした新しい Zone。スロットを持つ置き場は中心の周りに作り直す（start は 2×3、他は 2×2）。
+
+    5 番（腕を合わせて Enter）と zones_view.py（画像をクリック）の両方が使う。元の zone は変更しない。
+    """
+    cx, cy = round(x, 1), round(y, 1)
+    if not zone.slots:
+        return replace(zone, x=cx, y=cy)
+    if zone.name == "start":
+        return replace(zone, x=cx, y=cy, slots=grid_slots(cx, cy, 45.0, 40.0, 2, 3))
+    return replace(zone, x=cx, y=cy, slots=grid_slots(cx, cy, 30.0, 30.0, 2, 2))
+
+
+def save_config_with_backup(cfg: AppConfig, path: Path) -> Path | None:
+    """config.json を書く前に config.bak_<時刻>.json を残す。戻り値はバックアップのパス（初回は None）。"""
+    bak = None
+    if path.exists():
+        bak = path.with_suffix(f".bak_{time.strftime('%Y%m%d_%H%M%S')}.json")
+        shutil.copy(path, bak)
+    cfg.save(path)
+    return bak
 
 
 def summarize(cfg: AppConfig, homography_path: Path) -> str:
@@ -78,10 +102,7 @@ class Wizard:
 
     # ------------------------------------------------------------ persistence
     def save(self) -> None:
-        if self.config_path.exists():
-            bak = self.config_path.with_suffix(f".bak_{time.strftime('%Y%m%d_%H%M%S')}.json")
-            shutil.copy(self.config_path, bak)
-        self.cfg.save(self.config_path)
+        save_config_with_backup(self.cfg, self.config_path)
         print(f"  → 保存しました: {self.config_path}")
 
     # ---------------------------------------------------------------- devices
@@ -213,16 +234,16 @@ class Wizard:
 
     def step5_zones(self) -> None:
         print("\n[5/8] 置き場 — 各置き場の中心に吸盤の先端を合わせて Enter（s で飛ばす）。スタート台は片付け先")
+        print("  カメラ画像の上でクリックして決めるなら、代わりに zones_view.py を使う（較正済みなら）")
+        zones = []
         for z in self.cfg.zones:
             a = ask(f"  {z.name}（{z.aliases[0] if z.aliases else ''}）に合わせたら Enter / s=スキップ", "")
-            if a.lower() == "s":
-                continue
-            x, y, zz = self.pose_xy()
-            z.x, z.y = round(x, 1), round(y, 1)
-            if z.slots:
-                nx, ny = (2, 3) if z.name == "start" else (2, 2)
-                z.slots = grid_slots(z.x, z.y, 45.0 if z.name == "start" else 30.0, 40.0 if z.name == "start" else 30.0, nx, ny)
-            print(f"    {z.name} = ({z.x}, {z.y})  slots={len(z.slots)}")
+            if a.lower() != "s":
+                x, y, _ = self.pose_xy()
+                z = place_zone(z, x, y)
+                print(f"    {z.name} = ({z.x}, {z.y})  slots={len(z.slots)}")
+            zones.append(z)
+        self.cfg.zones = zones
         a = ask("  トレイの底に吸盤が触れる高さまで下げたら Enter（z_place を決める）/ s=スキップ", "")
         if a.lower() != "s":
             _, _, zz = self.pose_xy()

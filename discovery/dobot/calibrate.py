@@ -155,22 +155,73 @@ def pick_target(centers: Sequence[tuple[float, float]],
     return min(centers, key=lambda c: (c[0] - click[0]) ** 2 + (c[1] - click[1]) ** 2)
 
 
+RECORD_MIN_GAP_S = 1.0  # ロックから記録まで最低この秒数は空ける（長押しで両方が連続発火するのを防ぐ）
+
+
 def space_transition(locked: tuple[float, float] | None,
-                     target: tuple[float, float] | None) -> tuple[str, tuple[float, float] | None]:
+                     target: tuple[float, float] | None,
+                     since_lock_s: float | None = None,
+                     min_gap_s: float = RECORD_MIN_GAP_S) -> tuple[str, tuple[float, float] | None]:
     """物モードの space の状態遷移。1 回目=ピクセルをロック、2 回目=pose と対にして記録。
 
     腕を物の真上に合わせた時点では物が吸盤の影に隠れて検出が消えるため、検出が生きている
     うちにピクセルを確定し、ロボット姿勢はその後で読む。ロック済みなら target は見ない。
+    ロックから since_lock_s 秒しか経っていない記録は "wait" で弾く: 2026-10-16 のベンチで Space の
+    長押しがロック→記録と連続発火し、腕を動かす前の姿勢が 2 点記録された（RMS 54 mm）。
     """
     if locked is not None:
+        if since_lock_s is not None and since_lock_s < min_gap_s:
+            return ("wait", locked)
         return ("record", locked)
     if target is not None:
         return ("lock", target)
     return ("noop", None)
 
 
+# ---------------------------------------------------- 対応点の逐次保存（途中クラッシュ対策）
+def pairs_sidecar(out_path: str | Path) -> Path:
+    """記録途中の対応点を置くファイル。assets/homography.json → assets/homography.pairs.json。
+
+    2026-10-15 のベンチで 4 点記録後に calibrate が落ち、q までメモリ上にしかなかった点が全部消えた。
+    1 点ごとにここへ書き、次回起動時に読み戻して続きから記録する。
+    """
+    out = Path(out_path)
+    return out.with_name(out.stem + ".pairs.json")
+
+
+def load_pairs(path: str | Path) -> list[Pair]:
+    p = Path(path)
+    if not p.exists():
+        return []
+    return [Pair(**d) for d in json.loads(p.read_text(encoding="utf-8"))]
+
+
+def save_pairs(path: str | Path, pairs: Sequence[Pair]) -> None:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps([q.__dict__ for q in pairs], ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def record_pair(pairs: Sequence[Pair], pt: tuple[float, float], xy: tuple[float, float],
+                sidecar: str | Path, label: str = "") -> list[Pair]:
+    """1 点追加した新しいリストを返し、同時にサイドカーへ書く（元のリストは変更しない）。"""
+    new = [*pairs, Pair(pt[0], pt[1], xy[0], xy[1], label or f"pt{len(pairs)}")]
+    save_pairs(sidecar, new)
+    return new
+
+
+def drop_last_pair(pairs: Sequence[Pair], sidecar: str | Path) -> list[Pair]:
+    """直前の 1 点を捨てた新しいリストを返し、サイドカーも更新する。空なら何もしない。"""
+    if not pairs:
+        return list(pairs)
+    new = list(pairs[:-1])
+    save_pairs(sidecar, new)
+    return new
+
+
 def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool = True,
-                            object_spec=None, min_area: int = 400, max_area: int = 60000) -> PixelToRobot:
+                            object_spec=None, min_area: int = 400, max_area: int = 60000,
+                            resume: bool = True) -> PixelToRobot:
     """実機用。camera.read() の画像に対し、ArUco 中心（または 目印の物・クリック点）へロボットを合わせ pose を読む。
 
     robot は robot_dobot.RobotBase（pose() が (x,y,z,r)）。robot=None なら XY を手入力。
@@ -178,10 +229,16 @@ def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool
     俯瞰カメラでは腕を合わせた瞬間に物が隠れるので 2 段階: 腕をどけたまま space でピクセルをロック →
     吸盤の先端をその点へ手で合わせ、もう一度 space で pose を読んで対にする。場所を変えて 4 回以上。
     複数見えるときはクリックした物。
-    キー: [space]=ロック→記録 / [u]=ロック取り消し / [c]=クリック点モードでクリック / [q]=終了して保存
+    記録した点は 1 点ごとに pairs_sidecar(out_path) へ書かれ、途中で落ちても保存後も残る。resume=True なら
+    起動時にそれを読み戻して続きから記録する（点を足して精度を上げる用。CLI の --fresh で捨てる）。
+    キー: [space]=ロック→記録 / [u]=ロック取り消し / [d]=直前の点を捨てる / クリック=その物を目標に /
+          [q]=終了して保存
     """
     import cv2
-    pairs: list[Pair] = []
+    sidecar = pairs_sidecar(out_path)
+    pairs: list[Pair] = load_pairs(sidecar) if resume else []
+    if pairs:
+        print(f"resumed {len(pairs)} pairs from {sidecar} (run with --fresh to discard them)")
     click_pt: list[tuple[float, float]] = []
     if object_spec is not None:
         use_aruco = False
@@ -192,11 +249,12 @@ def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool
             click_pt.clear()
             click_pt.append((float(x), float(y)))
 
-    win = "calibrate (space=record, q=quit)"
+    win = "calibrate (space=lock/record, u=cancel lock, d=drop last, q=quit)"
     cv2.namedWindow(win)
     cv2.setMouseCallback(win, on_mouse)
     current_target: tuple[float, float] | None = None
     locked_pt: tuple[float, float] | None = None
+    locked_at = 0.0
     marker_ids: list[int] = []
     while True:
         frame = camera.read()
@@ -242,20 +300,26 @@ def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool
             break
         if k == ord("u") and object_spec is not None:
             locked_pt = None
+        if k == ord("d"):
+            pairs = drop_last_pair(pairs, sidecar)
+            print(f"dropped last pair, {len(pairs)} left")
         if k == ord(" ") and object_spec is not None:
-            action, pt = space_transition(locked_pt, current_target)
+            action, pt = space_transition(locked_pt, current_target, time.monotonic() - locked_at)
             if action == "lock":
                 locked_pt = pt
+                locked_at = time.monotonic()
                 click_pt.clear()
                 print("pixel locked", pt, "- now move the tool tip there, SPACE again")
+            elif action == "wait":
+                print("ignored: SPACE too soon after the lock - move the tool tip onto the block first")
             elif action == "record":
                 if robot is not None:
                     x, y, *_ = robot.pose()
                 else:
                     x, y = map(float, input("robot X,Y [mm]: ").split(","))
-                pairs.append(Pair(pt[0], pt[1], x, y, f"pt{len(pairs)}"))
+                pairs = record_pair(pairs, pt, (x, y), sidecar)
                 locked_pt = None
-                print("recorded", pairs[-1])
+                print("recorded", pairs[-1], f"-> {sidecar}")
         elif k == ord(" ") and current_target is not None:
             if robot is not None:
                 x, y, *_ = robot.pose()
@@ -266,15 +330,16 @@ def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool
                 done_ids = {int(p.label[2:]) for p in pairs if p.label.startswith("id")}
                 todo = [i for i in marker_ids if i not in done_ids]
                 label = f"id{todo[0]}" if todo else "pt"
-            pairs.append(Pair(current_target[0], current_target[1], x, y, label or f"pt{len(pairs)}"))
+            pairs = record_pair(pairs, current_target, (x, y), sidecar, label)
             click_pt.clear()
-            print("recorded", pairs[-1])
+            print("recorded", pairs[-1], f"-> {sidecar}")
     cv2.destroyWindow(win)
     if len(pairs) < 4:
-        raise RuntimeError(f"only {len(pairs)} pairs; need >= 4")
+        raise RuntimeError(f"only {len(pairs)} pairs; need >= 4 (they are kept in {sidecar}; rerun to continue)")
     h, w = frame.shape[:2]
     p2r = PixelToRobot.fit(pairs, (w, h))
     p2r.save(out_path, pairs)
+    save_pairs(sidecar, pairs)  # 残しておく: 次回起動で続きから点を足せる（やり直しは --fresh）
     print(f"saved {out_path}  RMS={p2r.rms_error_mm(pairs):.2f} mm  scale={p2r.mm_per_px(w/2, h/2):.3f} mm/px")
     return p2r
 
@@ -287,6 +352,7 @@ if __name__ == "__main__":
     ap.add_argument("--manual", action="store_true", help="ArUco を使わずクリック点で対応を取る")
     ap.add_argument("--object", default=None, help="マーカーの代わりに置く物の名前（例: eraser。config に無ければ既定の定義）")
     ap.add_argument("--no-robot", action="store_true", help="ロボット未接続: XY を手入力")
+    ap.add_argument("--fresh", action="store_true", help="前回途中まで記録した対応点（*.pairs.json）を捨てて最初から")
     ap.add_argument("--make-markers", default=None, help="印刷用 ArUco PNG を出力するフォルダ")
     args = ap.parse_args()
     if args.make_markers:
@@ -307,6 +373,22 @@ if __name__ == "__main__":
             next((o for o in AppConfig.default().objects if o.name == args.object), None)
         if spec is None:
             raise SystemExit(f"--object {args.object}: 物体定義がありません")
-    with make_camera(cfg.camera) as cam:
-        interactive_calibration(cam, robot, args.out or cfg.homography_path, use_aruco=not args.manual,
-                                object_spec=spec, min_area=cfg.min_area_px, max_area=cfg.max_area_px)
+    out = args.out or cfg.homography_path
+    # 落ちたときの手がかり: Python の例外も、OpenCV 側の致命シグナル（faulthandler）も logs/ に残す
+    import faulthandler
+    import sys
+    import traceback
+    crash_path = Path(cfg.log_dir) / "calibrate_crash.log"
+    crash_path.parent.mkdir(parents=True, exist_ok=True)
+    crash_log = crash_path.open("a", encoding="utf-8")
+    faulthandler.enable(file=crash_log)
+    try:
+        with make_camera(cfg.camera) as cam:
+            interactive_calibration(cam, robot, out, use_aruco=not args.manual, object_spec=spec,
+                                    min_area=cfg.min_area_px, max_area=cfg.max_area_px, resume=not args.fresh)
+    except Exception:
+        crash_log.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+        traceback.print_exc(file=crash_log)
+        crash_log.flush()
+        print(f"traceback written to {crash_path}; recorded pairs are kept in {pairs_sidecar(out)}", file=sys.stderr)
+        raise

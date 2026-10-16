@@ -1,5 +1,6 @@
 .venv/
 logs/
 assets/homography.json
+assets/homography.pairs.json
 assets/markers/
 config.local.json

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Dobot Magician ピック＆プレース 起動スクリプト（Mac / Linux）
 #   ./start.sh          設定が済んでいれば実演画面、まだならウィザード
-#   ./start.sh wizard   初期設定ウィザード（カメラ→ロボット→較正→置き場→高さ→検出→試運転）
+#   ./start.sh wizard   初期設定ウィザード（カメラ→ロボット→較正→置き場→高さ→検出→試運転）。--from N で途中から
 #   ./start.sh demo     実演画面（config.json のポートとカメラで。ブラウザが開く）
 #   ./start.sh dry      実機なしの実演（動作確認）
 #   ./start.sh check    読み取りだけ（カメラ一覧・ポート候補・テスト）
@@ -39,11 +39,11 @@ if [ "$mode" = "auto" ]; then
 fi
 
 case "$mode" in
-  wizard) exec uv run python setup_wizard.py ;;
+  wizard) shift; exec uv run python setup_wizard.py "$@" ;;   # 例: ./start.sh wizard --from 5
   demo)
     port=$(uv run python -c "import json;print(json.load(open('config.json',encoding='utf-8'))['demo']['panel_port'])")
     ( sleep 4; open_url "http://127.0.0.1:${port}" ) &
-    exec uv run python demo.py --config config.json --robot pydobot ;;
+    exec uv run python demo.py --config config.json ;;   # ロボットは config.json の backend(pydobot/magician)
   dry)
     ( sleep 4; open_url "http://127.0.0.1:8790" ) &
     exec uv run python demo.py --dry-run --no-llm ;;

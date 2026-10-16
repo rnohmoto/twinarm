@@ -219,6 +219,129 @@ def drop_last_pair(pairs: Sequence[Pair], sidecar: str | Path) -> list[Pair]:
     return new
 
 
+# ------------------------------------------- ロボット自身が動いて取る較正（calibrate.py --drive）
+DRIVE_HOVER_GAP_MM = 8.0     # 物の上面と吸盤の隙間: 物を真下へ滑り込ませられて、目で中心を合わせやすい高さ
+DRIVE_PARK_INSET_MM = 20.0   # 退避点: 基部側の端から内側へ
+DRIVE_PARK_SIDE_MM = 30.0    # 退避点: 左右の端から内側へ
+SETTLE_FRAMES = 5            # 腕が退避してからカメラを読むまでに捨てるフレーム数
+
+
+def drive_grid(robot, nx: int = 3, ny: int = 3, margin_mm: float = 25.0) -> list[tuple[float, float]]:
+    """ロボット自身が回る較正点: 作業域の内側に margin を取った nx×ny の格子のうち、届くもの。"""
+    from robot_dobot import WorkspaceGuard
+    guard = WorkspaceGuard(robot)
+    xs = np.linspace(robot.x_min + margin_mm, robot.x_max - margin_mm, nx)
+    ys = np.linspace(robot.y_min + margin_mm, robot.y_max - margin_mm, ny)
+    pts = [(round(float(x), 1), round(float(y), 1)) for x in xs for y in ys]
+    return [p for p in pts if guard.inside(p[0], p[1], robot.z_safe)]
+
+
+def park_pose(robot, y: float) -> tuple[float, float]:
+    """カメラを読む前の退避点: 基部側の端で、目標と反対側。俯瞰カメラで腕が物を隠さないように。"""
+    side = robot.y_min + DRIVE_PARK_SIDE_MM if y >= 0 else robot.y_max - DRIVE_PARK_SIDE_MM
+    return (robot.x_min + DRIVE_PARK_INSET_MM, side)
+
+
+def drive_bias(old: PixelToRobot | None, pairs: Sequence[Pair]) -> dict | None:
+    """前の較正が命令座標からどれだけずれて狙っていたか。old(pixel) − 命令 の平均・基部から見た半径方向・RMS・最大。"""
+    if old is None or not pairs:
+        return None
+    rows = []
+    for p in pairs:
+        x, y = old.to_robot(p.u, p.v)
+        ex, ey = x - p.x, y - p.y
+        r = float(np.hypot(p.x, p.y))
+        rows.append((ex, ey, (ex * p.x + ey * p.y) / r if r else 0.0, float(np.hypot(ex, ey))))
+    a = np.array(rows)
+    return {"mean_dx": float(a[:, 0].mean()), "mean_dy": float(a[:, 1].mean()), "mean_radial": float(a[:, 2].mean()),
+            "rms": float(np.sqrt(np.mean(a[:, 3] ** 2))), "max": float(a[:, 3].max())}
+
+
+def read_settled(camera, frames: int = SETTLE_FRAMES) -> np.ndarray:
+    frame = None
+    for _ in range(frames):
+        frame = camera.read()
+    return frame
+
+
+def drive_calibration(camera, robot, cfg, object_spec, out_path: str | Path, points=None,
+                      hover_gap_mm: float = DRIVE_HOVER_GAP_MM, ask=input, say=print) -> PixelToRobot:
+    """ロボット自身が各目標へ動き、その真下に置いてもらった物をカメラで読んで対応点にする。**腕が動く。**
+
+    手で腕を押し当てて pose を読む方式は、押したときのたわみやバックラッシュで数 mm 偏る
+    （2026-10-16: ピック位置が外側に偏り、ブロックを基部側へ寄せないと吸えなかった）。
+    ここでは「命令した座標 → 吸盤が実際に行く場所」をそのまま対応点にするので、ピック時と同じ経路で合う。
+    各点: (x,y,z_safe) → (x,y,z_hover) で止まる → 物を吸盤の真下に置いて Enter → z_safe → 退避点 → 撮って検出。
+    Enter=記録 / s=この点を飛ばす / q=中断（ホームへ戻り、4 点以上あれば保存）。Ctrl+C はその場で止める（ホームへ戻さない）。
+    """
+    from detect import detect_objects
+    from robot_dobot import EmergencyStop
+    rc = cfg.robot
+    points = list(points or drive_grid(rc))
+    z_pick = object_spec.z_pick if object_spec.z_pick is not None else rc.z_pick
+    z_hover = z_pick + hover_gap_mm
+    out_path = Path(out_path)
+    old = PixelToRobot.load(out_path) if out_path.exists() else None
+    sidecar = pairs_sidecar(out_path)
+    pairs: list[Pair] = []
+    frame = None
+    say(f"{len(points)} 点を回ります。各点で吸盤が物の上面 +{hover_gap_mm:g} mm (z={z_hover:.1f}) で止まるので、"
+        f"{object_spec.name} を真下（中心）に置いて Enter。腕が動きます: 手を退けてください")
+    try:
+        robot.home()
+        for i, (x, y) in enumerate(points):
+            robot.move_to(x, y, rc.z_safe)
+            robot.move_to(x, y, z_hover)
+            answer = ""
+            while True:
+                answer = ask(f"[{i + 1}/{len(points)}] ({x:.0f},{y:.0f}) {object_spec.name} を吸盤の真下（中心）に置いて "
+                             "Enter / s=飛ばす / q=中断: ").strip().lower()
+                if answer in ("s", "q"):
+                    break
+                robot.move_to(x, y, rc.z_safe)
+                px, py = park_pose(rc, y)
+                robot.move_to(px, py, rc.z_safe)
+                frame = read_settled(camera)
+                dets = detect_objects(frame, [object_spec], cfg.min_area_px, cfg.max_area_px)
+                target = pick_target([(d.cx, d.cy) for d in dets], old.to_pixel(x, y) if old else None)
+                if target is None:
+                    say(f"  {object_spec.name} が見えません。吸盤を戻すので置き直してください")
+                    robot.move_to(x, y, rc.z_safe)
+                    robot.move_to(x, y, z_hover)
+                    continue
+                pairs = record_pair(pairs, target, (x, y), sidecar)
+                msg = f"  recorded pixel=({target[0]:.0f},{target[1]:.0f}) -> commanded ({x:.0f},{y:.0f})"
+                if old is not None:
+                    ox, oy = old.to_robot(*target)
+                    msg += f"  (前の較正なら ({ox:.0f},{oy:.0f}) と答えていた)"
+                say(msg)
+                break
+            if answer == "q":
+                break
+        robot.home()
+    except (KeyboardInterrupt, EmergencyStop):
+        say(f"中断: 腕はその場で止めます（ホームへは戻しません）。記録済み {len(pairs)} 点は {sidecar} にあります")
+        raise
+    if len(pairs) < 4:
+        raise RuntimeError(f"only {len(pairs)} pairs; need >= 4 (they are kept in {sidecar})")
+    h, w = frame.shape[:2]
+    p2r = PixelToRobot.fit(pairs, (w, h))
+    if old is not None:
+        bak = Path(cfg.log_dir) / f"homography_before_drive_{time.strftime('%Y%m%d_%H%M%S')}.json"
+        bak.parent.mkdir(parents=True, exist_ok=True)
+        bak.write_text(out_path.read_text(encoding="utf-8"), encoding="utf-8")
+        say(f"前の較正を {bak} に退避しました")
+    p2r.save(out_path, pairs)
+    save_pairs(sidecar, pairs)
+    say(f"saved {out_path}  RMS={p2r.rms_error_mm(pairs):.2f} mm  scale={p2r.mm_per_px(w / 2, h / 2):.3f} mm/px")
+    b = drive_bias(old, pairs)
+    if b is not None:
+        side = "外側" if b["mean_radial"] > 0 else "内側"
+        say(f"前の較正の狙いのずれ: 平均 dx={b['mean_dx']:+.1f} dy={b['mean_dy']:+.1f} mm、基部から見て{side}に "
+            f"{abs(b['mean_radial']):.1f} mm、RMS {b['rms']:.1f} mm、最大 {b['max']:.1f} mm")
+    return p2r
+
+
 def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool = True,
                             object_spec=None, min_area: int = 400, max_area: int = 60000,
                             resume: bool = True) -> PixelToRobot:
@@ -353,6 +476,8 @@ if __name__ == "__main__":
     ap.add_argument("--object", default=None, help="マーカーの代わりに置く物の名前（例: eraser。config に無ければ既定の定義）")
     ap.add_argument("--no-robot", action="store_true", help="ロボット未接続: XY を手入力")
     ap.add_argument("--fresh", action="store_true", help="前回途中まで記録した対応点（*.pairs.json）を捨てて最初から")
+    ap.add_argument("--drive", action="store_true",
+                    help="ロボット自身が格子状に動き、その真下に置いた --object の物をカメラで読んで較正する（腕が動く）")
     ap.add_argument("--make-markers", default=None, help="印刷用 ArUco PNG を出力するフォルダ")
     args = ap.parse_args()
     if args.make_markers:
@@ -374,6 +499,8 @@ if __name__ == "__main__":
         if spec is None:
             raise SystemExit(f"--object {args.object}: 物体定義がありません")
     out = args.out or cfg.homography_path
+    if args.drive and (robot is None or spec is None):
+        raise SystemExit("--drive には --object と実機接続（--no-robot 無し）が必要です")
     # 落ちたときの手がかり: Python の例外も、OpenCV 側の致命シグナル（faulthandler）も logs/ に残す
     import faulthandler
     import sys
@@ -384,8 +511,11 @@ if __name__ == "__main__":
     faulthandler.enable(file=crash_log)
     try:
         with make_camera(cfg.camera) as cam:
-            interactive_calibration(cam, robot, out, use_aruco=not args.manual, object_spec=spec,
-                                    min_area=cfg.min_area_px, max_area=cfg.max_area_px, resume=not args.fresh)
+            if args.drive:
+                drive_calibration(cam, robot, cfg, spec, out)
+            else:
+                interactive_calibration(cam, robot, out, use_aruco=not args.manual, object_spec=spec,
+                                        min_area=cfg.min_area_px, max_area=cfg.max_area_px, resume=not args.fresh)
     except Exception:
         crash_log.write(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
         traceback.print_exc(file=crash_log)

@@ -4,3 +4,4 @@ assets/homography.json
 assets/homography.pairs.json
 assets/markers/
 config.local.json
+config.bak_*.json

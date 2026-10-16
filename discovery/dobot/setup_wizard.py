@@ -28,6 +28,18 @@ from config import AppConfig
 STEPS = ["カメラ", "ロボット", "マーカー印刷と配置", "キャリブレーション", "置き場の座標", "物の高さ", "検出の確認", "試運転"]
 
 
+HARDWARE_BACKENDS = ("pydobot", "magician")
+
+
+def hardware_backend(current: str) -> str:
+    """ウィザードは実機を相手にする: dry や未設定なら pydobot、実機バックエンドが設定済みならそれを保つ。
+
+    以前は無条件に pydobot へ書き換えていて、検証済みの magician(非常停止レーン付き)を config.json から
+    消しかけた(2026-10-16)。
+    """
+    return current if current in HARDWARE_BACKENDS else "pydobot"
+
+
 def grid_slots(cx: float, cy: float, dx: float = 50.0, dy: float = 40.0, nx: int = 2, ny: int = 3) -> list[list[float]]:
     """中心 (cx,cy) の周りに nx×ny のスロットを作る（片付け先・トレイ内の置き位置）。"""
     xs = [cx + (i - (nx - 1) / 2) * dx for i in range(nx)]
@@ -84,7 +96,7 @@ class Wizard:
     def open_robot(self):
         if self.robot is None:
             from robot_dobot import make_robot
-            self.cfg.robot.backend = "pydobot"
+            self.cfg.robot.backend = hardware_backend(self.cfg.robot.backend)
             self.robot = make_robot(self.cfg.robot)
             self.robot.connect()
         return self.robot

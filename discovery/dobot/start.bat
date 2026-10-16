@@ -24,12 +24,12 @@ if "%MODE%"=="" (
 )
 
 if "%MODE%"=="wizard" (
-  uv run python setup_wizard.py
+  uv run python setup_wizard.py %2 %3
   goto :eof
 )
 if "%MODE%"=="demo" (
   start "" http://127.0.0.1:8790
-  uv run python demo.py --config config.json --robot pydobot
+  uv run python demo.py --config config.json
   goto :eof
 )
 if "%MODE%"=="dry" (

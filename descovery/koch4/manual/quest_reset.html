@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>借りた Quest Pro の初期化（展示用アカウントにして、終わったら戻す）</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="manual.css" rel="stylesheet">
+  <style>
+    .tag { display: inline-block; font-size: .8rem; padding: 1px 8px; border-radius: 10px; margin-left: 6px; vertical-align: 1px; }
+    .tag-ok { background: #e3f2e9; color: #1e7e46; border: 1px solid #9ad1ae; }
+    .tag-2nd { background: #fff4e0; color: #9a5b00; border: 1px solid #f0c674; }
+    .tag-est { background: #eceff1; color: #455a64; border: 1px solid #b0bec5; }
+    .timebox { font-size: .9rem; color: #495057; }
+  </style>
+</head>
+<body>
+<nav class="nav-top">
+  <a href="index.html">入口</a><a href="handshake.html">握手（2 ペア）</a><a href="vr.html">VR（一人称・2 人）</a><a href="quest_setup.html">Quest の準備</a><a href="quest_reset.html"><strong>Quest の初期化</strong></a><span class="sep">｜</span>
+  <a href="#s0">流れ</a><a href="#s1">前日まで</a><a href="#s2">貸主に伝える</a><a href="#s3">先に試す</a><a href="#s4">初期化</a><a href="#s5">初期設定</a><a href="#s6">開発者モード</a><a href="#s7">Mac と接続</a><a href="#s8">段取り</a><a href="#s9">戻し方</a><a href="#s10">困ったとき</a><a href="#s11">参考資料</a>
+</nav>
+<div class="container py-4">
+
+<header class="mb-4">
+  <h1 class="h2">借りた Quest Pro の初期化</h1>
+  <p class="text-muted mb-1">他の人のアカウントが入っている借用機を、展示用の Meta アカウントで使えるようにし（開発者モードと USB 接続まで）、展示が終わったら貸主に戻すまでの手引きです。借用機 1 台につき 1 回行います。</p>
+  <p class="mb-0">新品のゴーグルや、展示用アカウントで初期設定した台は、この手引きではなく <a href="quest_setup.html">Quest の準備</a>を使います。この手引きは、その §4 以降を借用機向けに言い直したものです。</p>
+  <p class="mb-0 mt-2"><span class="tag tag-ok">確認済み</span> Meta の公式ページで確かめた記述　<span class="tag tag-2nd">二次情報</span> 利用者の報告など、公式ページに無い記述　<span class="tag tag-est">推定</span> 文書の組み合わせからの読み</p>
+</header>
+
+<!-- ===================================================== -->
+<h2 id="s0">0. 流れ</h2>
+<figure class="diagram">
+<svg viewBox="0 0 940 330" xmlns="http://www.w3.org/2000/svg" font-family="Meiryo, sans-serif" font-size="13">
+  <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#2c3e50"/></marker></defs>
+  <g>
+    <rect x="14" y="30" width="200" height="70" rx="8" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+    <text x="114" y="56" text-anchor="middle" font-weight="bold">① 前日までに PC で</text>
+    <text x="114" y="78" text-anchor="middle" font-size="12">開発者の登録と確認を済ませる</text>
+    <rect x="250" y="30" width="200" height="70" rx="8" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
+    <text x="350" y="56" text-anchor="middle" font-weight="bold">② 貸主に伝える</text>
+    <text x="350" y="78" text-anchor="middle" font-size="12">消えるもの・バックアップ・管理端末か</text>
+    <rect x="486" y="30" width="200" height="70" rx="8" fill="#eaf7ef" stroke="#27ae60" stroke-width="2"/>
+    <text x="586" y="56" text-anchor="middle" font-weight="bold">③ 先に試す（10 分）</text>
+    <text x="586" y="78" text-anchor="middle" font-size="12">追加プロフィールで開発者モードが出るか</text>
+    <rect x="722" y="30" width="200" height="70" rx="8" fill="#fdf2f2" stroke="#c0392b" stroke-width="2"/>
+    <text x="822" y="56" text-anchor="middle" font-weight="bold">④ 出荷時設定にリセット</text>
+    <text x="822" y="78" text-anchor="middle" font-size="12">電池 50% 以上・取り消せない</text>
+  </g>
+  <g>
+    <rect x="14" y="190" width="200" height="70" rx="8" fill="#eaf7ef" stroke="#27ae60" stroke-width="2"/>
+    <text x="114" y="216" text-anchor="middle" font-weight="bold">⑤ 展示用で初期設定</text>
+    <text x="114" y="238" text-anchor="middle" font-size="12">最初にログインした人が所有者</text>
+    <rect x="250" y="190" width="200" height="70" rx="8" fill="#fff8f0" stroke="#e67e22" stroke-width="2"/>
+    <text x="350" y="216" text-anchor="middle" font-weight="bold">⑥ 開発者モード</text>
+    <text x="350" y="238" text-anchor="middle" font-size="12">展示用アカウントのアプリでオン</text>
+    <rect x="486" y="190" width="200" height="70" rx="8" fill="#f4ecf7" stroke="#8e44ad" stroke-width="2"/>
+    <text x="586" y="216" text-anchor="middle" font-weight="bold">⑦ Mac と USB</text>
+    <text x="586" y="238" text-anchor="middle" font-size="12">MTP 通知 → 常に許可 → check</text>
+    <rect x="722" y="190" width="200" height="70" rx="8" fill="#eceff1" stroke="#607d8b" stroke-width="2"/>
+    <text x="822" y="216" text-anchor="middle" font-weight="bold">⑧ 展示の後に戻す</text>
+    <text x="822" y="238" text-anchor="middle" font-size="12">もう一度リセットして返す</text>
+  </g>
+  <g stroke="#2c3e50" stroke-width="2" marker-end="url(#a1)" fill="none">
+    <line x1="214" y1="65" x2="248" y2="65"/><line x1="450" y1="65" x2="484" y2="65"/><line x1="686" y1="65" x2="720" y2="65"/>
+    <path d="M822 100 L822 140 L114 140 L114 188"/>
+    <line x1="214" y1="225" x2="248" y2="225"/><line x1="450" y1="225" x2="484" y2="225"/><line x1="686" y1="225" x2="720" y2="225"/>
+  </g>
+  <g stroke="#27ae60" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#a1)" fill="none">
+    <path d="M586 100 L586 160 L350 160 L350 188"/>
+  </g>
+  <text x="470" y="155" text-anchor="middle" font-size="12" fill="#1e7e46">③ で開発者モードが出たら、リセットせずに ⑥ へ</text>
+  <text x="114" y="128" text-anchor="middle" font-size="12" fill="#495057">パソコン</text>
+  <text x="350" y="128" text-anchor="middle" font-size="12" fill="#495057">Teams かメール</text>
+  <text x="822" y="128" text-anchor="middle" font-size="12" fill="#495057">ゴーグルのボタンだけ</text>
+  <text x="114" y="288" text-anchor="middle" font-size="12" fill="#495057">ゴーグルとスマホ・Wi-Fi</text>
+  <text x="350" y="288" text-anchor="middle" font-size="12" fill="#495057">スマホ・Wi-Fi</text>
+  <text x="586" y="288" text-anchor="middle" font-size="12" fill="#495057">Mac とゴーグル</text>
+  <text x="822" y="288" text-anchor="middle" font-size="12" fill="#495057">展示の後</text>
+  <text x="470" y="318" text-anchor="middle" font-size="12" fill="#495057">①・②・⑤・⑥ はインターネットが要る。④・⑦ は要らない。</text>
+</svg>
+<figcaption>図 0-1: 借用機 1 台あたりの 8 段階。③ で開発者モードが出れば ④ と ⑤ は飛ばせる。</figcaption>
+</figure>
+
+<div class="note">
+<strong>なぜ初期化になるか</strong><span class="tag tag-ok">確認済み</span>: Meta のヘルプは、ゴーグルの所有者を変えるには出荷時設定へのリセットが必要で、リセットの後に最初にログインした人が所有者になる、と書いています。所有者（貸主）をリセットせずに外す手順は公式にありません。開発者モードのスイッチは、その台とペアリングした Meta Horizon アプリの「ヘッドセット設定」にあり、利用者の報告では追加プロフィール側のアプリには出ません<span class="tag tag-2nd">二次情報</span>。追加プロフィール案は壊さない試しなので先に 10 分だけ行い、出なければリセットします。
+</div>
+
+<!-- ===================================================== -->
+<h2 id="s1">1. 前日までに済ませること（PC と手元）</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:30%">項目</th><th>内容</th></tr></thead>
+<tbody>
+<tr><td>展示用の Meta アカウント</td><td>作成済み（2026 年 10 月 14 日）。メールアドレスとパスワードを手元に置く。<a href="quest_setup.html#s2">Quest の準備 §2</a></td></tr>
+<tr><td>開発者の登録と確認</td><td>展示用アカウントで <a href="https://developers.meta.com/horizon/">Meta の開発者サイト</a>にログインし、組織（チーム）を作り、アカウントの確認（SMS か支払い方法）と組織の確認を済ませる。確認に日数がかかることがあるので、ゴーグルを触る前に終える。<a href="quest_setup.html#s5">Quest の準備 §5</a></td></tr>
+<tr><td>スマートフォン</td><td>Meta Horizon アプリを入れ、展示用アカウントでログインしておく。初期設定のあいだ Wi-Fi と Bluetooth をオン。<a href="quest_setup.html#s3">Quest の準備 §3</a></td></tr>
+<tr><td>Wi-Fi</td><td>初期設定と更新に要る。会場では使わないので、⑤ と ⑥ は前日までに Wi-Fi のある所で行う</td></tr>
+<tr><td>充電</td><td>リセットの前に電池を 50% 以上にする（Meta の条件）。できれば満充電</td></tr>
+<tr><td>Mac と USB-C ケーブル</td><td>adb を入れた Mac と、データ通信に対応したケーブル。<a href="quest_setup.html#s7">Quest の準備 §7</a></td></tr>
+<tr><td>貸主の了解</td><td>「展示用アカウントでログインし直す」ことの了解は得ている。§2 の 3 点を伝えてから着手する</td></tr>
+</tbody>
+</table>
+<div class="gate"><strong>関門 1</strong>: 開発者ダッシュボードに展示用アカウントの組織が表示され、アカウントの確認が済んだ表示になっている。ここが済んでいないと ⑥ で「開発者モード」の項目が出ない。</div>
+
+<!-- ===================================================== -->
+<h2 id="s2">2. 貸主に伝えること・確かめること</h2>
+<h3>2.1 伝える 3 点</h3>
+<ol>
+  <li><strong>ログアウトは初期化になる</strong><span class="tag tag-ok">確認済み</span>。貸主のアカウントを外すには出荷時設定へのリセットしかない。</li>
+  <li><strong>本体に入っているものが消える</strong><span class="tag tag-ok">確認済み</span>。アカウント情報と、ダウンロード済みのゲームやコンテンツが本体から消える。購入したものはアカウントに残り、もう一度ダウンロードできる。</li>
+  <li><strong>残したい設定とアプリのデータはクラウドバックアップで</strong><span class="tag tag-ok">確認済み</span>。ゴーグルの 設定 → 一般（版によっては システム → バックアップ）の「クラウドバックアップ」をオンにしておくと、アプリのデータと設定が保存される。初期から有効になっていることが多い。</li>
+</ol>
+<div class="step">
+<p class="mb-1"><strong>文例（Teams・3 行）</strong></p>
+<pre>借りているゴーグル 2 台、展示用のアカウントでログインし直すため、出荷時設定に戻します。
+本体に入っているアプリやデータは消えますが、購入したものはアカウントに残ります。
+残したい設定があれば、ゴーグルの設定のクラウドバックアップがオンになっているかだけ見ておいてください。</pre>
+</div>
+<h3>2.2 確かめる 2 点</h3>
+<table class="table table-striped">
+<thead><tr><th style="width:36%">確かめること</th><th>なぜ・どう見分けるか</th></tr></thead>
+<tbody>
+<tr><td>会社の組織管理（Meta Quest for Business）に入っていないか</td><td>管理端末は初期設定が <code>work.meta.com/device</code> のコード入力画面で、Meta Horizon アプリは使わない<span class="tag tag-ok">確認済み</span>。その場合は管理者だけが端末を解放でき、開発者モードも管理者の設定しだい<span class="tag tag-2nd">二次情報</span>。貸主に「初期設定でコードを入れる画面があったか」「自分の Meta Horizon アプリに台が出ているか」を聞く。管理端末なら、この手引きでは進めず、管理者に解放を頼む</td></tr>
+<tr><td>貸主が所有者（メインのプロフィール）か</td><td>貸主の Meta Horizon アプリの「デバイス」にその台が出ていれば所有者。所有者でない人が借りて又貸ししている台は、所有者に了解を取る</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s3">3. 先に試す: 追加プロフィールで開発者モードが出るか（10 分・壊さない）</h2>
+<p>ゴーグルを初期化せずに済む可能性を 10 分だけ確かめます。出なければ §4 へ進みます。この試しで貸主のデータが消えることはありません。</p>
+<div class="step">
+<ol class="mb-0">
+  <li>貸主のアカウントでログインしたままゴーグルを被り、右コントローラの Meta ボタンでメニューを出す。</li>
+  <li>左側の時計を選んでクイック設定を開き、右上の <strong>設定</strong> → <strong>プロフィール</strong>。</li>
+  <li>展示用アカウントのメールアドレスを入れて「リンクを送信」。リンクは 15 分で失効するので、すぐにスマートフォンでメールを開いて受け入れる<span class="tag tag-ok">確認済み</span>。</li>
+  <li>ゴーグルの中で展示用のプロフィールに切り替える。展示用アカウントでログインしたスマートフォンの Meta Horizon アプリに、その台が「デバイス」として出るか（出なければ「新しいデバイスを接続」でペアリングを試す）。</li>
+  <li>アプリで ヘッドセット → <strong>ヘッドセット設定</strong> を開き、「開発者モード」の項目が出てオンにできるか見る。</li>
+</ol>
+</div>
+<div class="gate"><strong>判定</strong>: 「開発者モード」が出てオンにできた → §6 の 2 以降（USB の許可へ）。出ない、または灰色でオンにできない → §4 へ。利用者の報告では追加プロフィール側のアプリには出ません<span class="tag tag-2nd">二次情報</span>。10 分を超えて粘らない。</div>
+<p>試した追加プロフィールは、§4 でリセットすれば一緒に消えます。リセットしない場合は、貸主が自分のアプリの「プロフィールを管理」から外せます<span class="tag tag-ok">確認済み</span>。</p>
+
+<!-- ===================================================== -->
+<h2 id="s4">4. 出荷時設定にリセットする（ゴーグルのボタンだけで・5 分）</h2>
+<div class="danger">
+<strong>取り消せません</strong><span class="tag tag-ok">確認済み</span>。アカウント情報と、ダウンロード済みのゲームとコンテンツが本体から消えます。購入したものはアカウントに残ります。電池が 50% 以上あることを確かめてから行います。§2 の 3 点を貸主に伝えてから着手します。
+</div>
+<p>貸主のスマートフォンもパスワードも要らない、本体のボタンだけの方法です（Meta Horizon アプリからもリセットできますが、貸主のアプリが要ります）。</p>
+<div class="step">
+<ol class="mb-0">
+  <li><strong>ゴーグルの電源を切る</strong>。左側の電源ボタンを長押しし、「電源を切る」を選ぶ。</li>
+  <li><strong>電源ボタンと音量（−）ボタンを同時に押し続ける</strong>。起動画面（英語の文字メニュー）が出るまで離さない。出ないときは充電してからやり直す<span class="tag tag-ok">確認済み</span>。電源ボタンはヘッドセット左側（Meta の初期設定ページ）。音量ボタンの位置は公式ページに記載が無いので、実機で先に確かめておく。</li>
+  <li><strong>音量ボタンで「Factory Reset」（出荷時設定にリセット）に合わせ、電源ボタンで決定</strong>。</li>
+  <li><strong>音量ボタンで「Yes」（はい）に合わせ、電源ボタンで決定</strong>。本体が消去されて再起動し、言語を選ぶ初期設定の画面になる。</li>
+</ol>
+</div>
+<div class="gate"><strong>関門 4</strong>: ゴーグルを被ると、言語を選ぶ初期設定の画面から始まる（ホーム画面に戻らない）。</div>
+<p>この後に最初にログインした人が、その台の所有者になります<span class="tag tag-ok">確認済み</span>。貸主のアカウントではなく、必ず展示用アカウントでログインします。</p>
+
+<!-- ===================================================== -->
+<h2 id="s5">5. 展示用アカウントで初期設定する（Wi-Fi のある所で・15〜30 分）</h2>
+<p><a href="quest_setup.html#s4">Quest の準備 §4</a> と同じ手順です。借用機で気を付ける点だけ足します。</p>
+<div class="step">
+<ol class="mb-0">
+  <li>ゴーグルの中の案内に従い、言語を選び、Wi-Fi に繋ぐ。</li>
+  <li>コントローラを起こす（左はメニューボタン、右はホームボタン。両方を 2 秒長押しで白いライトが点滅）。</li>
+  <li><strong>展示用アカウントでログインしたスマートフォン</strong>の Meta Horizon アプリで メニュー → デバイス → 「新しいデバイスを接続」→ Meta Quest Pro を選び、画面の指示に従ってペアリングする。貸主のスマートフォンは使わない。</li>
+  <li>初めてログインするときに Meta Horizon プロフィール（ゴーグルの中での名前）を作る。2 台目以降は同じアカウントなので、プロフィールはそのまま使う。</li>
+  <li><strong>ソフトウェアの更新</strong>が出たら、充電ドックに載せたまま完了まで待つ。初期化した台は更新が溜まっていることがあり、10〜30 分かかる。会場で始めない。</li>
+  <li>設定 → <strong>トラッキング</strong> で「ジェスチャーコントロールとボディトラッキング」（手の認識）をオンにする（展示で手だけの操作を使う場合）。</li>
+</ol>
+</div>
+<div class="gate"><strong>関門 5</strong>: ゴーグルを被るとホーム画面が出て、展示用アカウントのアプリの「デバイス」にその台が表示される。借用機 2 台と自前の 1 台で、アプリに 3 台が並ぶ。</div>
+
+<!-- ===================================================== -->
+<h2 id="s6">6. 開発者モードを入れる（スマートフォン・2 分）</h2>
+<p><a href="quest_setup.html#s6">Quest の準備 §6</a> と同じです。開発者モードは台ごとに入れるので、3 台それぞれで行います。</p>
+<div class="step">
+<ol class="mb-0">
+  <li>展示用アカウントの Meta Horizon アプリで、ツールバーのヘッドセットのアイコン → その台 → <strong>ヘッドセット設定</strong> → <strong>開発者モード</strong> をオン。</li>
+  <li>項目が出ないときは、アプリを終了して開き直し、ゴーグルも再起動する。それでも出なければ §1 の登録と確認（関門 1）を見直す（§10）。</li>
+</ol>
+</div>
+
+<!-- ===================================================== -->
+<h2 id="s7">7. Mac と USB で繋いで許可する（インターネット不要・5 分）</h2>
+<p><a href="quest_setup.html#s7">Quest の準備 §7</a> と同じです。初期化した台は、以前の Mac への許可も消えているので、使う Mac ごとに許可を出し直します。</p>
+<div class="step">
+<ol class="mb-0">
+  <li>ゴーグルを USB-C ケーブルで Mac に繋ぐ（データ対応のケーブル）。</li>
+  <li>ゴーグルを被り、クイック設定 → 設定 → <strong>開発者</strong> で <strong>MTP 通知</strong>をオンにする。</li>
+  <li>「USB デバッグを許可しますか」で <strong>「このコンピュータから常に許可」</strong>を選ぶ。出ないときはケーブルを挿し直してもう一度被る。</li>
+  <li>Mac で確認する。
+<pre>cd twinarm/descovery
+./koch4/start.sh check</pre>
+  最後に <code>✓ ＜番号＞: 接続済み（adb 可・USB）</code> とバッテリー残量が出れば完了。</li>
+</ol>
+</div>
+<div class="gate"><strong>関門 7</strong>: <code>./koch4/start.sh check</code> に「接続済み」が出る。ここから先は <a href="vr.html#s3">VR のページ §3</a> の起動、境界（ガーディアン）の設定、<a href="vr.html#s4">位置合わせ</a>。</div>
+
+<!-- ===================================================== -->
+<h2 id="s8">8. 時間の目安と段取り</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:22%">段階</th><th style="width:16%">1 台あたり</th><th style="width:18%">インターネット</th><th>いつ・どこで</th></tr></thead>
+<tbody>
+<tr><td>① 開発者の登録と確認</td><td>30 分＋確認の待ち</td><td>要る</td><td>前日までに PC で（アカウント共通・1 回）</td></tr>
+<tr><td>② 貸主に伝える</td><td>—</td><td>—</td><td>着手の前に Teams で</td></tr>
+<tr><td>③ 追加プロフィールの試し</td><td>10 分</td><td>要る（招待メール）</td><td>前日までに。10 分で見切る</td></tr>
+<tr><td>④ 出荷時設定にリセット</td><td>5 分＋充電</td><td>要らない</td><td>前日までに。電池 50% 以上</td></tr>
+<tr><td>⑤ 展示用で初期設定と更新</td><td>15〜30 分</td><td>要る</td><td>前日までに Wi-Fi のある所で。更新を待つ時間が読めない</td></tr>
+<tr><td>⑥ 開発者モード</td><td>2 分</td><td>要る</td><td>⑤ の直後に</td></tr>
+<tr><td>⑦ Mac と USB</td><td>5 分</td><td>要らない</td><td>前日までに各 Mac で。会場でも可</td></tr>
+</tbody>
+</table>
+<p class="timebox">借用機 2 台を前日に通すと、③〜⑦ で 1 台 40〜60 分、2 台で 1.5〜2 時間（更新の待ちを含む）。会場で行うのは USB の許可と境界の設定、位置合わせだけにします。自前の 1 台は <a href="quest_setup.html#s4">Quest の準備 §4</a> から同じ日に通します。</p>
+
+<!-- ===================================================== -->
+<h2 id="s9">9. 展示の後に戻す（返却）</h2>
+<p>展示用アカウントを本体から外して返すには、もう一度出荷時設定にリセットします。貸主は自分のアカウントでログインし直すと、再び所有者になります。</p>
+<div class="step">
+<ol class="mb-0">
+  <li>§4 の手順でもう一度リセットする（電池 50% 以上）。展示用アカウント、開発者モード、USB の許可、位置合わせの保存は本体から消える。</li>
+  <li>言語を選ぶ画面のまま電源を切り、充電して返す。初期設定は貸主が自分のアカウントとスマートフォンで行う（最初にログインした人が所有者）。</li>
+  <li>展示用アカウントの Meta Horizon アプリの「デバイス」に残った台は、外しておく（任意）。</li>
+  <li>貸主に「初期化して返した。ダウンロードし直しが要る。購入物はアカウントに残っている」と一言添える。クラウドバックアップをオンにしていれば、設定とアプリのデータは復元される<span class="tag tag-ok">確認済み</span>。</li>
+</ol>
+</div>
+<div class="note">位置合わせの保存（永続アンカーと設定ファイル）は Mac 側の設定ファイルと本体の両方に関わります。返却の前に、次回のために設定ファイルを Mac に残しておきます（<a href="vr.html#s4">VR のページ §4</a>）。</div>
+
+<!-- ===================================================== -->
+<h2 id="s10">10. 困ったとき</h2>
+<table class="table table-striped">
+<thead><tr><th style="width:32%">症状</th><th>確かめること・直し方</th></tr></thead>
+<tbody>
+<tr><td>電源と音量（−）を押しても起動画面が出ない</td><td>充電してからやり直す（Meta の案内）。ゴーグルが完全に電源オフになっているか。ボタンを離すのが早すぎないか</td></tr>
+<tr><td>起動画面が出たが選べない</td><td>音量（＋／−）で項目を移動し、電源ボタンで決定する。コントローラは使わない</td></tr>
+<tr><td>リセット後の初期設定でコードを入力する画面が出た</td><td>組織管理の台（§2.2）。進めずに貸主と管理者に相談する</td></tr>
+<tr><td>アプリに「開発者モード」が出ない</td><td>展示用アカウントでログインしたアプリか。その台とペアリングしたアプリか。開発者サイトで組織を作り、アカウントの確認と組織の確認が済んでいるか（関門 1）。アプリとゴーグルを再起動し、ゴーグルを最新にする</td></tr>
+<tr><td>「開発者モード」をオンにすると「予期しないエラー」</td><td>ゴーグルを Wi-Fi に繋いで更新してからやり直す（Meta の回答の例）</td></tr>
+<tr><td>「USB デバッグを許可」が出ない</td><td>初期化で以前の許可が消えている。ケーブルがデータ対応か。開発者モードがオンか。設定 → 開発者 の「MTP 通知」がオンか。ケーブルを挿し直してからゴーグルを被る</td></tr>
+<tr><td>貸主が「購入したゲームが消えた」と言う</td><td>本体から消えただけで、アカウントの購入物は残る。ストアからダウンロードし直す</td></tr>
+<tr><td>追加プロフィールの招待リンクが開けない</td><td>送信から 15 分で失効する。ゴーグルからもう一度送る</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== -->
+<h2 id="s11">11. 参考資料</h2>
+<table class="table">
+<thead><tr><th>資料</th><th>使った箇所</th></tr></thead>
+<tbody>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/149134797159340/">Meta ヘルプ: Meta Quest を出荷時設定にリセットする方法</a>（2026 年 10 月 15 日ごろ更新の表示）</td><td>§4 本体のボタンでの手順・取り消せない・消えるものと残るもの・電池 50%・クラウドバックアップ</td></tr>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/186776216593082/">Meta ヘルプ: Meta Quest のデバイス所有者を変更する</a></td><td>§0・§4・§9 所有者の変更はリセットのみ・リセット後に最初にログインした人が所有者</td></tr>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/195886835457001/">Meta ヘルプ: Meta Quest にプロフィールを追加する</a></td><td>§3 追加の手順・リンクは 15 分で失効</td></tr>
+<tr><td><a href="https://www.meta.com/en-gb/help/quest/156269236385482/">Meta ヘルプ: ヘッドセットからプロフィールを削除する</a></td><td>§3 所有者がアプリの「プロフィールを管理」から外す・リセットでも消える</td></tr>
+<tr><td><a href="https://www.meta.com/help/quest/399621398228171/">Meta ヘルプ: Meta Quest のクラウドバックアップ</a></td><td>§2 設定 → 一般 の「クラウドバックアップ」</td></tr>
+<tr><td><a href="https://www.meta.com/ja-jp/help/quest/869053370725118/">Meta ヘルプ: Meta Quest Pro の初期設定</a></td><td>§4・§5 電源ボタンは左側・コントローラの起こし方・アプリとのペアリング</td></tr>
+<tr><td><a href="https://www.meta.com/en-gb/help/quest/1221526986650385/">Meta ヘルプ: work.meta.com/device のコード入力</a>／<a href="https://www.meta.com/en-gb/help/quest/683648677697569/">組織管理の Meta Quest を出荷時設定にリセットする</a></td><td>§2.2・§10 組織管理の台の見分け方・管理者が端末を解放する</td></tr>
+<tr><td><a href="https://developers.meta.com/horizon/documentation/android-apps/enable-developer-mode/">Meta 開発者: Test your app on your device</a>／<a href="https://developers.meta.com/horizon/documentation/native/android/mobile-device-setup/">Device setup</a></td><td>§1・§6・§10 開発者モードはアプリから入れる・チーム所属と確認が前提・MTP 通知</td></tr>
+<tr><td><a href="https://communityforums.atmeta.com/discussions/Questions_Discussions/developer-mode-toggle-still-missing-on-quest-3-even-after-account--org-both-show/1322016">Meta コミュニティ: 追加アカウントでは開発者モードを切り替えられない（2025 年 5 月・採択回答）</a></td><td>§0・§3 二次情報。追加プロフィールでは出ない見込みの根拠</td></tr>
+<tr><td><a href="https://developers.meta.com/horizon/feedback/vr/investigations/1140973032424639/">Meta 開発者フィードバック: Quest 3S で開発者モードが入らない（Meta の回答 2026 年 4 月）</a></td><td>§10 組織の確認と本体の更新</td></tr>
+</tbody>
+</table>
+<footer>借りた Quest Pro の初期化（展示用アカウントにして、終わったら戻す）</footer>
+</div>
+</body>
+</html>

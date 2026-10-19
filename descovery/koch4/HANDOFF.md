@@ -48,6 +48,7 @@ twinarm の descovery/koch4 で VR を実機と Quest Pro で立ち上げます�
 | VR 仮想壁（`--ff vwall`・Mode 5 に壁・ブリッジ・WebXR ページ） | ✅ | `--sim`＋デスクトップ Chrome | V0（リーダーで壁を感じる）・V1（Quest Pro） |
 | VR 重さ（`--vw`・肩と肘に電流・握っている間だけ。Kt は機種別） | ✅ | domain テスト 29 件 | V-w（向きと上限。腕反力は実機未検証） |
 | **一人称の位置合わせ（C）**: コントローラ先端／指先で実機の指先を 2〜3 点触って台の x/y/z/yaw を最小二乗で解く・残差表示・保存 | ✅（10/4） | 解法の自己診断 `koch4SelfTest()` が真値に一致（残差 0） | V-c（Quest Pro・実機で残差と体感） |
+| **空間アンカー**（10/19）: 確定(保存) で台の位置を WebXR の永続アンカーに登録（`requestPersistentHandle`→localStorage）・AR 開始時に `restorePersistentAnchor` で復元し、毎フレーム「アンカーの姿勢×差分」で台を置く。位置合わせ・編集は差分を持ち直し、保存で登録し直す。失敗時は設定値と C に戻る。`?anchors=0`・「A アンカー解除」 | ✅（10/19・desktop） | 自己診断 `koch4AnchorSelfTest()`（差分の往復・原点が変わっても台がアンカーに追従）・`node --check` | V-c の 3 項目（再 AR・付け替え・境界引き直し） |
 | **投げる・落とす・跳ねる**（放した瞬間の指先速度・重力・空気抵抗・机／床の反発と摩擦・物体同士の衝突・音） | ✅（10/4） | Chrome（sim）で握る→放す→机に落ちる・編集・視点切替 | V4（実機の握りで投げる。速度上限 5 m/s・反発値の体感） |
 | **2 人**（`--vr2`: ペアのフォロワー機を手で動かす 2 人目の入力装置。`--leader-type koch_follower`＝腕トルク抜き・gripper だけ壁・M288 換算。重さは肘＝電流、**肩（XL430）＝PWM モード**（電流制御が無いため電圧で。握っている間だけトルク ON・`--vw-pwm-scale`／`--vw-pwm-cap`）。ブリッジ `--arms B,F`・分身 2 体） | ✅（10/4） | launcher dry-run・bridge `--sim --arms B,F`・ページで 2 体・肩 PWM の書込み順序を `--selftest` で確認（0 を書いてからトルク ON・解放時に Mode 4 と上限 885 へ復帰） | V5（実機。肩 PWM の向きと強さ・握手に戻したとき肩が保持できること） |
 | **USB 接続** `koch4_quest_usb.py`（adb reverse＋Quest Browser で `http://localhost:<port>/` を開く・`--mirror`=scrcpy・**`--wifi`＝adb を Wi-Fi に切替えて USB の口を充電器に空ける**・`--check` は電池残量も表示） | ✅（10/4） | `--check`（adb 無しの経路） | U0（開発者モード・adb 疎通・30 分の電池の減り・adb over Wi-Fi で reverse が張れるか） |

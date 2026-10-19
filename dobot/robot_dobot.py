@@ -98,19 +98,22 @@ class RobotBase:
     def disconnect(self) -> None: ...
     def pose(self) -> tuple[float, float, float, float]:
         raise NotImplementedError
-    def _move(self, x: float, y: float, z: float, r: float, wait: bool) -> None:
+    def _move(self, x: float, y: float, z: float, r: float, wait: bool, linear: bool) -> None:
         raise NotImplementedError
     def _ee(self, on: bool) -> None:
         raise NotImplementedError
 
     # --- 共通（ガード付き） ---
-    def move_to(self, x: float, y: float, z: float, r: float | None = None, wait: bool = True) -> None:
+    def move_to(self, x: float, y: float, z: float, r: float | None = None, wait: bool = True,
+                linear: bool | None = None) -> None:
+        """linear=None なら cfg.travel_mode（既定は関節補間 MOVJ）。物へ下りる区間だけ呼び出し側が linear=True にする。"""
         if self.estop.is_set():
             raise EmergencyStop("estop is set")
         self.guard.check(x, y, z)
         rr = self.cfg.r if r is None else r
+        lin = (self.cfg.travel_mode == "movl") if linear is None else bool(linear)
         self.log.append(f"move_to({x:.1f},{y:.1f},{z:.1f},{rr:.1f})")
-        self._move(x, y, z, rr, wait)
+        self._move(x, y, z, rr, wait, lin)
 
     def ee_on(self) -> None:
         self.log.append("ee_on")
@@ -156,13 +159,15 @@ class DryRunRobot(RobotBase):
     def __init__(self, cfg: RobotConfig, sim_move_s: float = 0.0):
         super().__init__(cfg)
         self._pose = tuple(cfg.home_xyzr)
+        self.modes: list[str] = []       # 各移動の補間: "J"=関節 / "L"=直線（テストで確認する）
         self.sim_move_s = sim_move_s
         self.ee_state = False
 
     def pose(self):
         return self._pose
 
-    def _move(self, x, y, z, r, wait):
+    def _move(self, x, y, z, r, wait, linear=True):
+        self.modes.append("L" if linear else "J")
         # 模擬の移動中も estop を見る（実機の移動待ちと同じ分岐。停止は 1 区間を待たずに効く）
         if self.sim_move_s:
             end = time.monotonic() + self.sim_move_s
@@ -240,8 +245,9 @@ class PydobotRobot(RobotBase):
         x, y, z, r, *_ = self.dev.pose()
         return float(x), float(y), float(z), float(r)
 
-    def _move(self, x, y, z, r, wait):
-        self.dev.move_to(x, y, z, r, wait=wait)
+    def _move(self, x, y, z, r, wait, linear=True):
+        from pydobot.enums import PTPMode  # type: ignore
+        self.dev._set_ptp_cmd(x, y, z, r, mode=PTPMode.MOVL_XYZ if linear else PTPMode.MOVJ_XYZ, wait=wait)
 
     def _ee(self, on):
         if self.cfg.end_effector == "gripper":
@@ -317,6 +323,7 @@ class PickPlaceController:
     pick:  (x,y,z_safe) → (x,y,z_pick) → ee_on → (x,y,z_safe)
     place: (px,py,z_safe) → (px,py,z_place) → ee_off → (px,py,z_safe)
     途中で OutOfWorkspace / EmergencyStop が出たら、そこで止めて例外を上げる（呼び出し側が home へ戻す）。
+    物へ下りる区間だけ直線（MOVL）、ほかは cfg.travel_mode（既定 MOVJ: 速い）。
     """
     def __init__(self, robot: RobotBase):
         self.robot = robot
@@ -325,14 +332,14 @@ class PickPlaceController:
     def pick(self, x: float, y: float, r: float | None = None, z_pick: float | None = None) -> None:
         zp = self.c.z_pick if z_pick is None else z_pick
         self.robot.move_to(x, y, self.c.z_safe, r)
-        self.robot.move_to(x, y, zp, r)
+        self.robot.move_to(x, y, zp, r, linear=True)
         self.robot.ee_on()
         self.robot.move_to(x, y, self.c.z_safe, r)
 
     def place(self, x: float, y: float, z_place: float | None = None) -> None:
         zp = self.c.z_place if z_place is None else z_place
         self.robot.move_to(x, y, self.c.z_safe)
-        self.robot.move_to(x, y, zp)
+        self.robot.move_to(x, y, zp, linear=True)
         self.robot.ee_off()
         self.robot.move_to(x, y, self.c.z_safe)
 

@@ -49,7 +49,8 @@ class RobotConfig:
     velocity: float = 150.0          # pydobot speed(velocity, acceleration)（pydobot バックエンドのみ）
     acceleration: float = 150.0
     # magician バックエンド（robot_magician.py）
-    speed_pct: float = 30.0          # PTP 共通パラメータの速度比・加速度比（%・1〜100。低速から始めて M3 の実測で決める）
+    speed_pct: float = 30.0          # PTP 共通パラメータの速度比・加速度比（%・1〜100。低速から始めて M3 の実測で決める。ベンチは 100）
+    travel_mode: str = "movj"        # 退避・横移動・持ち上げの補間: movj=関節補間（速い）/ movl=直線。物へ下りる区間は常に直線
     move_timeout_s: float = 10.0     # 1 区間の移動で index が進まないとき、ForceStop して諦めるまでの秒数
     poll_s: float = 0.03             # 移動待ちで index と estop を見る間隔
     alarm_poll_s: float = 0.25       # 移動待ちでアラームを読む間隔

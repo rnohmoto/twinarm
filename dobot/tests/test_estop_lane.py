@@ -35,6 +35,7 @@ class FakeArm:
         self._pose = (200.0, 0.0, 50.0, 0.0)
         self.on_poll = None
         self.closed = False
+        self.modes: list[int] = []          # 各 PTP の ptpMode（MOVJ=1 / MOVL=2）
 
     def device_sn(self) -> str:
         return "FAKE"
@@ -72,9 +73,13 @@ class FakeArm:
         self.sent.append(("force_stop",))
 
     def move_linear_queued(self, x, y, z, r) -> int:
+        return self.move_queued(2, x, y, z, r)
+
+    def move_queued(self, mode, x, y, z, r) -> int:
         self._target += 1
         self._polls = 0
         self._pose = (x, y, z, r)
+        self.modes.append(mode)
         self.sent.append(("ptp", x, y, z, r))
         return self._target
 
@@ -269,3 +274,16 @@ def test_panel_estop_takes_effect_while_worker_is_moving(tmp_path):
     finally:
         runner.shutdown()
         runner._panel.stop()
+
+
+def test_magician_sends_movj_for_travel_and_movl_for_descent():
+    from jog import PTP_MOVJ_XYZ, PTP_MOVL_XYZ
+    arm = FakeArm()
+    rb = _robot(arm, travel_mode="movj")
+    rb.move_to(220, 10, 40)                       # 退避・横移動: 関節補間
+    rb.move_to(220, 10, -50, linear=True)         # 降下: 直線
+    assert arm.modes == [PTP_MOVJ_XYZ, PTP_MOVL_XYZ]
+    arm2 = FakeArm()
+    rb2 = _robot(arm2, travel_mode="movl")
+    rb2.move_to(220, 10, 40)
+    assert arm2.modes == [PTP_MOVL_XYZ]

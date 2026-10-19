@@ -25,6 +25,7 @@ class Detection:
     angle_deg: float = 0.0     # minAreaRect の角度（グリッパ回転用）
     x_mm: float | None = None      # ロボット座標（キャリブ後に planner が埋める）
     y_mm: float | None = None
+    size_mm: float | None = None   # 外接矩形の長辺 [mm]（planner が埋める。置くときに他の物と重ねないための大きさ）
     score: float = 1.0
     circularity: float = 0.0
     aspect: float = 1.0        # 長辺/短辺
@@ -37,6 +38,8 @@ class Detection:
         if self.x_mm is not None:
             d["x_mm"] = round(self.x_mm, 1)
             d["y_mm"] = round(self.y_mm, 1)
+        if self.size_mm is not None:
+            d["size_mm"] = round(self.size_mm, 1)
         return d
 
 

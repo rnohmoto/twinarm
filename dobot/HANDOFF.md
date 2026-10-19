@@ -6,8 +6,12 @@
 ## 0. 起動は 1 コマンド
 
 ```bash
-cd dobot && ./start.sh        # Mac/Linux。Finder なら start.command をダブルクリック。Windows は start.bat
+cd dobot && ./start.sh launcher   # Finder なら start.command をダブルクリック（同じもの）。Windows は start.bat（ランチャー無し）
 ```
+
+ブラウザにランチャー（http://127.0.0.1:8789）が開く。「実演を起動」で実演（http://127.0.0.1:8790）。停止・再起動・較正・置き場・設定・ログも
+この画面から。新しい Mac は先に `setup.command`（1 回）。説明員向けの手順は [docs/operation-manual.md](docs/operation-manual.md)、
+導入は [docs/setup-manual.md](docs/setup-manual.md)。
 
 - 設定が揃っていれば実演画面（`demo.py`）が立ち上がり、ブラウザで http://127.0.0.1:8790 が開く。終了は Ctrl+C
 - **起動時に腕がホーム姿勢へ動く。** 腕の周りを空けてから実行する

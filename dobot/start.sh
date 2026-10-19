@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Dobot Magician ピック＆プレース 起動スクリプト（Mac / Linux）
 #   ./start.sh          設定が済んでいれば実演画面、まだならウィザード
+#   ./start.sh launcher 素人向けのランチャー画面（起動・停止・較正・置き場・設定。start.command と同じ）
 #   ./start.sh wizard   初期設定ウィザード（カメラ→ロボット→較正→置き場→高さ→検出→試運転）。--from N で途中から
 #   ./start.sh demo     実演画面（config.json のポートとカメラで。ブラウザが開く）
 #   ./start.sh dry      実機なしの実演（動作確認）
@@ -40,6 +41,7 @@ fi
 
 case "$mode" in
   wizard) shift; exec uv run python setup_wizard.py "$@" ;;   # 例: ./start.sh wizard --from 5
+  launcher) shift; exec uv run python launcher.py "$@" ;;     # ブラウザが開く。--dry で実機なしの練習
   demo)
     port=$(uv run python -c "import json;print(json.load(open('config.json',encoding='utf-8'))['demo']['panel_port'])")
     ( sleep 4; open_url "http://127.0.0.1:${port}" ) &
@@ -53,5 +55,5 @@ case "$mode" in
     uv run pytest -q ;;
   suction) shift; exec uv run python suction.py "$@" panel ;;
   jog) shift; exec uv run python jog.py "$@" ;;
-  *) echo "使い方: ./start.sh [auto|wizard|demo|dry|check|suction|jog]"; exit 2 ;;
+  *) echo "使い方: ./start.sh [auto|launcher|wizard|demo|dry|check|suction|jog]"; exit 2 ;;
 esac

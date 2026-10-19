@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Quest Pro 初期化と開発者モード（iPhone 用の図解）</title>
+  <style>
+/* 一列の手順書。各手順に iPhone アプリかゴーグルの画面の模式図を添え、押す所を番号つきで示す */
+:root {
+  --bg: #f4f6f8; --fg: #1b2430; --muted: #5a6675; --line: #d6dce4; --card: #ffffff;
+  --accent: #d9480f; --accent-soft: #fff0e6; --ok: #1f7a4d; --ok-soft: #e6f4ec; --warn-soft: #fff8e1; --warn: #8a6d00;
+  --phone: #1b2430; --screen: #eef1f5; --screen-fg: #10161d; --screen-line: #cfd6de; --screen-card: #ffffff;
+  --hmd: #0b0f14; --hmd-fg: #e8edf2;
+  --font: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo UI", Meiryo, system-ui, sans-serif;
+  --mono: "SF Mono", Menlo, Consolas, "BIZ UDGothic", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f141a; --fg: #e4e9ef; --muted: #98a4b2; --line: #2a3440; --card: #161d26;
+  --accent: #ff7f45; --accent-soft: #3a2316; --ok: #5cc38a; --ok-soft: #16302a; --warn-soft: #3a3010; --warn: #e8c766;
+  --phone: #000000; --screen: #1a222c; --screen-fg: #e8edf2; --screen-line: #334050; --screen-card: #232d39;
+  --hmd: #000000; --hmd-fg: #e8edf2; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f141a; --fg: #e4e9ef; --muted: #98a4b2; --line: #2a3440; --card: #161d26;
+  --accent: #ff7f45; --accent-soft: #3a2316; --ok: #5cc38a; --ok-soft: #16302a; --warn-soft: #3a3010; --warn: #e8c766;
+  --phone: #000000; --screen: #1a222c; --screen-fg: #e8edf2; --screen-line: #334050; --screen-card: #232d39;
+  --hmd: #000000; --hmd-fg: #e8edf2; color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 16px; line-height: 1.65;
+  padding-block: 12px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 640px; margin: 0 auto; display: grid; gap: 22px; }
+main > *, .card > *, ol > li, ul > li, figure, .tbl { min-width: 0; }   /* グリッドの子が pre や表の幅で広がらないように */
+pre { max-width: 100%; }
+h1 { font-size: 24px; line-height: 1.3; margin: 8px 0 2px; text-wrap: balance; }
+h2 { font-size: 19px; line-height: 1.35; margin: 0; padding-top: 6px; border-top: 2px solid var(--line); text-wrap: balance; }
+h2 .step { display: inline-block; min-width: 1.6em; padding: 0 .4em; margin-right: .4em; border-radius: 6px; background: var(--fg); color: var(--bg); font-size: 15px; text-align: center; font-variant-numeric: tabular-nums; }
+h2 .time { font-size: 13px; color: var(--muted); font-weight: normal; margin-left: .5em; white-space: nowrap; }
+p { margin: 0; }
+.lead { color: var(--muted); font-size: 15px; }
+ol, ul { margin: 0; padding-left: 1.4em; display: grid; gap: 6px; }
+li::marker { color: var(--accent); font-weight: bold; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; }
+.say { background: var(--accent-soft); border-left: 4px solid var(--accent); border-radius: 8px; padding: 10px 14px; font-size: 15px; }
+.gate { background: var(--ok-soft); border-left: 4px solid var(--ok); border-radius: 8px; padding: 10px 14px; font-size: 15px; }
+.gate b, .say b { color: inherit; }
+.warn { background: var(--warn-soft); border-left: 4px solid var(--warn); border-radius: 8px; padding: 10px 14px; font-size: 15px; }
+.flow { display: flex; flex-wrap: wrap; gap: 8px; }
+.flow span { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 14px; white-space: nowrap; }
+.flow span b { color: var(--accent); margin-right: .3em; font-variant-numeric: tabular-nums; }
+code { font-family: var(--mono); font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+pre { font-family: var(--mono); font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; }
+.tbl { overflow-x: auto; }
+/* 模式図: iPhone の画面 */
+.shots { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+figure { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.phone { width: 230px; max-width: 100%; background: var(--phone); border-radius: 28px; padding: 10px; }
+.screen { background: var(--screen); color: var(--screen-fg); border-radius: 20px; overflow: hidden; font-size: 13px; line-height: 1.4; }
+.status { display: flex; justify-content: space-between; padding: 6px 14px 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.appbar { padding: 8px 14px 10px; font-weight: 700; font-size: 15px; border-bottom: 1px solid var(--screen-line); }
+.appbar small { display: block; font-weight: normal; font-size: 12px; color: var(--muted); }
+.row { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--screen-line); background: var(--screen-card); }
+.row small { color: var(--muted); font-size: 12px; }
+.row.hl { outline: 3px solid var(--accent); outline-offset: -3px; }
+.n { position: absolute; left: -2px; top: -2px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+.row.hl .n { left: 2px; top: 50%; transform: translateY(-50%); position: absolute; }
+.row.hl .lbl { padding-left: 24px; }
+.chev { color: var(--muted); }
+.tog { width: 40px; height: 24px; border-radius: 12px; background: var(--screen-line); position: relative; flex: none; }
+.tog::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+.tog.on { background: var(--ok); }
+.tog.on::after { left: 18px; }
+.dlg { margin: 18px 12px; background: var(--screen-card); border-radius: 12px; padding: 12px; display: grid; gap: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.dlg b { font-size: 14px; }
+.dlg .btns { display: flex; gap: 8px; justify-content: flex-end; }
+.dlg .btns span { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--screen-line); }
+.dlg .btns span.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.chk { display: flex; align-items: center; gap: 8px; }
+.chk i { width: 16px; height: 16px; border: 2px solid var(--accent); border-radius: 4px; display: inline-grid; place-items: center; font-style: normal; font-size: 12px; color: var(--accent); }
+.field { margin: 10px 14px; border: 1px dashed var(--screen-line); border-radius: 8px; padding: 8px 10px; text-align: center; letter-spacing: .3em; font-family: var(--mono); font-size: 16px; }
+.hint { padding: 8px 14px; font-size: 12px; color: var(--muted); }
+/* 模式図: ゴーグルの中の画面 */
+.hmd { width: 300px; max-width: 100%; background: var(--hmd); color: var(--hmd-fg); border-radius: 14px; padding: 14px 16px; font-size: 13px; line-height: 1.5; display: grid; gap: 6px; }
+.hmd .ttl { font-weight: 700; font-size: 14px; border-bottom: 1px solid #334050; padding-bottom: 6px; }
+.hmd .item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; position: relative; }
+.hmd .item.hl { outline: 2px solid var(--accent); }
+.hmd .item.hl .n { position: static; transform: none; margin-right: 6px; }
+.hmd .mono { font-family: var(--mono); font-size: 13px; }
+.hmd .keys { font-size: 12px; color: #b7c2cf; }
+figcaption { font-size: 13px; color: var(--muted); max-width: 300px; }
+.note-fig { font-size: 12px; color: var(--muted); }
+footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; }
+@media (max-width: 420px) { body { font-size: 15px; } h1 { font-size: 22px; } .phone { width: 100%; } .hmd { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media print { body { background: #fff; color: #000; } .phone, .hmd { break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+
+<main>
+<header>
+  <p class="lead"><a href="quest_reset.html">詳しい版（quest_reset.html）</a> ｜ <a href="quest_setup.html">Quest の準備</a> ｜ <a href="vr.html">VR</a></p>
+  <h1>借りた Quest Pro を初期化して開発者モードにする</h1>
+  <p class="lead">iPhone と Meta Horizon アプリで進める手順。アプリで「開発者モードを利用できるのはデバイス所有者のみ」と出た台のためのものです。所有者を変える公式の方法は出荷時設定へのリセットだけで、リセットの後に最初にログインした人が所有者になります。</p>
+  <p class="note-fig">画面の図は模式図です。文言と並びはアプリと本体の版で少し違います。</p>
+</header>
+
+<section class="card">
+  <p><b>今日の流れ</b>（借用機 1 台あたり。更新の待ち時間を除いて約 40 分）</p>
+  <div class="flow">
+    <span><b>1</b>貸主に一言</span><span><b>2</b>電池 50% 以上</span><span><b>3</b>リセット 5 分</span><span><b>4</b>初期設定 15〜30 分</span><span><b>5</b>更新</span><span><b>6</b>開発者登録（未了なら）</span><span><b>7</b>開発者モード 2 分</span><span><b>8</b>MTP 通知と USB の許可</span><span><b>9</b>Mac で check</span>
+  </div>
+  <p class="lead">Wi-Fi（会社か iPhone のテザリング）が要るのは 4〜7。8 と 9 はネット不要です。</p>
+</section>
+
+<section class="card">
+  <h2><span class="step">1</span>貸主に伝える<span class="time">1 分</span></h2>
+  <div class="say">「開発者モードは所有者のアカウントだけと出たので、ゴーグルを<b>初期化</b>して展示用アカウントで使います。本体の中のアプリと設定は消えますが、<b>購入したものはアカウントに残ります</b>。フェスの後にもう一度初期化して返します。」</div>
+  <ul>
+    <li>残したい設定があれば、本体の 設定 → 一般（版によっては システム → バックアップ）の「クラウドバックアップ」がオンかだけ見てもらう。多くは最初からオンです。</li>
+    <li>初期設定のときに work.meta.com/device のコードを入れた台（組織管理の台）なら、管理者の設定が要るので先に貸主に聞く。</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2><span class="step">2</span>電池と iPhone の準備<span class="time">5 分</span></h2>
+  <ul>
+    <li>ゴーグルの電池を <b>50% 以上</b>にする（Meta の条件）。できれば充電しながら。</li>
+    <li>iPhone に App Store から <b>Meta Horizon</b> を入れ、<b>展示専用のアカウント</b>でログインしておく。Wi-Fi と Bluetooth をオン。</li>
+    <li>貸主のアカウントで入った iPhone は使わない。</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2><span class="step">3</span>出荷時設定にリセット（ゴーグルのボタンだけ）<span class="time">5 分</span></h2>
+  <p>貸主のスマートフォンもパスワードも要りません。取り消せないので、1 と 2 を済ませてから。</p>
+  <ol>
+    <li>電源を切る。左側の電源ボタンを長押しし「電源を切る」。</li>
+    <li><b>電源ボタンと音量（−）ボタンを同時に押し続ける</b>。英語の文字メニューが出るまで離さない。出ないときは充電してからやり直す。</li>
+    <li>音量ボタンで <b>Factory Reset</b> に合わせ、電源ボタンで決定。</li>
+    <li>音量ボタンで <b>Yes</b> に合わせ、電源ボタンで決定。消去と再起動のあと、言語を選ぶ画面になる。</li>
+  </ol>
+  <div class="shots">
+    <figure>
+      <div class="hmd">
+        <div class="ttl mono">Meta Quest Pro</div>
+        <div class="item mono">Exit and boot device</div>
+        <div class="item mono">Boot device</div>
+        <div class="item mono hl"><span><span class="n">3</span>Factory Reset</span><span class="keys">電源で決定</span></div>
+        <div class="item mono">Sideload update</div>
+        <div class="keys">音量（+／−）で上下に動かす。電源ボタンで決定。次の画面で Yes を選ぶ</div>
+      </div>
+      <figcaption>図 3: 起動メニュー（英語の文字だけの画面）。Factory Reset → Yes の順。</figcaption>
+    </figure>
+  </div>
+  <div class="gate"><b>関門 3</b>: 本体が消去されて再起動し、言語を選ぶ画面が出る。</div>
+</section>
+
+<section class="card">
+  <h2><span class="step">4</span>展示用アカウントで初期設定（iPhone でペアリング）<span class="time">15〜30 分</span></h2>
+  <ol>
+    <li>ゴーグルで言語を選び、Wi-Fi に繋ぐ。</li>
+    <li>コントローラを起こす。左はメニューボタン、右はホームボタンを 2 秒長押しして白いライトが点滅すれば準備完了。</li>
+    <li>iPhone の Meta Horizon アプリで <b>メニュー → デバイス → 新しいデバイスを接続 → Meta Quest Pro</b>。ゴーグルに出る 5 桁のコードを入れる。</li>
+    <li>ここでログインしたアカウントが所有者になる。<b>必ず展示専用アカウント</b>。</li>
+    <li>初めてなら Meta Horizon プロフィール（ゴーグルの中の名前）を作る。2 台目以降は同じプロフィールを使う。</li>
+  </ol>
+  <div class="shots">
+    <figure>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>Wi-Fi ●</span></div>
+        <div class="appbar">メニュー</div>
+        <div class="row hl"><span class="n">3</span><span class="lbl">デバイス</span><span class="chev">›</span></div>
+        <div class="row"><span>ストア</span><span class="chev">›</span></div>
+        <div class="row"><span>ライブラリ</span><span class="chev">›</span></div>
+        <div class="row"><span>設定</span><span class="chev">›</span></div>
+      </div></div>
+      <figcaption>図 4-1: アプリの「メニュー」から「デバイス」。</figcaption>
+    </figure>
+    <figure>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>Wi-Fi ●</span></div>
+        <div class="appbar">デバイス</div>
+        <div class="row hl"><span class="n">3</span><span class="lbl">＋ 新しいデバイスを接続</span><span class="chev">›</span></div>
+        <div class="row"><span>Meta Quest Pro</span><span class="chev">›</span></div>
+        <div class="field">●●●●●</div>
+        <div class="hint">ゴーグルに表示された 5 桁のコードを入力</div>
+      </div></div>
+      <figcaption>図 4-2: 「新しいデバイスを接続」→ Meta Quest Pro → ゴーグルの 5 桁のコード。</figcaption>
+    </figure>
+  </div>
+  <div class="gate"><b>関門 4</b>: ゴーグルを被るとホーム画面が出て、アプリの「デバイス」に Meta Quest Pro が表示される。</div>
+</section>
+
+<section class="card">
+  <h2><span class="step">5</span>本体の更新<span class="time">10〜30 分</span></h2>
+  <ul>
+    <li>更新が出たら、充電ドックか充電器に繋いだまま完了まで待つ。初期化した台は更新が溜まっていることがある。</li>
+    <li>手で確かめる: ゴーグルの クイックコントロール → 設定 → <b>一般 → ソフトウェアのアップデート</b>。</li>
+    <li>会場では更新を始めない（Wi-Fi が無い）。前日までに済ませる。</li>
+    <li>手だけで操作するなら、設定 → トラッキング → 「ジェスチャーコントロールとボディトラッキング」をオン。</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2><span class="step">6</span>開発者登録（まだなら・1 回だけ）<span class="time">15〜30 分</span></h2>
+  <p>開発者モードのスイッチは、開発者組織（チーム）に属し、確認の済んだアカウントにしか出ません。iPhone の Safari か PC で行います。</p>
+  <ol>
+    <li><b>developers.meta.com</b> を開き、展示専用アカウントでログイン。</li>
+    <li>開発者ダッシュボードの <b>Create New Team</b> で組織（チーム）を作る。名前は自由。</li>
+    <li>確認（verification）の欄で、<b>SMS の二段階認証</b>か<b>支払い方法</b>（PayPal は不可）を登録する。SMS が届かなければ支払い方法に切り替える。</li>
+    <li>組織の確認（身分証・通常は数分）も済ませる。Meta のサポートは開発者モードの前提として求めた例があります。</li>
+  </ol>
+  <div class="gate"><b>関門 6</b>: ダッシュボードに自分の組織が出て、確認が済んだ表示になる。</div>
+</section>
+
+<section class="card">
+  <h2><span class="step">7</span>開発者モードを入れる（iPhone のアプリ）<span class="time">2 分</span></h2>
+  <p>ゴーグルの設定にはありません。アプリで入れます。ゴーグルは電源オン・Wi-Fi に繋いだままにします。</p>
+  <ol>
+    <li>アプリ下のツールバーの<b>ヘッドセットのアイコン</b>（デバイス）をタップ。</li>
+    <li>ペアリング済みの <b>Meta Quest Pro</b>（機種名と状態の項目）をタップ。</li>
+    <li>ヘッドセットの絵の下の <b>ヘッドセット設定</b> をタップ。</li>
+    <li><b>開発者モード</b> をタップし、スイッチをオンにする。</li>
+  </ol>
+  <div class="shots">
+    <figure>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>Wi-Fi ●</span></div>
+        <div class="appbar">デバイス</div>
+        <div class="row hl"><span class="n">2</span><span class="lbl">Meta Quest Pro<br><small>接続済み・電池 82%</small></span><span class="chev">›</span></div>
+        <div class="hint">（ヘッドセットの絵）</div>
+        <div class="row hl"><span class="n">3</span><span class="lbl">ヘッドセット設定</span><span class="chev">›</span></div>
+        <div class="row"><span>キャスト</span><span class="chev">›</span></div>
+      </div></div>
+      <figcaption>図 7-1: デバイス → その台 → ヘッドセット設定。</figcaption>
+    </figure>
+    <figure>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>Wi-Fi ●</span></div>
+        <div class="appbar">ヘッドセット設定</div>
+        <div class="row"><span>Wi-Fi</span><span class="chev">›</span></div>
+        <div class="row"><span>Bluetooth</span><span class="chev">›</span></div>
+        <div class="row hl"><span class="n">4</span><span class="lbl">開発者モード</span><span class="tog on"></span></div>
+        <div class="row"><span>詳細設定</span><span class="chev">›</span></div>
+        <div class="hint">スイッチが緑（オン）になれば完了</div>
+      </div></div>
+      <figcaption>図 7-2: 「開発者モード」をオン。</figcaption>
+    </figure>
+    <figure>
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>Wi-Fi ●</span></div>
+        <div class="appbar">ヘッドセット設定</div>
+        <div class="dlg"><b>開発者モードを利用できるのはデバイス所有者のみです</b><span>この台の所有者が別のアカウントのままです。</span><div class="btns"><span class="primary">OK</span></div></div>
+        <div class="hint">これが出る台は 3 に戻って初期化する</div>
+      </div></div>
+      <figcaption>図 7-3: 追加プロフィールのアカウントで開くと出る表示。所有者でないと入れられない。</figcaption>
+    </figure>
+  </div>
+  <div class="warn"><b>項目が出ないとき</b>: 6 の登録と確認が済んでいるか、同じアカウントでアプリにログインしているか。アプリを終了して開き直し、ゴーグルも再起動する。ゴーグルの更新が残っていないか。</div>
+  <div class="gate"><b>関門 7</b>: 開発者モードのスイッチがオンで、ゴーグルの 設定 に「開発者」の項目が現れる。</div>
+</section>
+
+<section class="card">
+  <h2><span class="step">8</span>MTP 通知をオンにして USB を許可（ゴーグル）<span class="time">5 分</span></h2>
+  <p>アプリに USB の設定はありません。ここからはゴーグルと Mac だけで、ネットも要りません。</p>
+  <ol>
+    <li>Mac に adb を入れる（1 回だけ）。<pre>brew install --cask android-platform-tools</pre></li>
+    <li>ゴーグルを被り、クイック設定 → 設定（歯車）→ <b>開発者</b> で <b>MTP 通知</b> をオン。</li>
+    <li>データ対応の USB-C ケーブルでゴーグルを Mac に繋ぐ。</li>
+    <li>ゴーグルの中に「USB デバッグを許可しますか」と出るので、<b>「このコンピュータから常に許可」</b>にチェックして許可。出ないときはケーブルを挿し直してもう一度被る。</li>
+    <li>許可は Mac とゴーグルの組ごと。別の Mac を使うときはその Mac でも出し直す。</li>
+  </ol>
+  <div class="shots">
+    <figure>
+      <div class="hmd">
+        <div class="ttl">設定 › 開発者</div>
+        <div class="item hl"><span><span class="n">2</span>MTP 通知</span><span class="tog on"></span></div>
+        <div class="item"><span>USB 接続ダイアログ</span><span class="tog on"></span></div>
+        <div class="item"><span>リンクの共有</span><span class="tog"></span></div>
+        <div class="keys">「開発者」は開発者モードをオンにすると現れる。他の項目は触らない</div>
+      </div>
+      <figcaption>図 8-1: ゴーグルの 設定 → 開発者 → MTP 通知をオン。</figcaption>
+    </figure>
+    <figure>
+      <div class="hmd">
+        <div class="ttl">USB デバッグを許可しますか？</div>
+        <div class="keys">このコンピュータの RSA キーのフィンガープリント: 3A:9F:…</div>
+        <div class="chk"><i>✓</i><span><span class="n" style="position:static;display:inline-grid;margin-right:4px">4</span>このコンピュータから常に許可する</span></div>
+        <div class="item" style="justify-content:flex-end;gap:14px"><span class="keys">拒否</span><span style="color:var(--accent);font-weight:700">許可</span></div>
+      </div>
+      <figcaption>図 8-2: ケーブルを挿して被ると出る。チェックを入れて「許可」。</figcaption>
+    </figure>
+  </div>
+  <div class="gate"><b>関門 8</b>: 拒否を押してしまったら、ケーブルを抜いてゴーグルを再起動し、繋ぎ直す。</div>
+</section>
+
+<section class="card">
+  <h2><span class="step">9</span>Mac で確かめる<span class="time">2 分</span></h2>
+  <pre>cd twinarm/descovery
+./koch4/start.sh check</pre>
+  <p>最後に <code>✓ ＜番号＞: 接続済み（adb 可・USB）</code> と電池残量が出れば完了。「未許可」なら 8 の許可をやり直す。「端末が見えません」ならケーブル（充電専用は不可）と開発者モード。</p>
+  <div class="gate"><b>関門 9</b>: check に「接続済み」。ここから VR の手引き §3 の起動（<code>./koch4/start.sh vr</code>）、境界の設定、位置合わせへ。</div>
+</section>
+
+<section class="card">
+  <h2><span class="step">?</span>困ったとき</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>症状</th><th>確かめること</th></tr></thead>
+    <tbody>
+      <tr><td>「開発者モードを利用できるのはデバイス所有者のみ」</td><td>所有者が貸主のまま。3 からやり直す（初期化）。</td></tr>
+      <tr><td>アプリに「開発者モード」が無い</td><td>6 の組織とアカウントの確認。同じアカウントでログインしているか。アプリとゴーグルを再起動。更新。</td></tr>
+      <tr><td>SMS が届かない</td><td>支払い方法の登録に切り替える（PayPal は不可）。</td></tr>
+      <tr><td>ペアリングで見つからない</td><td>iPhone の Bluetooth と Wi-Fi。ゴーグルの電源。iPhone をゴーグルの近くに置く。</td></tr>
+      <tr><td>「USB デバッグを許可」が出ない</td><td>データ対応のケーブルか。開発者モードがオンか。MTP 通知がオンか。挿し直してから被る。</td></tr>
+      <tr><td>起動メニューが出ない</td><td>充電してから、電源と音量（−）を同時に長押し。</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card">
+  <h2><span class="step">後</span>フェスの後に戻す</h2>
+  <ol>
+    <li>3 の手順でもう一度出荷時設定にリセットする（電池 50% 以上）。展示用アカウント、開発者モード、USB の許可、位置合わせの保存が本体から消える。</li>
+    <li>言語を選ぶ画面のまま電源を切り、充電して返す。初期設定は貸主が自分のアカウントと iPhone で行う。</li>
+  </ol>
+</section>
+
+<footer>根拠: Meta ヘルプ「デバイス所有者の変更」「出荷時設定へのリセット」「ソフトウェアのアップデート」「ジェスチャーコントロールとボディトラッキング」、Meta 開発者文書 Device setup（2026 年 8 月版）、Meta Horizon アプリの表示（2026-10-19 本人確認）。詳しい版は twinarm の manual/quest_reset.html と quest_setup.html。</footer>
+</main>
+
+</body>
+</html>

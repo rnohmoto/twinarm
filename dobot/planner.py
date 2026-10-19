@@ -18,7 +18,13 @@ import numpy as np
 from calibrate import PixelToRobot
 from config import AppConfig, Zone
 from detect import Detection, detect_objects
-from robot_dobot import EmergencyStop, OutOfWorkspace, PickPlaceController, RobotBase
+from robot_dobot import (
+    EmergencyStop,
+    MotionError,
+    OutOfWorkspace,
+    PickPlaceController,
+    RobotBase,
+)
 
 
 @dataclass
@@ -149,6 +155,10 @@ class TaskExecutor:
                 self.stats["picks_fail"] += 1
                 self.logger({"ev": "error", "type": "EmergencyStop"})
                 return Result(False, "停止しました。", {"error": "estop"})
+            except MotionError as e:
+                self.stats["picks_fail"] += 1
+                self.logger({"ev": "error", "type": type(e).__name__, "msg": str(e)})
+                return Result(False, f"ロボットが止まりました。{e}", {"error": str(e)})
             self.last_target = target
             self.stats["picks_ok"] += 1
             done += 1
@@ -187,9 +197,19 @@ class TaskExecutor:
     def go_home(self) -> Result:
         try:
             self.robot.home()
-        except (OutOfWorkspace, EmergencyStop) as e:
+        except (OutOfWorkspace, EmergencyStop, MotionError) as e:
             return Result(False, "ホームに戻れませんでした。", {"error": str(e)})
         return Result(True, "ホームに戻りました。")
+
+    def round_trip(self) -> Result:
+        """作業域内を 1 往復して home へ（試運転・非常停止の試験用）。"""
+        try:
+            self.robot.round_trip()
+        except EmergencyStop as e:
+            return Result(False, "往復の途中で止めました。", {"error": str(e)})
+        except (OutOfWorkspace, MotionError) as e:
+            return Result(False, "往復できませんでした。", {"error": str(e)})
+        return Result(True, "往復してホームに戻りました。")
 
     def stop(self) -> Result:
         self.robot.stop()

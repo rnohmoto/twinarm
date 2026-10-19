@@ -49,12 +49,20 @@ def thermistor_c(adc: int, r_pullup: float = 4700.0, r25: float = 100000.0, beta
     return 1.0 / inv_t - 273.15
 
 
+ROUND_TRIP_DX = 30.0   # 往復の退避点: home から前へ (mm)
+ROUND_TRIP_DY = 40.0   # 往復の退避点: home から左右へ (mm)
+
+
 class OutOfWorkspace(Exception):
     pass
 
 
 class EmergencyStop(Exception):
     pass
+
+
+class MotionError(RuntimeError):
+    """移動が正常に終わらなかった（magician バックエンド。停止手順 ForceStop→Clear→ポンプ停止は送信済み）。"""
 
 
 @dataclass
@@ -126,6 +134,15 @@ class RobotBase:
             pass
         self.move_to(x, y, z, r)
 
+    def round_trip(self) -> None:
+        """作業域内を 1 往復して home へ（吸着は使わない）。非常停止の試験と疎通確認用。"""
+        x0, y0, _z0, r0 = self.cfg.home_xyzr
+        self.log.append("round_trip")
+        self.home()
+        self.move_to(x0 + ROUND_TRIP_DX, y0 + ROUND_TRIP_DY, self.cfg.z_safe, r0)
+        self.move_to(x0 + ROUND_TRIP_DX, y0 - ROUND_TRIP_DY, self.cfg.z_safe, r0)
+        self.home()
+
     def stop(self) -> None:
         self.estop.set()
         self.log.append("ESTOP")
@@ -146,8 +163,16 @@ class DryRunRobot(RobotBase):
         return self._pose
 
     def _move(self, x, y, z, r, wait):
+        # 模擬の移動中も estop を見る（実機の移動待ちと同じ分岐。停止は 1 区間を待たずに効く）
         if self.sim_move_s:
-            time.sleep(self.sim_move_s)
+            end = time.monotonic() + self.sim_move_s
+            while True:
+                if self.estop.is_set():
+                    raise EmergencyStop("estop during simulated move")
+                left = end - time.monotonic()
+                if left <= 0:
+                    break
+                time.sleep(min(0.02, left))
         self._pose = (x, y, z, r)
 
     def _ee(self, on):
@@ -170,7 +195,9 @@ class PydobotRobot(RobotBase):
 
     @staticmethod
     def list_candidate_ports() -> list[str]:
-        """CP210x（Silicon Labs）または説明に Dobot を含むポートを列挙する（選びはしない）。
+        """CP210x（Silicon Labs）・CH9102（WCH 1A86:55D4）・説明に Dobot を含むポートを列挙する（選びはしない）。
+
+        USB-シリアル変換は個体で違う: 2026-10-05 に繋いだ機体（SN DT1426040100）は CH9102 だった。
 
         twinarm の実機規則: ポートは推測せず、ユーザーが渡す。ここは候補を見せるだけ。
         """
@@ -178,7 +205,7 @@ class PydobotRobot(RobotBase):
         cands = []
         for p in list_ports.comports():
             desc = f"{p.description} {p.manufacturer} {p.hwid}".lower()
-            if "cp210" in desc or "silicon labs" in desc or "dobot" in desc:
+            if "cp210" in desc or "silicon labs" in desc or "dobot" in desc or "1a86:55d4" in desc:
                 cands.append(p.device)
         return cands
 
@@ -277,6 +304,10 @@ def make_robot(cfg: RobotConfig) -> RobotBase:
         return DryRunRobot(cfg)
     if cfg.backend == "pydobot":
         return PydobotRobot(cfg)
+    if cfg.backend == "magician":
+        # 遅延 import（jog.py が本モジュールを import するため）
+        from robot_magician import MagicianRobot
+        return MagicianRobot(cfg)
     raise ValueError(f"unknown robot backend: {cfg.backend}")
 
 

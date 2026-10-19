@@ -5,6 +5,8 @@
 #   ./start.sh demo     実演画面（config.json のポートとカメラで。ブラウザが開く）
 #   ./start.sh dry      実機なしの実演（動作確認）
 #   ./start.sh check    読み取りだけ（カメラ一覧・ポート候補・テスト）
+#   ./start.sh suction --port /dev/cu.usbserial-XXXX   吸引 ON/OFF だけの画面（腕は動かさない）
+#   ./start.sh jog --port /dev/cu.usbserial-XXXX       前後・左右・上下のコントローラーと吸引の画面（腕が動く）
 set -e
 cd "$(dirname "$0")"
 
@@ -12,7 +14,7 @@ if ! command -v uv >/dev/null 2>&1; then
   echo "uv が見つかりません。https://docs.astral.sh/uv/ の手順でインストールしてから再実行してください。"
   exit 1
 fi
-uv sync -q
+uv sync -q --inexact   # keep the voice/llm extras installed by "uv sync --extra voice --extra llm"
 
 open_url() {
   local url="$1"
@@ -49,5 +51,7 @@ case "$mode" in
     uv run python check_camera.py --list || true
     uv run python check_robot.py --list
     uv run pytest -q ;;
-  *) echo "使い方: ./start.sh [auto|wizard|demo|dry|check]"; exit 2 ;;
+  suction) shift; exec uv run python suction.py "$@" panel ;;
+  jog) shift; exec uv run python jog.py "$@" ;;
+  *) echo "使い方: ./start.sh [auto|wizard|demo|dry|check|suction|jog]"; exit 2 ;;
 esac

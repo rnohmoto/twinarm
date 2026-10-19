@@ -27,7 +27,9 @@ first-time setup manual.
   for any new guard or pure function before wiring it to hardware.
 - `demo.py` is the only long-running process that owns the camera and the arm, and it does so on
   one worker thread. `panel_web.py` never touches hardware: browser buttons queue commands. Keep
-  that split when adding UI features.
+  that split when adding UI features. `suction.py panel` (pump only) and `jog.py` (step moves
+  plus pump) also open the Magician's port, with the same split: one worker thread owns the serial
+  port and HTTP handlers only submit jobs to it. Only one of these processes can run at a time.
 - `config.json` is generated from `config.py` defaults (`uv run python config.py config.json`)
   and then edited by `setup_wizard.py` on the real bench. Do not hand-write coordinates into it
   from here; they come from the arm's pose on site.

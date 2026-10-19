@@ -18,18 +18,54 @@ Magician can and cannot report) · [`manual/purchase.html`](manual/purchase.html
 
 ## Status
 
-Offline tests pass with no hardware (`uv run pytest`, 23 tests). `demo.py --dry-run` runs the whole
-pipeline against a synthetic frame and serves the browser panel. Real-arm and real-camera steps have
-**not** been run yet: the Magician is on hand but not connected, and the camera is not bought.
+Offline tests pass with no hardware (`uv run pytest`). `demo.py --dry-run` runs the whole
+pipeline against a synthetic frame and serves the browser panel. On 2026-10-05 the Magician was
+connected to the Mac for the first time: it answers on a CH9102 USB-serial port (not CP210x) as
+serial number `DT1426040100`, firmware 4.0.6, and accepts the suction command (`suction.py pulse`: read-back
+ON, then OFF). On 2026-10-15 (fest Mac D bench, C922 overhead) the user confirmed on the real arm: `jog.py` step
+moves, the workspace guard refusing x > 300, Esc stopping a held move, the cup holding a wood block;
+`demo.py --robot magician` homed at start, and the stop lane (往復（試運転） → 非常停止 → 停止解除 →
+ホーム) was accepted within the same second in the panel events. Camera lock on the Mac, calibration
+(wizard 3–8) and the 20-cycle run are still open.
 
 ## Quick start
+
+Bench session with Claude Code on the fest Mac (role D): paste the prompt in
+[`../docs/fest_start_prompts.md`](../docs/fest_start_prompts.md) section 4 D. It walks M0 (link-up and
+stop), M1/M2 (camera lock and calibration), M3 (20 cycles), then voice, and asks you for the port.
 
 ```bash
 cd dobot
 ./start.sh            # Mac/Linux: wizard if not configured yet, otherwise the demo panel (.\start.bat on Windows)
 ./start.sh dry        # no hardware: synthetic camera + recording robot, panel at http://127.0.0.1:8790
 ./start.sh check      # read-only: cameras, candidate ports, offline tests
+./start.sh suction --port /dev/cu.usbserial-XXXX   # suction ON/OFF panel only, at http://127.0.0.1:8791
 ```
+
+Suction alone (for filming; the arm does not move, homing is not needed):
+
+```bash
+uv run python suction.py --port /dev/cu.usbserial-XXXX panel    # two big buttons; Space toggles, O = on, F = off
+uv run python suction.py --port /dev/cu.usbserial-XXXX on       # also: off / status / pulse --seconds 3
+```
+
+The panel switches the pump off by itself after `--max-on-s` (300 s; 0 disables) and on exit.
+
+Controller for filming (**moves the arm**: forward/back, left/right, up/down in fixed steps, plus suction):
+
+```bash
+./start.sh jog --port /dev/cu.usbserial-XXXX        # or: uv run python jog.py --port ... ; --dry for no hardware
+```
+
+One press is one straight step of 1/5/10/20 mm; holding a button or key repeats steps one at a time, so
+the arm never travels more than one step after release. Keys: arrows = forward/back/left/right, W/S =
+up/down, Space = suction, Esc = stop. Targets go through the workspace guard in `config.json` and a
+joint-range check (J2 0–85°, J3 −10–95°, computed from the pose; the model matches the angles the arm
+reports); `--speed` (default 30 %) sets the PTP velocity ratio. Directions are in the robot frame and
+assume the arm was homed after power-on. If the firmware still stops a move with a range alarm (for
+example 0x22, inverse-kinematics limit), the panel stops the queue, clears the alarm and says so; other
+alarms stay until "アラーム解除" is pressed. Every step is logged to `logs/jog_YYYYMMDD.jsonl` (pose,
+joint angles, target, result, alarm codes).
 
 Or step by step:
 
@@ -46,10 +82,24 @@ answer `y`):
 ```bash
 uv run python setup_wizard.py             # 1 camera · 2 robot · 3 markers · 4 calibrate · 5 zones · 6 heights · 7 detect · 8 smoke test
 uv run python demo.py --config config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
+uv run python demo.py --config config.json --robot magician --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm   # direct protocol + stop lane
 ```
 
-Then open http://127.0.0.1:8790 (camera with detection boxes, what was heard → intent → reply,
-robot state, buttons: send text / mic / home / tidy / e-stop / resume / attract loop).
+`--robot magician` (`robot_magician.py`) talks the Dobot protocol directly instead of pydobot: the e-stop button sets
+the stop event on the HTTP thread at once, and the worker thread, polling the queue index inside its own motion wait,
+sends ForceStop → Clear → pump-off itself. Motion speed is `robot.speed_pct` (percent, default 30). First run on the
+real arm on 2026-10-15 (home at start, e-stop during 往復 accepted at once); the two-stage suction
+release still needs confirming with an object.
+
+Then open http://127.0.0.1:8790 (camera with detection boxes, the voice card, what was heard → intent → reply,
+robot state, buttons: send text / home / tidy / e-stop / resume / attract loop).
+
+Voice UI (`voice_front.py`, robotics T13 Step 2/3/5): hold the big mic button or the Space key while you speak;
+on release the panel shows what was heard and the interpretation, then runs it after `demo.confirm_auto_run_s`
+(default 2 s; Enter runs at once, Esc cancels). An ambiguous utterance (negation, two objects, "that one",
+"reset") is shown with 「これですか？」 and waits for Enter/Esc. Stop words (「止まって」「待って」 …) trigger the
+e-stop lane at once. Needs the `voice` extras (faster-whisper + sounddevice); without a mic, type into the
+聞き取り box and press 「文字で試す」 to rehearse the same flow in `--dry-run`.
 
 Read-only checks used inside the wizard are also standalone:
 
@@ -86,25 +136,29 @@ Risk classes: **read-only** (no motion), **moves arm** (commands motion), **came
 | Script | Purpose | Hardware risk |
 | ------ | ------- | ------------- |
 | `setup_wizard.py` | Guided first-time setup: camera + exposure lock, port + homing check, ArUco markers, calibration, zone teaching (hand-guide with the forearm unlock key), per-object `z_pick`, detection tuning, smoke test. Saves `config.json` after each step. | reads only by default; **moves arm** only after `y` (home / smoke test) |
-| `demo.py` | Demo runner: browser panel + dialog mode + attract loop. One worker thread owns camera and robot; the panel only queues commands. | **moves arm** with `--robot pydobot`; `--dry-run` never does |
+| `demo.py` | Demo runner: browser panel + dialog mode + attract loop. One worker thread owns camera and robot; the panel only queues commands (the e-stop button additionally sets the stop event on the HTTP thread). | **moves arm** with `--robot pydobot` / `--robot magician`; `--dry-run` never does |
 | `panel_web.py` | stdlib HTTP server: `/` page, `/stream` MJPEG, `/status` JSON, `POST /cmd`. | none |
-| `check_camera.py` | Enumerate cameras; open one, lock exposure/WB, measure brightness jitter, save a snapshot to `logs/`. | camera only |
+| `check_camera.py` | Enumerate cameras; open one, lock exposure/WB and autofocus (read back), measure brightness jitter, save a snapshot to `logs/`. | camera only |
+| `suction.py` | Suction pump ON/OFF only: `on` / `off` / `status` / `pulse` commands and a two-button browser panel (port 8791). Talks the Dobot protocol directly (immediate command, no queue, no pydobot). | **runs the pump**; never moves the arm; `--dry` touches nothing |
+| `jog.py` | Filming controller: browser panel (port 8791) with step moves on X/Y/Z, stop, alarm clear and suction ON/OFF. Reuses `suction.py`'s worker and panel; targets pass the workspace guard. | **moves arm** on every button press; `--dry` never does |
 | `check_robot.py` | List candidate ports (`--list`); connect and print pose; `--home` / `--round-trip` move the arm; `--dry` rehearses without hardware. | read-only by default; **moves arm** with flags |
 | `calibrate.py` | Eye-to-hand calibration: print ArUco markers (`--make-markers`), then fit pixels→robot XY into `assets/homography.json` while *you* jog the arm. | read-only |
 | `main.py` | CLI app (OpenCV window): `--tune` (camera only), `--dry-run`, or live with `--robot pydobot`. `demo.py` reuses its `build()`. | **moves arm** when `--robot pydobot` |
 | `robot_dobot.py` | pydobot wrapper with workspace guard (AABB + reach annulus), emergency stop, dry-run robot; refuses to guess a port. | **moves arm** with `--live` |
+| `robot_magician.py` | Direct-protocol backend (`--robot magician`, built on `jog.py`/`suction.py`): queue-index motion wait that watches the e-stop event, ForceStop → Clear → pump-off halt lane, two-stage suction release (both immediate commands), alarm read before and during motion. No pydobot. | **moves arm** with `--robot magician` |
 | `camera.py` / `detect.py` / `planner.py` | UVC/RealSense/file camera with exposure lock and read-back; HSV + shape detection; TaskExecutor (observe → select → pick and place, tidy up, zone slots). | camera / via robot |
-| `rule_parser.py` / `llm_agent.py` | Japanese rule parser (offline) / Claude tool-use agent (enum-only arguments, no coordinates from the LLM; tools: list_objects, pick_and_place, tidy_up, go_home, stop). | none |
-| `asr.py` / `tts.py` | Push-to-talk faster-whisper / VOICEVOX-say-SAPI. Optional extras. | none |
+| `rule_parser.py` / `llm_agent.py` | Japanese rule parser (offline; flags ambiguous utterances and takes the last-named object after a negation; wider stop words; home before tidy) / Claude tool-use agent (enum-only arguments, no coordinates from the LLM; tools: list_objects, pick_and_place, tidy_up, go_home, stop). | none |
+| `asr.py` / `tts.py` | Hold-to-talk recorder (ring buffer with pre/post-roll, no Enter) + faster-whisper with per-segment confidence and a hallucination/confidence gate / VOICEVOX-say-SAPI. Optional extras. | none |
+| `voice_front.py` | Voice dialog state machine on its own ASR thread: record → transcribe → rule parse → show heard text + interpretation → countdown run, 「これですか？」 for ambiguous ones, stop words → e-stop lane. Hands only confirmed intents to the worker. | none (serial untouched) |
 | `config.py` | Dataclasses + JSON (`python config.py config.json` writes the defaults). | none |
-| `tests/` | Offline tests: detection incl. shapes, homography, parsing, guards, executor, panel HTTP, demo runner, wizard helpers. | none |
+| `tests/` | Offline tests: detection incl. shapes, homography, parsing, guards, executor, panel HTTP, demo runner, wizard helpers, stop lane (fake arm + dry-run panel e-stop), voice UI (fake mic stream, transcript gate, 99-utterance parser regression in `tests/data/`, dialog state machine, panel round trip). | none |
 
 ## Layout
 
 ```
 dobot/
   AGENTS.md  README.md  pyproject.toml  config.json
-  setup_wizard.py  demo.py  panel_web.py  main.py  check_camera.py  check_robot.py  calibrate.py
+  setup_wizard.py  demo.py  panel_web.py  main.py  check_camera.py  check_robot.py  calibrate.py  suction.py  jog.py
   camera.py  detect.py  planner.py  robot_dobot.py  rule_parser.py  llm_agent.py  asr.py  tts.py  config.py
   tests/           offline tests (pytest)
   manual/          first-time setup manual (index.html) + img/ photo slots
@@ -125,6 +179,9 @@ too (community reports); Magician E6 is TCP/IP and needs a different adapter (fo
 uv sync --extra llm      # anthropic (Claude tool use); set ANTHROPIC_API_KEY
 uv sync --extra voice    # faster-whisper + sounddevice (push-to-talk)
 ```
+
+`./start.sh` / `.\start.bat` run `uv sync --inexact`, so extras installed this way stay in `.venv`
+(a plain `uv sync` removes them again).
 
 LLM defaults (`config.json` → `llm`): `claude-sonnet-5`, adaptive thinking, `effort: low`, five strict
 enum-only tools. Switch to `claude-opus-5` by editing `llm.model`; `claude-haiku-4-5` would need the call in

@@ -149,7 +149,7 @@
 <h3>3.1 なぜ「固定」が要るか</h3>
 <p>このシステムは色（HSV）で物を見つけ、画像の位置を mm に変換します。カメラが<strong>露出・ホワイトバランス・フォーカスを自動で変える</strong>と、色のしきい値が外れたり像の倍率が変わったりして、拾い損ねや数 mm のずれが出ます。純正ビジョンキットも固定焦点レンズを使い、国内の実務例でも「高さでピントが合わず認識率が落ちた」報告があります。対策は 2 つで、どちらも C920n で可能です。</p>
 <ul>
-  <li><strong>AF を止める</strong>: <code>check_camera.py</code> が OpenCV から自動露出を切り、効いたかを読み戻して報告します。AF は <code>CAP_PROP_AUTOFOCUS=0</code>（Windows／Linux）。Mac は OpenCV から触れないので、Logi Tune（対応機種なら）か OS 側で固定します。</li>
+  <li><strong>AF・露出・ホワイトバランスを止める</strong>: Windows と Linux は <code>check_camera.py</code> が OpenCV から書きます（Windows は DirectShow を明示。自動露出の読み戻しは DirectShow が対応しないので、効いたかは明るさの揺れで判断します）。Mac は OpenCV から触れないので、Logitech の <strong>Logi Options+</strong>（公式手順: Camera settings → Focus → Auto Focus を切ってスライダで合わせる。設定を効かせ続けるためアプリはバックグラウンドで起動したままにする）か Logi Tune、またはコマンドの <code>uvc-util</code> で固定します。C920／C922 は設定を本体に保存しない（新しいセッションで自動に戻る報告）ので、起動のたびに「固定 → <code>check_camera.py</code> で確認 → 起動」の順にします。</li>
   <li><strong>固定焦点のカメラを選ぶ</strong>: Elgato Facecam MK.2（30〜120cm 固定焦点・設定を本体に保存）なら、PC を替えても同じ状態が再現します。C270n も固定焦点ですが画角 55° と狭く、合焦距離が高さに合わない例があります。</li>
 </ul>
 <h3>3.2 置き方</h3>

@@ -139,11 +139,94 @@ function buildArms(){
   for (const [id, cfg] of Object.entries(CONFIG.arms)) arms[id] = makeArm(id, cfg);
   applyBases(); buildDesk(); applyGhost();
 }
-function applyBases(){
-  for (const a of Object.values(arms)) { const b = a.cfg.base; a.group.position.set(b.x, b.y, b.z); a.group.rotation.y = rad(b.yaw_deg); }
+function applyBases(fromUser){
+  for (const a of Object.values(arms)) {
+    const b = a.cfg.base; a.group.position.set(b.x, b.y, b.z); a.group.rotation.set(0, rad(b.yaw_deg), 0);
+    const st = anchorState[a.id];
+    if (fromUser && st && st.pose) st.off = relativePose(st.pose, baseToPose(b));   // 編集・位置合わせで台を動かした: アンカーからの差分を持ち直す
+  }
   if (arms[primaryId()]) arms[primaryId()].group.updateMatrixWorld(true);
 }
 const prim = () => arms[primaryId()];
+
+// ───────── 空間アンカー（AR）: 位置合わせの結果を実世界に固定し、次のセッション・付け替え・境界の引き直しの後も自動で復元 ─────────
+// 「確定(保存)」でアンカーを登録し、永続ハンドルをこのブラウザ（ヘッドセット）に保存する。AR を始めるたびに復元して分身の台を置く。
+// 復元できないときは従来どおり Mac の設定値（台の x/y/z/yaw）から始め、C で合わせる。URL に ?anchors=0 を付けると使わない。
+const ANCHORS_ON = new URLSearchParams(location.search).get('anchors') !== '0';
+const ANCHOR_KEY = id => `koch4.anchor.${id}`;
+const anchorState = {};           // armId -> { anchor, uuid, pose:{p,q}|null（アンカーの最新の姿勢）, off:{p,q}（台のアンカーからの差分）, status }
+const anchorReq = new Set();      // 次のフレームで登録し直す腕
+let xrSession = null, anchorsOk = false;
+const UP = new THREE.Vector3(0, 1, 0);
+const identityOff = () => ({ p:new THREE.Vector3(), q:new THREE.Quaternion() });
+function baseToPose(b){ return { p:new THREE.Vector3(b.x, b.y, b.z), q:new THREE.Quaternion().setFromAxisAngle(UP, rad(b.yaw_deg)) }; }
+function yawOf(q){ return new THREE.Euler().setFromQuaternion(q, 'YXZ').y; }
+function composePose(a, off){ return { p: off.p.clone().applyQuaternion(a.q).add(a.p), q: a.q.clone().multiply(off.q) }; }
+function relativePose(a, w){ const qi = a.q.clone().invert(); return { p: w.p.clone().sub(a.p).applyQuaternion(qi), q: qi.clone().multiply(w.q) }; }
+function readStored(id){ try { return localStorage.getItem(ANCHOR_KEY(id)); } catch(e) { return null; } }
+function writeStored(id, uuid){ try { if (uuid) localStorage.setItem(ANCHOR_KEY(id), uuid); else localStorage.removeItem(ANCHOR_KEY(id)); } catch(e) { /* プライベートモードなど */ } }
+function blankAnchor(status){ return { anchor:null, uuid:null, pose:null, off:identityOff(), status }; }
+async function restoreAnchors(session){
+  for (const id of armIds()) {
+    const st = anchorState[id] = blankAnchor('');
+    const uuid = readStored(id);
+    if (!uuid) { st.status = 'アンカー未登録→C で位置合わせ'; continue; }
+    if (typeof session.restorePersistentAnchor !== 'function') { st.status = '永続アンカー非対応→C'; continue; }
+    try { st.anchor = await session.restorePersistentAnchor(uuid); st.uuid = uuid; st.status = 'アンカー復元中'; }
+    catch(e) { st.status = `アンカー復元失敗(${e.message})→C`; writeStored(id, null); }
+  }
+}
+// 毎フレーム: アンカーの姿勢に差分を掛けて台を置く。位置合わせ中は解法の結果を優先し、見失っている間は直前の姿勢のまま
+function updateAnchors(frame, refOverride){
+  const ref = refOverride || renderer.xr.getReferenceSpace(); if (!frame || !ref) return;
+  for (const a of Object.values(arms)) {
+    const st = anchorState[a.id]; if (!st || !st.anchor) continue;
+    let pose = null; try { pose = frame.getPose(st.anchor.anchorSpace, ref); } catch(e) { pose = null; }
+    if (!pose) { if (!st.pose) st.status = 'アンカー追跡待ち'; continue; }
+    const t = pose.transform;
+    st.pose = { p:new THREE.Vector3(t.position.x, t.position.y, t.position.z), q:new THREE.Quaternion(t.orientation.x, t.orientation.y, t.orientation.z, t.orientation.w) };
+    if (calib.on && calib.armId === a.id) { st.status = 'アンカー(位置合わせ中)'; continue; }
+    const w = composePose(st.pose, st.off);
+    a.group.position.copy(w.p); a.group.quaternion.copy(w.q);
+    const b = a.cfg.base; b.x = +w.p.x.toFixed(4); b.y = +w.p.y.toFixed(4); b.z = +w.p.z.toFixed(4); b.yaw_deg = +deg(yawOf(w.q)).toFixed(2);
+    st.status = 'アンカー復元済み';
+  }
+  if (anchorReq.size) for (const id of [...anchorReq]) { anchorReq.delete(id); createAnchorFor(id, frame, ref); }
+}
+async function createAnchorFor(id, frame, ref){
+  const a = arms[id]; if (!a) return;
+  const st = anchorState[id] || (anchorState[id] = blankAnchor(''));
+  const b = baseToPose(a.cfg.base);
+  try {
+    const xf = new XRRigidTransform({ x:b.p.x, y:b.p.y, z:b.p.z, w:1 }, { x:b.q.x, y:b.q.y, z:b.q.z, w:b.q.w });
+    const anchor = await frame.createAnchor(xf, ref);
+    const old = st.anchor, oldUuid = st.uuid;
+    st.anchor = anchor; st.pose = b; st.off = identityOff();
+    if (old && old !== anchor) { try { old.delete(); } catch(e) { /* 既に無効 */ } }
+    let uuid = null;
+    if (typeof anchor.requestPersistentHandle === 'function') { try { uuid = await anchor.requestPersistentHandle(); } catch(e) { st.status = `アンカー登録(このセッションだけ: ${e.message})`; } }
+    else st.status = 'アンカー登録(永続化は非対応)';
+    if (uuid) {
+      if (oldUuid && oldUuid !== uuid && xrSession && typeof xrSession.deletePersistentAnchor === 'function') { try { await xrSession.deletePersistentAnchor(oldUuid); } catch(e) { /* 無ければよい */ } }
+      st.uuid = uuid; writeStored(id, uuid); st.status = 'アンカー登録済み';
+    }
+  } catch(e) { st.status = `アンカー登録失敗(${e.message})`; }
+}
+async function clearAnchors(){
+  for (const id of armIds()) {
+    const st = anchorState[id];
+    if (st && st.uuid && xrSession && typeof xrSession.deletePersistentAnchor === 'function') { try { await xrSession.deletePersistentAnchor(st.uuid); } catch(e) { /* 無ければよい */ } }
+    if (st && st.anchor) { try { st.anchor.delete(); } catch(e) { /* 既に無効 */ } }
+    writeStored(id, null);
+    anchorState[id] = blankAnchor('アンカー解除→台は設定値');
+  }
+  applyBases();
+}
+function anchorText(){
+  if (!renderer.xr.isPresenting || !ANCHORS_ON) return '';
+  const parts = Object.values(arms).map(a => { const st = anchorState[a.id]; return st && st.status ? `${a.id}:${st.status}` : ''; }).filter(Boolean);
+  return parts.length ? ' / ' + parts.join('・') : (anchorsOk ? '' : ' / アンカー非対応');
+}
 
 // ───────── 机（1 本目の腕のローカル座標。2 本目の腕の台座も載るように広げる） ─────────
 let desk = null, deskRect = { x0:-0.2, x1:0.3, z0:-0.15, z1:0.25 };
@@ -447,7 +530,7 @@ function applyPose(tms){
     hudMode.innerHTML = t; return;
   }
   hudBox.style.display = 'block'; hudBox.firstChild.textContent = 'Koch4 XR'; hudBox.querySelector('br').style.display = '';
-  hudMode.innerHTML = lines.join('<br>') + `<br>表示: ${view}` + (calib.on ? ' / <b>位置合わせ中</b>' : '') + (SPECTATOR ? ' / <b>観客モード</b>' : '')
+  hudMode.innerHTML = lines.join('<br>') + `<br>表示: ${view}${anchorText()}` + (calib.on ? ' / <b>位置合わせ中</b>' : '') + (SPECTATOR ? ' / <b>観客モード</b>' : '')
     + (renderer.xr.isPresenting ? '' : ` / 画面: ${LAYOUT_NAMES[layout]}`)
     + targetHud()
     + `<br>キー: 1-3 強制 0 解除 R 配置 E 編集 C 位置合わせ G 分身の見せ方 V 視点 M 画面の割り方 J 関節名 B 置く的 H 文字を消す S 音 Tab 腕切替`;
@@ -560,10 +643,14 @@ const calibBox = document.getElementById('calib');
 function startCalib(){
   if (SPECTATOR) return;
   calib.on = true; calib.armId = selArm; calib.points = []; clearCalibMarkers();
+  const st = anchorState[selArm];   // 中止したときにアンカーからの差分を戻せるように控える
+  calib.savedOff = st && st.off ? { p: st.off.p.clone(), q: st.off.q.clone() } : null;
   showCalib(); buildButtons();
 }
 function stopCalib(save){
   calib.on = false; calibBox.style.display = 'none'; clearCalibMarkers();
+  if (!save && calib.savedOff && anchorState[calib.armId]) anchorState[calib.armId].off = calib.savedOff;
+  calib.savedOff = null;
   if (save) saveConfig(); buildButtons();
 }
 function clearCalibMarkers(){ calib.markers.forEach(m => scene.remove(m)); calib.markers = []; }
@@ -600,7 +687,7 @@ function solveCalib(arm){
   const pc = new THREE.Vector3(), rq = new THREE.Vector3();
   pts.forEach(({p, q}) => { pc.add(p); rq.add(rotY(q, th)); }); pc.divideScalar(pts.length); rq.divideScalar(pts.length);
   b.x = +(pc.x - rq.x).toFixed(4); b.y = +(pc.y - rq.y).toFixed(4); b.z = +(pc.z - rq.z).toFixed(4); b.yaw_deg = +deg(th).toFixed(2);
-  applyBases(); buildDesk(); buildEditor();
+  applyBases(true); buildDesk(); buildEditor();
 }
 function calibResidual(arm){
   const b = arm.cfg.base, th = rad(b.yaw_deg); let s = 0;
@@ -661,6 +748,7 @@ function buildButtons(){
   if (!SPECTATOR) addBtn('C 位置合わせ', startCalib, 'calib');
   addBtn('G 分身', cycleGhost);
   addBtn('E 編集', toggleEditor);
+  if (!SPECTATOR && renderer.xr.isPresenting && anchorsOk) addBtn('A アンカー解除', clearAnchors);
   xrButtons.forEach(([l, f]) => addBtn(l, f));
   forceBtns.forEach(([b, name, id]) => b.classList.toggle('on', !!(arm.forced && arm.forced.name === name)));
 }
@@ -719,7 +807,7 @@ function buildEditor(){
     d.append(span, off, sg); editor.appendChild(d);
   });
   const hb = document.createElement('h3'); hb.textContent = `腕 ${arm.id} の台（m・yaw°）`; editor.appendChild(hb);
-  const b = arm.cfg.base, afterBase = () => { applyBases(); buildDesk(); };
+  const b = arm.cfg.base, afterBase = () => { applyBases(true); buildDesk(); };
   editor.appendChild(num('x', () => b.x, v => b.x = v, 0.01, undefined, undefined, afterBase));
   editor.appendChild(num('y', () => b.y, v => b.y = v, 0.01, undefined, undefined, afterBase));
   editor.appendChild(num('z', () => b.z, v => b.z = v, 0.01, undefined, undefined, afterBase));
@@ -752,6 +840,7 @@ async function saveConfig(){
   try { const r = await fetch('/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(CONFIG) });
         if (r.ok) { adoptConfig(await r.json()); for (const a of Object.values(arms)) a.sendStatus = '設定を保存'; } else { for (const a of Object.values(arms)) a.sendStatus = `設定保存 HTTP ${r.status}`; } }
   catch(e) { for (const a of Object.values(arms)) a.sendStatus = '設定保存 失敗(サーバなし)'; }
+  if (renderer.xr.isPresenting && anchorsOk) for (const id of armIds()) anchorReq.add(id);   // 保存した台の位置をアンカーとして登録し直す
 }
 async function resetConfig(){
   adoptConfig(structuredClone(DEFAULTS));
@@ -765,15 +854,21 @@ const xrButtons = [];
 async function startXR(mode){
   try {
     unlockAudio();
-    const init = { optionalFeatures: ['local-floor', 'dom-overlay', 'hand-tracking'], domOverlay: { root: document.body } };
+    const features = ['local-floor', 'dom-overlay', 'hand-tracking']; if (ANCHORS_ON) features.push('anchors');
+    const init = { optionalFeatures: features, domOverlay: { root: document.body } };
     const s = await navigator.xr.requestSession(mode, init);
     arActive = (mode === 'immersive-ar');
     scene.background = arActive ? null : new THREE.Color(0x27364a);
     grid.visible = !arActive;
     renderer.xr.setReferenceSpaceType('local-floor');
     await renderer.xr.setSession(s);
-    applyGhost();
-    s.addEventListener('end', () => { arActive = false; scene.background = INLINE_BG; grid.visible = true; applyGhost(); if (calib.on) stopCalib(false); });
+    xrSession = s; anchorsOk = ANCHORS_ON && (Array.isArray(s.enabledFeatures) ? s.enabledFeatures.includes('anchors') : true);
+    if (anchorsOk) restoreAnchors(s); else for (const id of armIds()) anchorState[id] = blankAnchor(ANCHORS_ON ? 'アンカー非対応→台は設定値' : '');
+    applyGhost(); buildButtons();
+    s.addEventListener('end', () => {
+      arActive = false; xrSession = null; anchorsOk = false; for (const id of Object.keys(anchorState)) delete anchorState[id];
+      scene.background = INLINE_BG; grid.visible = true; applyGhost(); if (calib.on) stopCalib(false); applyBases(); buildButtons();
+    });
   } catch(e) { hudMode.innerHTML = 'XR開始失敗: ' + e.message; }
 }
 (async () => {
@@ -792,12 +887,32 @@ window.koch4 = {
   objs: () => objs.map(o => ({ name:o.name, heldBy:o.heldBy, asleep:o.asleep, p:o.mesh.position.toArray().map(v => +v.toFixed(3)), v:o.v.toArray().map(v => +v.toFixed(3)) })),
   arms: () => Object.fromEntries(Object.entries(arms).map(([k, a]) => [k, { current: a.current && a.current.name, forced: a.forced && a.forced.name, sendStatus: a.sendStatus, base: a.cfg.base }])),
   config: () => CONFIG, calib, force: (armId, name) => setForced(arms[armId], objs.find(o => o.name === name) || null),
+  anchors: () => Object.fromEntries(Object.entries(anchorState).map(([k, s]) => [k, { uuid:s.uuid, status:s.status, hasAnchor: !!s.anchor }])),
+  anchorState, mkPose: b => baseToPose(b), updateAnchors,   // 実機の開発者ツールや自動テストから、アンカーの状態を読み書きする
+};
+// 自己診断（デスクトップのコンソールで koch4AnchorSelfTest()）: 差分の往復と、原点が変わったときに台がアンカーと一緒に動くこと
+window.koch4AnchorSelfTest = function(){
+  const arm = prim(); const keepBase = structuredClone(arm.cfg.base), keepSt = anchorState[arm.id];
+  const A = { p:new THREE.Vector3(0.3, 0.1, -0.2), q:new THREE.Quaternion().setFromAxisAngle(UP, rad(25)) };
+  const B = { x:0.5, y:0.72, z:-0.6, yaw_deg:-37 };
+  const off = relativePose(A, baseToPose(B)), back = composePose(A, off);
+  const e1 = back.p.distanceTo(new THREE.Vector3(B.x, B.y, B.z)), e2 = Math.abs(deg(yawOf(back.q)) - B.yaw_deg);
+  const A2 = { p:new THREE.Vector3(-0.4, 0.1, 0.9), q:new THREE.Quaternion().setFromAxisAngle(UP, rad(-80)) };   // 別の原点から見たアンカー
+  anchorState[arm.id] = { anchor:{ anchorSpace:'fake' }, uuid:'test', pose:null, off, status:'' };
+  const frame = { getPose: () => ({ transform: { position:{ x:A2.p.x, y:A2.p.y, z:A2.p.z }, orientation:{ x:A2.q.x, y:A2.q.y, z:A2.q.z, w:A2.q.w } } }) };
+  updateAnchors(frame, 'fakeRef');
+  const exp = composePose(A2, off);
+  const e3 = arm.group.position.distanceTo(exp.p), e4 = Math.abs(deg(yawOf(arm.group.quaternion)) - deg(yawOf(exp.q)));
+  const e5 = Math.hypot(arm.cfg.base.x - exp.p.x, arm.cfg.base.y - exp.p.y, arm.cfg.base.z - exp.p.z);
+  if (keepSt) anchorState[arm.id] = keepSt; else delete anchorState[arm.id];
+  arm.cfg.base = keepBase; applyBases(); buildDesk();
+  return { ok: e1 < 1e-6 && e2 < 1e-6 && e3 < 1e-6 && e4 < 1e-6 && e5 < 1e-3, e1, e2, e3, e4, e5 };
 };
 const _buildObjects = buildObjects;
 buildObjects = function(){ _buildObjects(); buildButtons(); };
 addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
-renderer.setAnimationLoop((t) => {
-  if (renderer.xr.isPresenting) { paneA.style.display = paneB.style.display = 'none'; applyPose(t); renderer.render(scene, camera); return; }
+renderer.setAnimationLoop((t, frame) => {
+  if (renderer.xr.isPresenting) { paneA.style.display = paneB.style.display = 'none'; updateAnchors(frame); applyPose(t); renderer.render(scene, camera); return; }
   updateCam(); applyPose(t); renderer.setViewport(0, 0, innerWidth, innerHeight); renderInline();
 });
 </script>

@@ -19,7 +19,7 @@ example slice; it has no backend and runs against mocks.
 | [`descovery/`](descovery/README.md) | Hardware experiment sandbox: standalone Koch-arm scripts. `descovery/koch4/` is the Learning Fest setup (start at its HANDOFF.md). |
 | [`dobot/`](dobot/README.md) | Dobot Magician pick-and-place sandbox: overhead camera → homography → pydobot, plus the first-time setup manual. |
 | [`twinarm-web-ui/`](twinarm-web-ui/README.md) | The web teleoperation UI: React and Vite, mock-backed. |
-| `docs/` | Reserved for documentation. Empty. |
+| `docs/` | Documentation. `fest_start_prompts.md`: the Learning Fest bench sessions, one Mac per role (handshake A, VR leader B, VR follower C, desktop robot D), with the prompt to paste into Claude Code on each Mac. |
 | `pyproject.toml` | Configuration-only root project. Holds the shared ruff configuration. |
 
 `twinarm/` and `descovery/` are independent uv projects, each with its own `pyproject.toml` and

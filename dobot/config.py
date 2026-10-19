@@ -27,6 +27,8 @@ class CameraConfig:
     exposure: float = -6.0           # OpenCV CAP_PROP_EXPOSURE（Windows: 2^n 秒・Linux: 100µs単位で機種依存）
     auto_wb: bool = False
     wb_temperature: int = 4500       # CAP_PROP_WB_TEMPERATURE
+    auto_focus: bool = False         # 展示では固定（AF が動くと像の倍率と画素→mm がずれる）。mac は OpenCV から触れない
+    focus: int | None = None         # CAP_PROP_FOCUS（C920/C922 系: 0〜250・5 刻み・0 が遠）。None なら AF を止めた位置のまま
     rotation_deg: int = 0            # 0/90/180/270（俯瞰の向き合わせ）
     warmup_frames: int = 10          # 露出安定待ち
     mirror: bool = False             # 鏡越しに撮る（内蔵カメラ＋ミラークリップ）→ 左右反転して鏡像を戻す
@@ -36,7 +38,7 @@ class CameraConfig:
 
 @dataclass
 class RobotConfig:
-    backend: str = "dry"             # dry | pydobot
+    backend: str = "dry"             # dry | pydobot | magician（公式プロトコル直接・停止レーン対応: robot_magician.py）
     port: str | None = None          # None=未指定（推測しない。--port か setup_wizard で書く）
     end_effector: str = "suction"    # suction | gripper
     ee_settle_s: float = 0.6         # 吸着/把持が効くまでの待ち
@@ -44,8 +46,14 @@ class RobotConfig:
     z_pick: float = -30.0            # 物体上面に吸盤が当たる高さ（既定。物ごとの値は ObjectSpec.z_pick）
     z_place: float = -25.0           # 置くときの高さ
     r: float = 0.0                   # 手先回転（吸盤では未使用）
-    velocity: float = 150.0          # pydobot speed(velocity, acceleration)
+    velocity: float = 150.0          # pydobot speed(velocity, acceleration)（pydobot バックエンドのみ）
     acceleration: float = 150.0
+    # magician バックエンド（robot_magician.py）
+    speed_pct: float = 30.0          # PTP 共通パラメータの速度比・加速度比（%・1〜100。低速から始めて M3 の実測で決める）
+    move_timeout_s: float = 10.0     # 1 区間の移動で index が進まないとき、ForceStop して諦めるまでの秒数
+    poll_s: float = 0.03             # 移動待ちで index と estop を見る間隔
+    alarm_poll_s: float = 0.25       # 移動待ちでアラームを読む間隔
+    ee_release_blow_s: float = 0.2   # 吸着 OFF の 1 段目（排気）の秒数。0 なら排気せずポンプ停止だけ
     # 作業範囲ガード（ベース原点=mm）。Magician のリーチ 320mm（公式）と根元干渉域を避ける
     x_min: float = 150.0
     x_max: float = 300.0
@@ -109,6 +117,9 @@ class DemoConfig:
     temp_adc_fullscale_v: float = 3.3  # ADC のフルスケール電圧（3.3 か 5.0。check_robot.py --adc で確認）
     temp_stop_c: float = 60.0        # これ以上で自動動作を休止
     temp_resume_c: float = 50.0      # これ未満で再開
+    # 声の UI（voice_front）: 聞き取った文と解釈を表示してから実行する（robotics 裁定 ②）
+    confirm_auto_run_s: float = 2.0  # 自動実行までの秒数。0＝表示して即実行・負＝常に Enter／はい を待つ
+    confirm_ask_ambiguous: bool = True  # 曖昧な発話（否定・複数・直前参照・リセット）は「これですか？」と確認してから
     panel_port: int = 8790           # ブラウザ UI（http://127.0.0.1:8790）
     stream_fps: int = 8
     jpeg_quality: int = 70
@@ -136,7 +147,15 @@ class ASRConfig:
     sample_rate: int = 16000
     max_record_s: float = 6.0        # push-to-talk の最長録音
     silence_rms: float = 0.01        # 無音判定（正規化振幅）
-    silence_hold_s: float = 0.8      # 無音がこの秒数続いたら録音終了
+    silence_hold_s: float = 0.8      # 無音がこの秒数続いたら録音終了（旧 API record() 用）
+    # 押している間だけ録音（PushToTalkRecorder.start/stop）
+    preroll_s: float = 0.4           # 押す少し前から含める（語頭の欠け防止）
+    postroll_s: float = 0.3          # 離した後も少し録る（語尾の欠け防止）
+    # 受理の判定（judge_transcript）。しきい値は faster-whisper の既定と同じ。実発話で決める
+    min_avg_logprob: float = -1.0    # これ未満は「聞き取りに自信がありません」
+    max_no_speech_prob: float = 0.6  # これ超かつ avg_logprob が低ければ無音扱い
+    hallucination_phrases: list[str] = field(default_factory=lambda: [
+        "ご視聴ありがとうございました", "ご視聴ありがとうございます", "チャンネル登録"])  # 無音で Whisper が出す決まり文句
 
 
 @dataclass

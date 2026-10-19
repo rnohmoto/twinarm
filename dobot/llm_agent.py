@@ -201,7 +201,10 @@ class RuleAgent:
         self.last_object: str | None = None
 
     def handle(self, utterance: str) -> str:
-        it = self.parse(utterance, self.cfg)
+        return self.run_intent(self.parse(utterance, self.cfg))
+
+    def run_intent(self, it) -> str:
+        """解析済みの意図を実行する（声の UI は確認済みの意図をここに渡す）。"""
         self.logger({"ev": "rule_intent", **it.to_dict()})
         ex = self.executor
         if it.action == "stop":
@@ -226,6 +229,9 @@ class RuleAgent:
             if r.ok and obj:
                 self.last_object = obj
             return r.message
+        if it.action == "unsupported":
+            from voice_front import UNSUPPORTED_MESSAGES
+            return UNSUPPORTED_MESSAGES.get(it.reason, "その操作はまだできません。")
         return "すみません、聞き取れませんでした。「赤いブロックを右のトレイに置いて」のように言ってください。"
 
 

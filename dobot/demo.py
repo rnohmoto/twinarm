@@ -35,7 +35,10 @@ for _s in (sys.stdout, sys.stderr):
 import numpy as np
 
 from camera import CameraBase
+from llm_agent import RuleAgent
 from panel_web import PanelServer, PanelState
+from rule_parser import Intent, parse
+from voice_front import VoiceFront
 
 
 class SharedCamera(CameraBase):
@@ -163,6 +166,11 @@ class DemoRunner:
         self.asr = None
         self.tts = None
         self._panel: PanelServer | None = None
+        # 声の UI: 解析と確認は voice_front（ASR スレッド）、実行はワーカー（"intent" コマンド）
+        self.rule_agent = agent if isinstance(agent, RuleAgent) else RuleAgent(cfg, executor, logger)
+        self.voice = VoiceFront(cfg, self.state, submit=self.queue.put, parse=lambda t: parse(t, cfg),
+                                asr_factory=self._make_asr, last_object=lambda: self.rule_agent.last_object,
+                                on_stop=self._voice_stop, on_activity=self._touch, logger=logger)
         if hasattr(logger, "listeners"):
             logger.listeners.append(self._on_event)
         cam_info = {"backend": cfg.camera.backend, "index": str(cfg.camera.index)}
@@ -275,16 +283,26 @@ class DemoRunner:
 
     # ------------------------------------------------------------- actions
     def handle_utterance(self, text: str) -> str:
+        """文字入力・LLM 経路: 解析と実行を一度に（確認なし）。"""
+        return self._execute(text, lambda: self.agent.handle(text))
+
+    def handle_intent(self, cmd: dict) -> str:
+        """声の UI 経路: voice_front で表示・確認済みの意図だけを実行する（解析はやり直さない）。"""
+        it = Intent.from_dict(cmd.get("intent") or {})
+        text = str(cmd.get("text") or it.raw or "")
+        return self._execute(text, lambda: self.rule_agent.run_intent(it), source="声")
+
+    def _execute(self, text: str, run, source: str = "発話") -> str:
         self.last_activity = time.time()
         self.state.update(mode="dialog", state="thinking", utterance=text, reply="", error="")
-        self.state.push_event(f"発話: {text}")
-        self.logger({"ev": "utterance", "text": text})
+        self.state.push_event(f"{source}: {text}")
+        self.logger({"ev": "utterance", "text": text, "source": source})
         t0 = time.time()
         picks0 = self.executor.stats["picks_ok"] + self.executor.stats["picks_fail"]
         self.busy.set()
         try:
             self.state.update(state="moving")
-            reply = self.agent.handle(text)
+            reply = run()
         except Exception as e:  # noqa: BLE001 — 実演を止めない
             reply = "うまく動けませんでした。もう一度お願いします。"
             self.state.update(error=repr(e))
@@ -303,6 +321,8 @@ class DemoRunner:
         self.last_activity = time.time()
         if t == "say":
             self.handle_utterance(str(cmd.get("text", "")).strip() or "何がある？")
+        elif t == "intent":
+            self.handle_intent(cmd)
         elif t == "listen":
             self.state.update(state="listening")
             if self.asr is None:
@@ -325,6 +345,17 @@ class DemoRunner:
             finally:
                 self.busy.clear()
             self.state.update(reply=r.message, state="idle")
+            self.state.push_event(r.message)
+        elif t == "round_trip":
+            t0 = time.time()
+            self.busy.set()
+            self.state.update(state="moving")
+            try:
+                r = self.executor.round_trip()
+            finally:
+                self.busy.clear()
+                self.guard.record(t0, time.time())
+            self.state.update(reply=r.message, state="estop" if self.robot.estop.is_set() else "idle")
             self.state.push_event(r.message)
         elif t == "tidy":
             t0, picks0 = time.time(), self.executor.stats["picks_ok"] + self.executor.stats["picks_fail"]
@@ -432,8 +463,52 @@ class DemoRunner:
         self._publish(dets, status)
 
     # ------------------------------------------------------------------ run
+    _VOICE_TYPES = ("ptt_start", "ptt_stop", "heard", "confirm", "cancel")
+
+    def _on_panel_command(self, cmd: dict) -> None:
+        """パネルの HTTP スレッドで呼ばれる。非常停止だけは Event を立てて表示を即時に変える（シリアルは触らない。
+        ForceStop の送出はワーカーが移動待ちの中で行う）。声の UI のコマンドは voice_front へ（ワーカーには積まない。
+        確定した意図だけが "intent" で届く）。残りはこれまでどおりワーカーのキューへ積む。"""
+        t = cmd.get("type")
+        if t == "estop":
+            self.robot.estop.set()
+            self.attract_on = False
+            self.voice.cancel()
+            self.state.update(state="estop", reply="止まります。", mode="dialog")
+            self.state.push_event("非常停止（受付）")
+        elif t in self._VOICE_TYPES:
+            if t == "ptt_start":
+                self.voice.ptt_start()
+            elif t == "ptt_stop":
+                self.voice.ptt_stop()
+            elif t == "heard":
+                self.voice.heard(str(cmd.get("text") or ""), run_now=bool(cmd.get("run")))
+            elif t == "confirm":
+                self.voice.confirm()
+            else:
+                self.voice.cancel()
+            return
+        self.queue.put(cmd)
+
+    def _touch(self) -> None:
+        self.last_activity = time.time()
+
+    def _make_asr(self):
+        if self.asr is None:
+            from asr import make_asr
+            self.asr = make_asr(self.cfg.asr)
+        return self.asr
+
+    def _voice_stop(self) -> None:
+        """声の停止語（「止まって」「待って」など）: パネルの非常停止ボタンと同じ即時経路。"""
+        self.robot.estop.set()
+        self.attract_on = False
+        self.state.update(state="estop", reply="止まります。", mode="dialog")
+        self.state.push_event("非常停止（声）")
+        self.queue.put({"type": "estop"})
+
     def start_panel(self, port: int | None = None) -> int:
-        self._panel = PanelServer(self.state, self.queue.put, port=port or self.cfg.demo.panel_port,
+        self._panel = PanelServer(self.state, self._on_panel_command, port=port or self.cfg.demo.panel_port,
                                   stream_fps=self.cfg.demo.stream_fps)
         p = self._panel.start()
         self.state.push_event(f"パネル起動 http://127.0.0.1:{p}")
@@ -490,6 +565,7 @@ class DemoRunner:
 
     def shutdown(self) -> None:
         self.running.clear()
+        self.voice.close()
         try:
             if not self.robot.estop.is_set():
                 self.executor.go_home()
@@ -508,7 +584,7 @@ def parse_args(argv=None):
     ap.add_argument("--config", default=str(HERE / "config.json"))
     ap.add_argument("--dry-run", action="store_true", help="カメラ=合成画像・ロボット=記録のみ")
     ap.add_argument("--no-llm", action="store_true", help="ルールベース解析のみ")
-    ap.add_argument("--robot", choices=["dry", "pydobot"], default=None)
+    ap.add_argument("--robot", choices=["dry", "pydobot", "magician"], default=None)
     ap.add_argument("--port", default=None, help="Magician のシリアルポート（推測しない）")
     ap.add_argument("--camera-index", default=None)
     ap.add_argument("--attract", action="store_true", help="自動ループを最初から ON")

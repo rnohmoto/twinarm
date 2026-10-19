@@ -183,7 +183,7 @@ def main(argv=None) -> int:
     ap.add_argument("--no-llm", action="store_true", help="ルールベース解析のみ（LLM を呼ばない）")
     ap.add_argument("--text", default=None, help="この 1 発話だけ処理して終了")
     ap.add_argument("--keyboard", action="store_true", help="マイクの代わりにキーボード入力")
-    ap.add_argument("--robot", choices=["dry", "pydobot"], default=None)
+    ap.add_argument("--robot", choices=["dry", "pydobot", "magician"], default=None)
     ap.add_argument("--port", default=None)
     ap.add_argument("--camera-index", default=None)
     ap.add_argument("--tune", action="store_true", help="検出チューニング表示のみ")

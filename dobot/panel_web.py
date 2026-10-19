@@ -3,7 +3,8 @@
   GET  /          … 画面（HTML 1 枚。JS が /status を 0.5 秒ごとに読む）
   GET  /stream    … multipart/x-mixed-replace の MJPEG（注釈つきの最新フレーム）
   GET  /status    … JSON（モード・状態・発話・意図・返事・検出数・カメラ/ロボットの状態・イベント）
-  POST /cmd       … JSON {"type": "say"|"listen"|"home"|"estop"|"resume"|"tidy"|"attract"|"quit", ...}
+  POST /cmd       … JSON {"type": "say"|"listen"|"home"|"round_trip"|"estop"|"resume"|"tidy"|"attract"|"quit", ...}
+                     声の UI: "ptt_start"|"ptt_stop"（押した／離した）|"heard"（文字を聞き取りとして）|"confirm"|"cancel"
 
 設計: パネルはロボットに直接触れない。コマンドは demo.py のワーカーに渡すだけ（1 本のスレッドが実機を持つ）。
 """
@@ -16,7 +17,7 @@ from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 STATE_KEYS = ("mode", "state", "utterance", "reply", "intent", "last_pick", "robot", "camera", "attract", "stats",
-              "objects_seen", "error", "fps")
+              "objects_seen", "error", "fps", "voice")
 
 
 class PanelState:
@@ -29,7 +30,7 @@ class PanelState:
         self._t0 = time.time()
         self._info: dict = {"mode": "dialog", "state": "starting", "utterance": "", "reply": "", "intent": None,
                             "last_pick": None, "robot": {}, "camera": {}, "attract": {}, "stats": {},
-                            "objects_seen": {}, "error": "", "fps": 0.0}
+                            "objects_seen": {}, "error": "", "fps": 0.0, "voice": {}}
         self.events: deque = deque(maxlen=40)
 
     def set_frame(self, jpeg: bytes) -> None:
@@ -76,16 +77,32 @@ PAGE_HTML = """<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}.kv b{color:#9fb3c8;font-weight:normal}
  ul.ev{list-style:none;padding:0;margin:0;font-size:13px;max-height:220px;overflow:auto}ul.ev li{padding:2px 0;border-bottom:1px solid #333}
  .ok{color:#7bd88f}.ng{color:#ff5c5c}
+ button.ptt{display:block;width:100%;font-size:20px;padding:18px;background:#2d6a4f;touch-action:none;user-select:none}
+ button.ptt.rec{background:#c0392b}
+ .vline{margin:6px 0;display:flex;align-items:center;gap:8px}.vline b{color:#9fb3c8;font-weight:normal;white-space:nowrap}
+ .vline input[type=text]{flex:1;width:auto}
+ .question{color:#f7c948;font-size:18px;min-height:22px}.bar{height:8px;background:#333;border-radius:4px;margin:6px 0}
+ #barfill{height:100%;width:0;background:#f7c948;border-radius:4px}.vmsg{font-size:13px;color:#9fb3c8;min-height:16px}
 </style></head><body>
 <header><span>Dobot Magician — 画像認識ピック＆プレース</span><span id="clock"></span></header>
 <main>
  <section>
   <img id="cam" src="/stream" alt="camera">
-  <div class="card"><h3>話しかける</h3>
+  <div class="card"><h3>声で話しかける（押している間だけ聞く）</h3>
+   <button id="ptt" class="ptt" type="button">🎤 押している間 録音（Space 長押しでも）</button>
+   <div class="vline"><b>聞き取り</b><input type="text" id="heard" placeholder="離すとここに出ます。直して Enter で実行" onkeydown="heardKey(event)"></div>
+   <div class="vline"><b>解釈</b><span id="proposal" class="big">-</span></div>
+   <div id="question" class="question"></div>
+   <div class="bar"><div id="barfill"></div></div>
+   <div id="vmsg" class="vmsg">-</div>
+   <div><button onclick="cmd({type:'confirm'})">実行／はい (Enter)</button> <button class="ghost" onclick="cmd({type:'cancel'})">取消／いいえ (Esc)</button> <button class="ghost" onclick="heardTry()">文字で試す</button></div>
+  </div>
+  <div class="card"><h3>文字で指示（確認なしで実行）</h3>
    <input type="text" id="say" placeholder="例: 赤いブロックを右のトレイに置いて / 片付けて" onkeydown="if(event.key==='Enter')say()">
-   <button onclick="say()">送る</button> <button onclick="cmd({type:'listen'})">🎤 マイク</button>
+   <button onclick="say()">送る</button>
    <div style="margin-top:8px">
     <button class="ghost" onclick="cmd({type:'home'})">ホーム</button>
+    <button class="ghost" onclick="cmd({type:'round_trip'})">往復（試運転）</button>
     <button class="warn" onclick="cmd({type:'tidy'})">片付け（元に戻す）</button>
     <button class="ghost" onclick="cmd({type:'loop'})">ループ ×3</button>
     <button class="danger" onclick="cmd({type:'estop'})">非常停止</button>
@@ -102,7 +119,25 @@ PAGE_HTML = """<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
  </aside>
 </main>
 <script>
-let attractOn=false;
+let attractOn=false,voice={},voiceGen=-1,pttDown=false;
+function inInput(e){const t=e.target;return !!(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'));}
+function pttStart(){if(pttDown)return;pttDown=true;cmd({type:'ptt_start'});}
+function pttStop(){if(!pttDown)return;pttDown=false;cmd({type:'ptt_stop'});}
+function heardKey(ev){if(ev.key==='Enter'){const t=ev.target.value.trim();if(t)cmd({type:'heard',text:t,run:true});ev.target.blur();}else if(ev.key==='Escape'){cmd({type:'cancel'});ev.target.blur();}}
+function heardTry(){const t=document.getElementById('heard').value.trim();if(t)cmd({type:'heard',text:t});}
+function renderVoice(v){const heard=document.getElementById('heard');if(v.gen!==voiceGen){voiceGen=v.gen;if(document.activeElement!==heard)heard.value=v.heard||'';}
+ document.getElementById('proposal').textContent=v.proposal||'-';document.getElementById('question').textContent=v.question||'';
+ const ph={idle:'待機',recording:'録音中',transcribing:'聞き取り中',proposed:'実行待ち',confirming:'確認待ち',failed:'聞き直し'}[v.phase]||v.phase||'-';
+ document.getElementById('vmsg').textContent=ph+(v.message?'：'+v.message:'');
+ document.getElementById('ptt').classList.toggle('rec',v.phase==='recording');tickBar();}
+function tickBar(){const f=document.getElementById('barfill');if(voice.phase==='proposed'&&voice.deadline&&voice.auto_run_s>0){const rem=Math.max(0,voice.deadline-Date.now()/1000);f.style.width=Math.round(100*rem/voice.auto_run_s)+'%';}else{f.style.width='0%';}}
+window.addEventListener('load',()=>{const b=document.getElementById('ptt');b.addEventListener('pointerdown',e=>{e.preventDefault();pttStart();});
+ ['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,()=>pttStop()));});
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&!inInput(e)){if(!e.repeat)pttStart();e.preventDefault();return;}
+ if(e.key==='Enter'&&!inInput(e)){cmd({type:'confirm'});return;}
+ if(e.key==='Escape'&&!inInput(e)){if(['proposed','confirming','failed'].includes(voice.phase))cmd({type:'cancel'});else cmd({type:'estop'});}});
+document.addEventListener('keyup',e=>{if(e.code==='Space'&&!inInput(e)){pttStop();e.preventDefault();}});
+window.addEventListener('blur',()=>pttStop());setInterval(tickBar,100);
 function cmd(o){return fetch('/cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)}).then(r=>r.json()).catch(()=>{});}
 function say(){const t=document.getElementById('say').value.trim();if(!t)return;cmd({type:'say',text:t});document.getElementById('say').value='';}
 function toggleAttract(){cmd({type:'attract',on:!attractOn});}
@@ -116,6 +151,7 @@ async function poll(){try{const s=await (await fetch('/status')).json();
  kv(document.getElementById('hw'),Object.assign({},s.camera||{},s.robot||{},{自動ループ:JSON.stringify(s.attract||{})}));
  attractOn=!!(s.attract&&s.attract.on);document.getElementById('attract').textContent='自動ループ: '+(attractOn?'ON':'OFF');
  document.getElementById('ev').innerHTML=(s.events||[]).slice().reverse().map(e=>'<li>'+esc(e.t)+' '+esc(e.text)+'</li>').join('');
+ voice=s.voice||{};renderVoice(voice);
  document.getElementById('clock').textContent=new Date().toLocaleTimeString();
 }catch(e){}}
 setInterval(poll,500);poll();

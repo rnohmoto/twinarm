@@ -145,15 +145,31 @@ def make_aruco_sheet(path: str | Path, ids: Sequence[int] = (0, 1, 2, 3), px: in
 
 
 # ---------------------------------------------------------- 対話キャリブ CLI
-def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool = True) -> PixelToRobot:
-    """実機用。camera.read() の画像に対し、ArUco 中心（または クリック点）へロボットを合わせ pose を読む。
+def pick_target(centers: Sequence[tuple[float, float]],
+                click: tuple[float, float] | None) -> tuple[float, float] | None:
+    """物を目印にするときの目標点: クリックがあれば最も近い検出、なければ最初（面積の大きい順）の検出。"""
+    if not centers:
+        return None
+    if click is None:
+        return centers[0]
+    return min(centers, key=lambda c: (c[0] - click[0]) ** 2 + (c[1] - click[1]) ** 2)
+
+
+def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool = True,
+                            object_spec=None, min_area: int = 400, max_area: int = 60000) -> PixelToRobot:
+    """実機用。camera.read() の画像に対し、ArUco 中心（または 目印の物・クリック点）へロボットを合わせ pose を読む。
 
     robot は robot_dobot.RobotBase（pose() が (x,y,z,r)）。robot=None なら XY を手入力。
+    object_spec（config.ObjectSpec）を渡すと、マーカーの代わりにその物（例: 消しゴム）の中心を目標にする:
+    物を置く → 吸盤の先端をその中心へ → space、を場所を変えて 4 回以上。複数見えるときはクリックした物。
     キー: [space]=現在の pose を対応点として記録 / [c]=クリック点モードでクリック / [q]=終了して保存
     """
     import cv2
     pairs: list[Pair] = []
     click_pt: list[tuple[float, float]] = []
+    if object_spec is not None:
+        use_aruco = False
+        from detect import detect_objects
 
     def on_mouse(event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -180,7 +196,20 @@ def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool
             if current_target:
                 cv2.putText(vis, f"move tool tip to id{todo[0]} then press SPACE", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2)
-        if click_pt:
+        if object_spec is not None:
+            dets = detect_objects(frame, [object_spec], min_area, max_area)
+            centers = [(d.cx, d.cy) for d in dets]
+            for u, v in centers:
+                cv2.circle(vis, (int(u), int(v)), 6, (0, 255, 255), 2)
+            current_target = pick_target(centers, click_pt[0] if click_pt else None)
+            if current_target:
+                cv2.circle(vis, (int(current_target[0]), int(current_target[1])), 10, (0, 200, 0), 2)
+                cv2.putText(vis, f"{object_spec.name}: move tool tip to its centre, then SPACE ({len(pairs)}/4+)",
+                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 0), 2)
+            else:
+                cv2.putText(vis, f"{object_spec.name} not seen - place it in view", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        elif click_pt:
             current_target = click_pt[0]
             cv2.circle(vis, (int(click_pt[0][0]), int(click_pt[0][1])), 6, (255, 0, 255), 2)
         for p in pairs:
@@ -219,6 +248,7 @@ if __name__ == "__main__":
     ap.add_argument("--config", default="config.json")
     ap.add_argument("--out", default=None)
     ap.add_argument("--manual", action="store_true", help="ArUco を使わずクリック点で対応を取る")
+    ap.add_argument("--object", default=None, help="マーカーの代わりに置く物の名前（例: eraser。config に無ければ既定の定義）")
     ap.add_argument("--no-robot", action="store_true", help="ロボット未接続: XY を手入力")
     ap.add_argument("--make-markers", default=None, help="印刷用 ArUco PNG を出力するフォルダ")
     args = ap.parse_args()
@@ -234,5 +264,12 @@ if __name__ == "__main__":
         from robot_dobot import make_robot
         robot = make_robot(cfg.robot)
         robot.connect()
+    spec = None
+    if args.object:
+        spec = next((o for o in cfg.objects if o.name == args.object), None) or \
+            next((o for o in AppConfig.default().objects if o.name == args.object), None)
+        if spec is None:
+            raise SystemExit(f"--object {args.object}: 物体定義がありません")
     with make_camera(cfg.camera) as cam:
-        interactive_calibration(cam, robot, args.out or cfg.homography_path, use_aruco=not args.manual)
+        interactive_calibration(cam, robot, args.out or cfg.homography_path, use_aruco=not args.manual,
+                                object_spec=spec, min_area=cfg.min_area_px, max_area=cfg.max_area_px)

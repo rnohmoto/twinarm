@@ -41,20 +41,27 @@ def brightness_stats(frames: list[np.ndarray]) -> dict:
     }
 
 
-def judge(stats: dict, props: dict, applied) -> list[str]:
+def judge(stats: dict, props: dict, applied, focus_applied=None) -> list[str]:
     """人が読む判定文。しきい値は経験値（照明一定・静止シーン前提）。"""
     notes = []
     if applied is None:
         notes.append("手動露出が効いていません（auto_exposure の書き込みが読み戻せない）。"
                      "macOS ならメーカーツールで固定、Windows なら別の値を試す")
     else:
-        notes.append(f"手動露出の設定値 {applied} が効いています（読み戻し一致）")
+        notes.append(f"手動露出の設定値 {applied} を書き込めました（読み戻し一致か、DirectShow のように読み戻し非対応）。"
+                     "効いたかは下の明るさの揺れで判断")
     if stats["n"] >= 5:
         if stats["std"] > 3.0 or abs(stats["drift"]) > 5.0:
             notes.append(f"明るさが揺れています（std={stats['std']:.1f} drift={stats['drift']:+.1f}）"
                          "→ 自動露出/自動 WB が生きているか、照明がちらついています")
         else:
             notes.append(f"明るさは安定しています（std={stats['std']:.1f} drift={stats['drift']:+.1f}）")
+    af = props.get("auto_focus")
+    if focus_applied is not None:
+        notes.append(f"オートフォーカス OFF が効いています（読み戻し auto_focus={af}・focus={props.get('focus')}）")
+    elif af not in (None, 0, 0.0):
+        notes.append(f"オートフォーカスが止まっていません（読み戻し auto_focus={af}）。像の倍率と座標が動くので、"
+                     "macOS ならメーカーツールか OS 側で固定、Windows なら別のカメラ番号・バックエンドで確認")
     w, h = props.get("width"), props.get("height")
     notes.append(f"実効解像度 {int(w or 0)}x{int(h or 0)} @ {props.get('fps')} fps・backend={props.get('backend') or '?'}")
     return notes
@@ -78,6 +85,8 @@ def main(argv=None) -> int:
     ap.add_argument("--seconds", type=float, default=3.0, help="明るさの揺れを見る秒数")
     ap.add_argument("--auto", action="store_true", help="自動露出のまま開く（比較用）")
     ap.add_argument("--exposure", type=float, default=-6.0, help="手動露出値（Windows: 2^n 秒。-6=1/64 秒）")
+    ap.add_argument("--auto-focus", action="store_true", help="オートフォーカスのまま開く（比較用。既定は AF を止める）")
+    ap.add_argument("--focus", type=int, default=None, help="フォーカス位置（C920/C922 系: 0〜250・5 刻み・0 が遠）。省略時は AF を止めた位置のまま")
     ap.add_argument("--mirror", action="store_true", help="鏡越し（ミラークリップ）: 左右反転して鏡像を戻す")
     ap.add_argument("--ref", default="", help="グレーカードの画素範囲 x,y,w,h（露出を固定できないカメラの補正を試す）")
     ap.add_argument("--pick-ref", action="store_true", help="窓でグレーカードをドラッグして範囲を選ぶ（x,y,w,h を表示して終了）")
@@ -99,6 +108,7 @@ def main(argv=None) -> int:
 
     cfg = CameraConfig(index=args.index, width=args.width, height=args.height, fps=args.fps,
                        auto_exposure=args.auto, exposure=args.exposure, mirror=args.mirror,
+                       auto_focus=args.auto_focus, focus=args.focus,
                        reference_roi=ref if len(ref) == 4 else None)
     if cfg.reference_roi:
         print(f"グレーカード補正 ON: roi={cfg.reference_roi}（補正後の明るさの揺れを報告します。"
@@ -124,7 +134,7 @@ def main(argv=None) -> int:
         stats = brightness_stats([f.mean(axis=2) for f in frames])
         print(f"frames={stats['n']} in {args.seconds}s  mean brightness={stats['mean']:.1f}")
         print("props:", {k: (round(v, 3) if isinstance(v, float) else v) for k, v in props.items()})
-        for line in judge(stats, props, cam.auto_exposure_applied):
+        for line in judge(stats, props, cam.auto_exposure_applied, cam.auto_focus_applied):
             print("-", line)
         if not args.no_snapshot and frames:
             import cv2

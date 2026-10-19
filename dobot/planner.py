@@ -112,8 +112,8 @@ class TaskExecutor:
         spec = self.cfg.object_by_name(name) if name else None
         return spec.z_pick if (spec and spec.z_pick is not None) else self.cfg.robot.z_pick
 
-    def observe(self) -> list[Detection]:
-        frame = self.camera.read()
+    def detect(self, frame: np.ndarray) -> list[Detection]:
+        """画像 1 枚から検出し、ロボット座標・大きさ・届くかを埋める。状態もログも触らないので表示スレッドからも呼べる。"""
         dets = detect_objects(frame, self.cfg.objects, self.cfg.min_area_px, self.cfg.max_area_px)
         if self.p2r is not None:
             for d in dets:
@@ -122,6 +122,11 @@ class TaskExecutor:
         for d in dets:  # ロボット座標が作業範囲外の検出は「見えているが拾えない」として印を付ける
             d.extra["reachable"] = bool(d.x_mm is not None and
                                         self.robot.guard.inside(d.x_mm, d.y_mm, self._z_pick(d.name)))
+        return dets
+
+    def observe(self) -> list[Detection]:
+        frame = self.camera.read()
+        dets = self.detect(frame)
         self.last_frame, self.last_dets = frame, dets
         self.logger({"ev": "observe", "n": len(dets), "dets": [d.to_public() for d in dets]})
         return dets

@@ -108,8 +108,9 @@
     "confirm_auto_run_s": 2.0,
     "confirm_ask_ambiguous": true,
     "panel_port": 8790,
-    "stream_fps": 8,
-    "jpeg_quality": 70
+    "stream_fps": 15,
+    "jpeg_quality": 70,
+    "panel_mirror": true
   },
   "zones": [
     {
@@ -290,7 +291,7 @@
       "max_area_px": null,
       "min_circularity": 0.0,
       "aspect_min": 1.0,
-      "aspect_max": 3.5,
+      "aspect_max": 4.0,
       "z_pick": -57.1,
       "ee": "suction"
     },
@@ -309,7 +310,7 @@
         [
           [
             40,
-            80,
+            50,
             60
           ],
           [
@@ -323,7 +324,7 @@
       "max_area_px": null,
       "min_circularity": 0.0,
       "aspect_min": 1.0,
-      "aspect_max": 3.5,
+      "aspect_max": 4.0,
       "z_pick": -57.1,
       "ee": "suction"
     },
@@ -356,7 +357,7 @@
       "max_area_px": null,
       "min_circularity": 0.0,
       "aspect_min": 1.0,
-      "aspect_max": 3.5,
+      "aspect_max": 4.0,
       "z_pick": -57.1,
       "ee": "suction"
     },
@@ -373,7 +374,7 @@
       "ranges": [
         [
           [
-            20,
+            16,
             120,
             100
           ],
@@ -388,7 +389,7 @@
       "max_area_px": null,
       "min_circularity": 0.0,
       "aspect_min": 1.0,
-      "aspect_max": 3.5,
+      "aspect_max": 4.0,
       "z_pick": -57.1,
       "ee": "suction"
     },

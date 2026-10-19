@@ -63,60 +63,64 @@ PAGE_HTML = """<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Magician パネル</title>
 <style>
  body{margin:0;font-family:'Segoe UI',Meiryo,sans-serif;background:#1b1f24;color:#e6e6e6}
- header{background:#2c3e50;padding:10px 18px;font-size:18px;font-weight:bold;display:flex;justify-content:space-between}
- main{display:grid;grid-template-columns:2fr 1fr;gap:14px;padding:14px}
- @media(max-width:900px){main{grid-template-columns:1fr}}
- img#cam{width:100%;background:#000;border-radius:8px}
- .card{background:#262b33;border-radius:8px;padding:12px 14px;margin-bottom:12px}
+ header{background:#2c3e50;padding:10px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+ header .title{font-size:18px;font-weight:bold;flex:1}
+ header #state{font-size:20px;padding:4px 16px;border-radius:999px;background:#1b1f24}
+ header #clock{font-size:14px;color:#9fb3c8}
+ main{max-width:1200px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+ img#cam{display:block;width:100%;max-height:72vh;object-fit:contain;background:#1b1f24;border-radius:10px}
+ .card{background:#262b33;border-radius:8px;padding:12px 14px}
  .card h3{margin:0 0 8px;font-size:14px;color:#9fb3c8;text-transform:uppercase;letter-spacing:.05em}
  .big{font-size:22px;font-weight:bold}
  .state-idle{color:#7bd88f}.state-moving{color:#f7c948}.state-listening{color:#5ac8fa}.state-thinking{color:#c792ea}.state-estop{color:#ff5c5c}
  button{background:#3498db;color:#fff;border:0;border-radius:6px;padding:10px 14px;margin:4px 4px 4px 0;font-size:15px;cursor:pointer}
  button.danger{background:#c0392b}button.warn{background:#e67e22}button.ghost{background:#4a5568}
  input[type=text]{width:70%;padding:10px;font-size:15px;border-radius:6px;border:1px solid #555;background:#111;color:#eee}
- .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}.kv b{color:#9fb3c8;font-weight:normal}
- ul.ev{list-style:none;padding:0;margin:0;font-size:13px;max-height:220px;overflow:auto}ul.ev li{padding:2px 0;border-bottom:1px solid #333}
- .ok{color:#7bd88f}.ng{color:#ff5c5c}
- button.ptt{display:block;width:100%;font-size:20px;padding:18px;background:#2d6a4f;touch-action:none;user-select:none}
+ button.ptt{display:block;width:100%;font-size:26px;padding:22px;background:#2d6a4f;touch-action:none;user-select:none}
  button.ptt.rec{background:#c0392b}
  .vline{margin:6px 0;display:flex;align-items:center;gap:8px}.vline b{color:#9fb3c8;font-weight:normal;white-space:nowrap}
  .vline input[type=text]{flex:1;width:auto}
- .question{color:#f7c948;font-size:18px;min-height:22px}.bar{height:8px;background:#333;border-radius:4px;margin:6px 0}
+ .dialog{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:18px;margin-top:8px}.dialog b{color:#9fb3c8;font-weight:normal}
+ .question{color:#f7c948;font-size:20px;min-height:24px}.bar{height:8px;background:#333;border-radius:4px;margin:6px 0}
  #barfill{height:100%;width:0;background:#f7c948;border-radius:4px}.vmsg{font-size:13px;color:#9fb3c8;min-height:16px}
+ .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+ .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}.kv b{color:#9fb3c8;font-weight:normal}
+ ul.ev{list-style:none;padding:0;margin:0;font-size:14px;max-height:260px;overflow:auto}ul.ev li{padding:3px 0;border-bottom:1px solid #333}
+ details{color:#9fb3c8;font-size:13px}details summary{cursor:pointer;margin-bottom:8px}
+ .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:900px){.two{grid-template-columns:1fr}}
 </style></head><body>
-<header><span>Dobot Magician — 画像認識ピック＆プレース</span><span id="clock"></span></header>
+<header><span class="title">Dobot Magician — 画像認識ピック＆プレース</span><span class="big" id="state">-</span><span id="clock"></span></header>
 <main>
- <section>
-  <img id="cam" src="/stream" alt="camera">
-  <div class="card"><h3>声で話しかける（押している間だけ聞く）</h3>
-   <button id="ptt" class="ptt" type="button">🎤 押している間 録音（Space 長押しでも）</button>
-   <div class="vline"><b>聞き取り</b><input type="text" id="heard" placeholder="離すとここに出ます。直して Enter で実行" onkeydown="heardKey(event)"></div>
-   <div class="vline"><b>解釈</b><span id="proposal" class="big">-</span></div>
-   <div id="question" class="question"></div>
-   <div class="bar"><div id="barfill"></div></div>
-   <div id="vmsg" class="vmsg">-</div>
-   <div><button onclick="cmd({type:'confirm'})">実行／はい (Enter)</button> <button class="ghost" onclick="cmd({type:'cancel'})">取消／いいえ (Esc)</button> <button class="ghost" onclick="heardTry()">文字で試す</button></div>
+ <img id="cam" src="/stream" alt="camera">
+ <div class="card"><h3>声で話しかける（押している間だけ聞く）</h3>
+  <button id="ptt" class="ptt" type="button">🎤 押している間 録音（Space 長押しでも）</button>
+  <div class="vline"><b>聞き取り</b><input type="text" id="heard" placeholder="離すとここに出ます。直して Enter で実行" onkeydown="heardKey(event)"></div>
+  <div class="dialog"><b>解釈</b><span id="proposal" class="big">-</span><b>返事</b><span id="reply">-</span></div>
+  <div id="question" class="question"></div>
+  <div class="bar"><div id="barfill"></div></div>
+  <div id="vmsg" class="vmsg">-</div>
+  <div class="row"><button onclick="cmd({type:'confirm'})">実行／はい (Enter)</button> <button class="ghost" onclick="cmd({type:'cancel'})">取消／いいえ (Esc)</button> <button class="ghost" onclick="heardTry()">文字で試す</button></div>
+ </div>
+ <div class="card"><h3>操作</h3>
+  <div class="vline"><input type="text" id="say" placeholder="例: 赤いブロックを右のトレイに置いて / 片付けて" onkeydown="if(event.key==='Enter')say()"><button onclick="say()">送る</button></div>
+  <div class="row">
+   <button class="ghost" onclick="cmd({type:'home'})">ホーム</button>
+   <button class="ghost" onclick="cmd({type:'round_trip'})">往復（試運転）</button>
+   <button class="warn" onclick="cmd({type:'tidy'})">片付け（元に戻す）</button>
+   <button class="ghost" onclick="cmd({type:'loop'})">ループ ×3</button>
+   <button class="danger" onclick="cmd({type:'estop'})">非常停止</button>
+   <button class="ghost" onclick="cmd({type:'resume'})">停止解除</button>
+   <button class="ghost" id="attract" onclick="toggleAttract()">自動ループ: -</button>
   </div>
-  <div class="card"><h3>文字で指示（確認なしで実行）</h3>
-   <input type="text" id="say" placeholder="例: 赤いブロックを右のトレイに置いて / 片付けて" onkeydown="if(event.key==='Enter')say()">
-   <button onclick="say()">送る</button>
-   <div style="margin-top:8px">
-    <button class="ghost" onclick="cmd({type:'home'})">ホーム</button>
-    <button class="ghost" onclick="cmd({type:'round_trip'})">往復（試運転）</button>
-    <button class="warn" onclick="cmd({type:'tidy'})">片付け（元に戻す）</button>
-    <button class="ghost" onclick="cmd({type:'loop'})">ループ ×3</button>
-    <button class="danger" onclick="cmd({type:'estop'})">非常停止</button>
-    <button class="ghost" onclick="cmd({type:'resume'})">停止解除</button>
-    <button class="ghost" id="attract" onclick="toggleAttract()">自動ループ: -</button>
-   </div>
+ </div>
+ <div class="card"><h3>記録</h3><ul class="ev" id="ev"></ul></div>
+ <details><summary>詳細（状態・判断・カメラ・ロボット）</summary>
+  <div class="two">
+   <div class="card"><h3>状態</h3><div class="kv" id="kv"></div></div>
+   <div class="card"><h3>いま聞いた → 判断</h3><div class="kv"><b>発話</b><span id="utt">-</span><b>意図</b><span id="intent">-</span><b>最後の動作</b><span id="pick">-</span></div></div>
+   <div class="card"><h3>カメラ・ロボット</h3><div class="kv" id="hw"></div></div>
   </div>
- </section>
- <aside>
-  <div class="card"><h3>状態</h3><div class="big" id="state">-</div><div class="kv" id="kv"></div></div>
-  <div class="card"><h3>いま聞いた → 判断 → 返事</h3><div class="kv"><b>発話</b><span id="utt">-</span><b>意図</b><span id="intent">-</span><b>返事</b><span id="reply">-</span><b>最後の動作</b><span id="pick">-</span></div></div>
-  <div class="card"><h3>カメラ・ロボット</h3><div class="kv" id="hw"></div></div>
-  <div class="card"><h3>記録</h3><ul class="ev" id="ev"></ul></div>
- </aside>
+ </details>
 </main>
 <script>
 let attractOn=false,voice={},voiceGen=-1,pttDown=false;
@@ -144,7 +148,8 @@ function toggleAttract(){cmd({type:'attract',on:!attractOn});}
 function esc(s){return String(s==null?'-':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function kv(el,obj){el.innerHTML=Object.entries(obj||{}).map(([k,v])=>'<b>'+esc(k)+'</b><span>'+esc(typeof v==='object'?JSON.stringify(v):v)+'</span>').join('');}
 async function poll(){try{const s=await (await fetch('/status')).json();
- const st=document.getElementById('state');st.textContent=(s.mode==='attract'?'自動ループ／':'対話／')+s.state;st.className='big state-'+s.state;
+ const st=document.getElementById('state');const stj={idle:'待機',moving:'動作中',listening:'聞いています',thinking:'考え中',estop:'非常停止'};
+ st.textContent=(s.mode==='attract'?'自動ループ／':'対話／')+(stj[s.state]||s.state);st.className='big state-'+s.state;
  kv(document.getElementById('kv'),{見えている物:s.objects_seen,拾った:(s.stats||{}).picks_ok,失敗:(s.stats||{}).picks_fail,片付け:(s.stats||{}).tidy,自動サイクル:(s.stats||{}).cycles,稼働:Math.round(s.uptime_s)+' s',映像:(s.fps||0)+' fps',エラー:s.error||'-'});
  document.getElementById('utt').textContent=s.utterance||'-';document.getElementById('intent').textContent=s.intent?JSON.stringify(s.intent):'-';
  document.getElementById('reply').textContent=s.reply||'-';document.getElementById('pick').textContent=s.last_pick?JSON.stringify(s.last_pick):'-';

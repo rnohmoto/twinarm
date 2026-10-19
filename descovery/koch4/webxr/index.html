@@ -52,11 +52,11 @@ const DEFAULTS = {
   version: 2,
   arms: { B: { label:'リーダー', model:'koch_leader', joints: structuredClone(DEFAULT_JOINTS), base:{ x:0, y:0.75, z:-0.6, yaw_deg:0 } } },
   objects: {  // この並び順がキー 1/2/3。軽い・柔らかい → 重い・硬い。spot は 1 本目の腕のローカル座標
-    sponge: { label:'スポンジ',   width:60, p_gain:250,  cap_ma:120, release:2.0, mass_g:10,  bounce:0.15, color:'#facc15', kind:'box',    spot:[-0.155,0,0.221] },
-    ball:   { label:'ボール',     width:45, p_gain:900,  cap_ma:350, release:1.5, mass_g:45,  bounce:0.65, color:'#ef4444', kind:'sphere', spot:[0,0,0.27] },
-    block:  { label:'鉄ブロック', width:30, p_gain:2000, cap_ma:450, release:1.0, mass_g:300, bounce:0.05, color:'#94a3b8', kind:'box',    spot:[0.155,0,0.221] },
+    sponge: { label:'スポンジ',   width:60, p_gain:250,  cap_ma:120, release:2.0, mass_g:10,  bounce:0.15, color:'#facc15', kind:'box',    spot:[-0.10,0,0.12] },
+    ball:   { label:'ボール',     width:45, p_gain:900,  cap_ma:350, release:1.5, mass_g:45,  bounce:0.65, color:'#ef4444', kind:'sphere', spot:[0,0,0.15] },
+    block:  { label:'鉄ブロック', width:30, p_gain:2000, cap_ma:450, release:1.0, mass_g:300, bounce:0.05, color:'#94a3b8', kind:'box',    spot:[0.10,0,0.12] },
   },
-  scene: { desk:{ x:0.05, z:0.05, w:0.5, d:0.4 }, sound:true, ghost:'half' },
+  scene: { desk:{ x:0.05, y:0, z:0.05, w:0.5, d:0.4 }, sound:true, ghost:'half' },   // desk.y = 机の面の高さ（台の底から・m）。実機の指先が届く高さに物を置くために上げる
 };
 let CONFIG = structuredClone(DEFAULTS);
 const JOINTS = ['shoulder_pan','shoulder_lift','elbow_flex','wrist_flex','wrist_roll'];
@@ -243,7 +243,7 @@ function buildDesk(){
   }
   deskRect = { x0, x1, z0, z1 };
   desk = box(x1 - x0, 0.012, z1 - z0, new THREE.MeshStandardMaterial({ color:0x475569, roughness:.8, transparent:true, opacity:0.9 }));
-  desk.position.set((x0 + x1)/2, -0.006, (z0 + z1)/2); p.group.add(desk);
+  desk.position.set((x0 + x1)/2, deskY() - 0.006, (z0 + z1)/2); p.group.add(desk);
 }
 
 // ───────── 仮想物体（1 本目の腕のローカル座標で物理を回す。握る→指先に付く／放す→投げられる・落ちる・跳ねる） ─────────
@@ -267,7 +267,8 @@ function buildObjects(){
 // ───────── 置く的（机の上の丸）: 物体を同じ色の丸の中にそっと置けたら OK。全部置けたらクリア。B で出す／消す ─────────
 // 投げ入れる遊びにすると実機を乱暴に振られるので、置く遊びにしている（ユーザー 10/5）。
 const TARGET_R = 0.032;                                  // 丸の半径 [m]（物体は幅 2〜3 cm）
-const TARGET_ARC = { r:0.15, deg:[40, 0, -40] };         // 丸の位置: 台座から 15 cm の弧。物体の並びと左右を入れ替える
+const TARGET_ARC = { ratio:0.65, deg:[40, 0, -40] };     // 丸の位置: 物の置き場所の平均距離 × 0.65 の弧（8〜20 cm）。物体の並びと左右を入れ替える
+function targetRadius(){ const ds = objs.map(o => Math.hypot(o.cfg.spot[0], o.cfg.spot[2])); const mean = ds.reduce((s, v) => s + v, 0) / Math.max(1, ds.length); return Math.min(0.20, Math.max(0.08, TARGET_ARC.ratio * mean)); }
 let targets = [], targetsOn = true, gameStart = 0, gameClear = 0;
 function buildTargets(){
   const p = prim();
@@ -275,12 +276,12 @@ function buildTargets(){
   targets = []; gameStart = gameClear = 0;
   if (!p || !targetsOn) return;
   objs.forEach((o, i) => {
-    const a = rad(TARGET_ARC.deg[i % TARGET_ARC.deg.length]), r = TARGET_ARC.r + (TARGET_ARC.deg[i % TARGET_ARC.deg.length] === 0 ? -0.01 : 0.01);
+    const a = rad(TARGET_ARC.deg[i % TARGET_ARC.deg.length]), r = targetRadius() + (TARGET_ARC.deg[i % TARGET_ARC.deg.length] === 0 ? -0.01 : 0.01);
     const mesh = new THREE.Group();
     const ring = new THREE.Mesh(new THREE.RingGeometry(TARGET_R - 0.005, TARGET_R, 40), new THREE.MeshBasicMaterial({ color:new THREE.Color(o.cfg.color), side:THREE.DoubleSide }));
     const disc = new THREE.Mesh(new THREE.CircleGeometry(TARGET_R - 0.005, 40), new THREE.MeshBasicMaterial({ color:new THREE.Color(o.cfg.color), transparent:true, opacity:.22, side:THREE.DoubleSide }));
     ring.rotation.x = disc.rotation.x = -Math.PI/2; mesh.add(ring, disc);
-    mesh.position.set(r * Math.sin(a), 0.002, r * Math.cos(a));
+    mesh.position.set(r * Math.sin(a), deskY() + 0.002, r * Math.cos(a));
     p.group.add(mesh);
     targets.push({ o, mesh, ring, disc, ok:false });
   });
@@ -298,7 +299,7 @@ function stepTargets(){
   for (const t of targets) {
     const pos = t.o.mesh.position;
     const inside = Math.hypot(pos.x - t.mesh.position.x, pos.z - t.mesh.position.z) < TARGET_R - 0.004;
-    const resting = !t.o.heldBy && t.o.asleep && pos.y - t.o.half < 0.012;   // 放して、机の上で止まっている
+    const resting = !t.o.heldBy && t.o.asleep && pos.y - t.o.half - deskY() < 0.012;   // 放して、机の上で止まっている
     const ok = inside && resting;
     if (ok && !t.ok) chime([660, 990]);
     t.ok = ok;
@@ -321,7 +322,7 @@ function targetHud(){
   const time = gameClear ? ` <b>クリア！ ${((gameClear - gameStart) / 1000).toFixed(1)} 秒</b>` : gameStart ? ` ${((performance.now() - gameStart) / 1000).toFixed(0)} 秒` : '';
   return `<br><b>置けた数 ${n}/${targets.length}</b> ${marks}${time}` + (showInfo ? '（同じ色の丸の中に置く）' : '');
 }
-function placeAtSpot(o){ o.mesh.position.set(o.cfg.spot[0], o.half + REST_LIFT, o.cfg.spot[2]); o.mesh.rotation.set(0,0,0); o.heldBy = null; o.v.set(0,0,0); o.spin.set(0,0,0); o.asleep = true; o.mesh.scale.set(1,1,1); }
+function placeAtSpot(o){ o.mesh.position.set(o.cfg.spot[0], deskY() + o.half + REST_LIFT, o.cfg.spot[2]); o.mesh.rotation.set(0,0,0); o.heldBy = null; o.v.set(0,0,0); o.spin.set(0,0,0); o.asleep = true; o.mesh.scale.set(1,1,1); }
 function resetPlacement(){ gameStart = gameClear = 0; objs.forEach(placeAtSpot); Object.values(arms).forEach(a => setForced(a, null)); }
 
 // ───────── 音（Web Audio・物が当たったとき。重いほど低く、速いほど大きい） ─────────
@@ -347,6 +348,7 @@ function thud(o, speed){
 
 // ───────── 物理（簡易剛体: 重力・空気抵抗・机／床との衝突・反発と摩擦・球同士の衝突） ─────────
 function floorY(){ const p = prim(); return p ? -p.cfg.base.y : -0.75; }      // world y=0 を 1 本目ローカルで
+const deskY = () => +(CONFIG.scene.desk.y || 0);                               // 机の面の高さ（1 本目ローカル）
 function onDesk(x, z){ return x >= deskRect.x0 && x <= deskRect.x1 && z >= deskRect.z0 && z <= deskRect.z1; }
 function stepPhysics(o, dt){
   if (o.heldBy || o.asleep) return;
@@ -355,11 +357,11 @@ function stepPhysics(o, dt){
   o.mesh.position.addScaledVector(o.v, dt);
   o.mesh.rotation.x += o.spin.x * dt; o.mesh.rotation.y += o.spin.y * dt; o.mesh.rotation.z += o.spin.z * dt;
   const pos = o.mesh.position;
-  const ground = onDesk(pos.x, pos.z) ? 0 : floorY();
+  const ground = onDesk(pos.x, pos.z) ? deskY() : floorY();
   if (pos.y - o.half <= ground && o.v.y <= 0) {
     const speed = Math.abs(o.v.y);
     pos.y = ground + o.half;
-    const bounce = o.cfg.bounce * (ground === 0 ? 1 : 0.8);
+    const bounce = o.cfg.bounce * (ground === deskY() ? 1 : 0.8);
     o.v.y = speed > 0.3 ? speed * bounce : 0;
     o.v.x *= 0.6; o.v.z *= 0.6; o.spin.multiplyScalar(0.5);
     if (speed > 0.3) thud(o, speed);
@@ -418,13 +420,25 @@ function adoptConfig(cfg){
   buildArms(); buildObjects(); buildEditor(); buildButtons();
 }
 async function loadConfig(){
-  try { const r = await fetch('/config', { cache:'no-store' }); if (r.ok) adoptConfig(await r.json()); }
+  try { const r = await fetch('/config', { cache:'no-store' }); if (r.ok) { noteConfigVersion(r); adoptConfig(await r.json()); } }
   catch(e) { /* サーバなし=既定値 */ }
 }
+function noteConfigVersion(r){ const v = r.headers.get('X-Config-Version'); if (v !== null && v !== '') cfgVersion = +v; }
 let st = null, lastOk = -1e9;
+// 設定の版（ブリッジが保存ごとに +1）: 別のページ（Mac の操作ページ）が保存したら読み直す。操作キュー: Mac から届いた操作を 1 回ずつ実行
+let cfgVersion = null, lastOpId = null, opSynced = false;
 async function poll(){
-  try { const r = await fetch('/state', { cache:'no-store' }); if (r.ok) { st = await r.json(); lastOk = performance.now(); } }
+  try { const r = await fetch('/state', { cache:'no-store' }); if (r.ok) { st = await r.json(); lastOk = performance.now(); followBridge(st); } }
   catch(e) { /* サーバなし=デモ継続 */ }
+}
+function followBridge(s){
+  if (s.cfg_version !== undefined) {
+    if (cfgVersion === null) cfgVersion = s.cfg_version;
+    else if (s.cfg_version !== cfgVersion) { cfgVersion = s.cfg_version; loadConfig(); }
+  }
+  const op = s.op;
+  if (!opSynced) { lastOpId = op ? op.id : null; opSynced = true; return; }   // 開いた時点より前の操作は実行しない
+  if (op && op.id !== lastOpId) { lastOpId = op.id; runOp(op); }
 }
 setInterval(poll, 33);
 loadConfig();
@@ -522,6 +536,10 @@ function applyPose(tms){
   }
   alertBox.style.display = alerts.length ? 'block' : 'none';
   alertBox.textContent = alerts.join('　|　');
+  if (SPECTATOR && st) lines.push(st.page ? `<span class="arm">ゴーグル</span> ${st.page.presenting ? (st.page.ar ? 'AR 中' : 'VR 中') : '平面'}`
+      + (st.page.calib_on ? ` / <b>位置合わせ中 ${st.page.points} 点${st.page.residual_cm != null ? ` ずれ ${st.page.residual_cm} cm` : ''}</b>` : '')
+      + (st.page.anchor ? ` / ${st.page.anchor}` : '') + (st.page.grab ? ' / <b>つかんで移動中</b>' : '')
+    : '<span class="arm">ゴーグル</span> 報告なし（ページが開いていない）');
   const view = renderer.xr.isPresenting ? (arActive ? 'AR(パススルー)' : 'VR') : VIEW_NAMES[inlineView];
   const hudBox = document.getElementById('hud');
   if (!showInfo) {   // 見せる用: 置けた数だけ（的を消していれば何も出さない）
@@ -707,12 +725,63 @@ window.koch4SelfTest = function(){
   return { ok, got, truth, residual_m: res };
 };
 
-// ───────── XR 入力（コントローラ／ハンド）: 位置合わせの点取りに使う。制御はしない ─────────
+// ───────── XR 入力（コントローラ／ハンド）: 位置合わせの点取りと、分身をつかんで動かす。制御はしない ─────────
+// Quest Browser は AR 中に DOM overlay（ボタン・文字）を描かない（10/19 実機）。AR 中の操作はこの 2 つと音だけ:
+//   位置合わせ中（Mac の C か キー C）: トリガー／つまむ = 点を 1 つ取る（音 1 つ）
+//   それ以外: 分身の近くでグリップを握る／トリガー長押し／つまんだまま = 台が手に貼り付いて動く（平行移動＋yaw・音 1 つ）。
+//            離すと音 2 つ、1.5 秒後に保存＝アンカー登録（音 3 つ）
+const GRAB_RADIUS = 0.35;            // 分身のどこか（台・関節・指先）からこの距離以内でつかみ始めたときだけ動かす [m]
+const GRAB_SAVE_DELAY_MS = 1500;     // 離してから保存するまで（続けて直すときに保存を連打しない）
+const grab = { armId:null, ctrl:null, rel:null, moved:false, saveTimer:0 };
+function inputPose(c){   // 入力装置の「位置＋yaw だけ」の姿勢。手なら人差し指の先と手首の向き、コントローラなら光線の起点と向き
+  const h = c.userData.hand, src = c.userData.src, joints = src && src.hand && h && h.joints ? h.joints : null;
+  const posNode = (joints && joints['index-finger-tip']) || c, rotNode = (joints && joints['wrist']) || c;
+  const p = new THREE.Vector3(); posNode.getWorldPosition(p);
+  const q = rotNode.getWorldQuaternion(new THREE.Quaternion());
+  return { p, q: new THREE.Quaternion().setFromAxisAngle(UP, yawOf(q)) };
+}
+function distToArm(arm, p){   // 入力装置から分身までの距離（台・各関節・指先のうち最も近いもの）
+  const v = new THREE.Vector3(); let d = Infinity;
+  for (const node of [arm.group, arm.jLift, arm.jElbow, arm.jWristF, arm.jWristR, arm.tip]) { node.getWorldPosition(v); d = Math.min(d, v.distanceTo(p)); }
+  return d;
+}
+function startGrab(c){
+  if (SPECTATOR || calib.on || grab.ctrl || !renderer.xr.isPresenting) return;
+  const hp = inputPose(c); let best = null, bd = GRAB_RADIUS;
+  for (const a of Object.values(arms)) { const d = distToArm(a, hp.p); if (d < bd) { bd = d; best = a; } }
+  if (!best) return;
+  clearTimeout(grab.saveTimer);
+  grab.armId = best.id; grab.ctrl = c; grab.rel = relativePose(hp, baseToPose(best.cfg.base)); grab.moved = false;
+  chime([520]);
+}
+function updateGrab(){   // 毎フレーム: 台 = 手の姿勢 × つかんだときの相対姿勢（手に貼り付く）
+  if (!grab.ctrl) return;
+  const a = arms[grab.armId]; if (!a) { grab.ctrl = null; return; }
+  const w = composePose(inputPose(grab.ctrl), grab.rel), b = a.cfg.base;
+  b.x = +w.p.x.toFixed(4); b.y = +w.p.y.toFixed(4); b.z = +w.p.z.toFixed(4); b.yaw_deg = +deg(yawOf(w.q)).toFixed(2);
+  applyBases(true); grab.moved = true;
+}
+function endGrab(c){
+  if (grab.ctrl !== c) return;
+  grab.ctrl = null; grab.rel = null;
+  buildDesk(); buildEditor();
+  if (!grab.moved) return;
+  chime([520, 780]);
+  grab.saveTimer = setTimeout(async () => { await saveConfig(); chime([660, 880, 1100]); }, GRAB_SAVE_DELAY_MS);
+}
 const controllers = [0, 1].map(i => {
   const c = renderer.xr.getController(i); scene.add(c);
-  const h = renderer.xr.getHand(i); scene.add(h);
-  c.addEventListener('connected', e => { c.userData.src = e.data; });
-  c.addEventListener('disconnected', () => { c.userData.src = null; });
+  const h = renderer.xr.getHand(i); scene.add(h); c.userData.hand = h;
+  // コントローラの基準点（点が取れる所）と短い光線。手のときは出さない（自分の指が見えている）
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.006, 10, 8), new THREE.MeshBasicMaterial({ color:0x60a5fa }));
+  const ray = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -0.25)]), new THREE.LineBasicMaterial({ color:0x60a5fa }));
+  dot.visible = ray.visible = false; c.add(dot, ray);
+  c.addEventListener('connected', e => { c.userData.src = e.data; dot.visible = ray.visible = !(e.data && e.data.hand); });
+  c.addEventListener('disconnected', () => { c.userData.src = null; dot.visible = ray.visible = false; endGrab(c); });
+  c.addEventListener('selectstart', () => { unlockAudio(); startGrab(c); });
+  c.addEventListener('selectend', () => endGrab(c));
+  c.addEventListener('squeezestart', () => { unlockAudio(); startGrab(c); });
+  c.addEventListener('squeezeend', () => endGrab(c));
   c.addEventListener('select', () => {
     unlockAudio();
     if (!calib.on) return;
@@ -721,11 +790,10 @@ const controllers = [0, 1].map(i => {
     const pos = new THREE.Vector3();
     if (tipJoint) tipJoint.getWorldPosition(pos);
     else { c.getWorldPosition(pos); if (calib.tipOffset) { const d = new THREE.Vector3(0, 0, -1).applyQuaternion(c.getWorldQuaternion(new THREE.Quaternion())); pos.addScaledVector(d, calib.tipOffset); } }
-    captureCalibPoint(pos);
+    captureCalibPoint(pos); chime([880]);
   });
   return c;
 });
-// DOM overlay のボタンを押したときは XR の select にしない（位置合わせの点が増えないように）
 for (const id of ['btns', 'editor']) document.getElementById(id).addEventListener('beforexrselect', e => e.preventDefault());
 
 // ───────── ボタン / キー ─────────
@@ -744,12 +812,19 @@ function buildButtons(){
   if (armIds().length > 1) addBtn(`Tab 腕: ${selArm}`, selectNextArm);
   if (!SPECTATOR) objs.forEach((o, i) => forceBtns.push([addBtn(`${i+1} ${o.cfg.label}`, () => setForced(arm, arm.forced === o ? null : o)), o.name, arm.id]));
   if (!SPECTATOR) addBtn('0 解除', () => setForced(arm, null));
-  addBtn('R 配置リセット', resetPlacement);
+  addBtn('R 配置リセット', () => { resetPlacement(); if (SPECTATOR) postOp('reset'); });
   if (!SPECTATOR) addBtn('C 位置合わせ', startCalib, 'calib');
   addBtn('G 分身', cycleGhost);
   addBtn('E 編集', toggleEditor);
   if (!SPECTATOR && renderer.xr.isPresenting && anchorsOk) addBtn('A アンカー解除', clearAnchors);
   xrButtons.forEach(([l, f]) => addBtn(l, f));
+  if (SPECTATOR && showInfo) {   // Mac の操作ページ: ゴーグルのページを遠隔で操作する（AR 中はゴーグルに UI が出ないため）
+    addBtn('ゴーグル: C 位置合わせ', () => postOp('calib_start'), 'calib'); addBtn('確定(保存)', () => postOp('calib_save'), 'calib');
+    addBtn('取消(1 点)', () => postOp('calib_undo')); addBtn('中止', () => postOp('calib_cancel'));
+    addBtn('ゴーグル: A アンカー解除', () => postOp('anchor_clear')); addBtn('ゴーグル: 再読込', () => postOp('reload'));
+    addBtn('高さ −1 cm', () => nudgeDesk(-0.01)); addBtn('高さ +1 cm', () => nudgeDesk(0.01));
+    addBtn('置き場所 近く', () => scaleSpots(0.9)); addBtn('置き場所 遠く', () => scaleSpots(1 / 0.9));
+  }
   forceBtns.forEach(([b, name, id]) => b.classList.toggle('on', !!(arm.forced && arm.forced.name === name)));
 }
 addEventListener('keydown', e => {
@@ -766,7 +841,7 @@ addEventListener('keydown', e => {
   if (e.key === 'v' || e.key === 'V') { inlineView = VIEW_ORDER[(VIEW_ORDER.indexOf(inlineView) + 1) % VIEW_ORDER.length]; updateCam(); }
   if (e.key === 's' || e.key === 'S') { CONFIG.scene.sound = !CONFIG.scene.sound; }
   if (e.key === 'j' || e.key === 'J') { showNames = !showNames; }
-  if (e.key === 'h' || e.key === 'H') { showInfo = !showInfo; }
+  if (e.key === 'h' || e.key === 'H') { showInfo = !showInfo; buildButtons(); }
   if (e.key === 'b' || e.key === 'B') { targetsOn = !targetsOn; buildTargets(); }
   if (e.key === 'm' || e.key === 'M') { layout = LAYOUT_ORDER[(LAYOUT_ORDER.indexOf(layout) + 1) % LAYOUT_ORDER.length]; }
   if (e.key === 'Tab') { e.preventDefault(); selectNextArm(); }
@@ -829,6 +904,8 @@ function buildEditor(){
   const dk = CONFIG.scene.desk, afterDesk = () => buildDesk();
   editor.appendChild(num('x', () => dk.x, v => dk.x = v, 0.05, -2, 2, afterDesk));
   editor.appendChild(num('z', () => dk.z, v => dk.z = v, 0.05, -2, 2, afterDesk));
+  const afterDeskY = () => { buildDesk(); buildTargets(); for (const o of objs) if (o.asleep && !o.heldBy && onDesk(o.mesh.position.x, o.mesh.position.z)) o.mesh.position.y = deskY() + o.half + REST_LIFT; };
+  editor.appendChild(num('高さ y（物が乗る面）', () => dk.y ?? 0, v => dk.y = v, 0.01, -0.5, 0.5, afterDeskY));
   editor.appendChild(num('幅 w', () => dk.w, v => dk.w = v, 0.1, 0.2, 3, afterDesk));
   editor.appendChild(num('奥行 d', () => dk.d, v => dk.d = v, 0.1, 0.2, 3, afterDesk));
   const hg = document.createElement('div'); hg.className = 'row'; hg.innerHTML = '<label>AR の分身</label>';
@@ -838,7 +915,7 @@ function buildEditor(){
 }
 async function saveConfig(){
   try { const r = await fetch('/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(CONFIG) });
-        if (r.ok) { adoptConfig(await r.json()); for (const a of Object.values(arms)) a.sendStatus = '設定を保存'; } else { for (const a of Object.values(arms)) a.sendStatus = `設定保存 HTTP ${r.status}`; } }
+        if (r.ok) { noteConfigVersion(r); adoptConfig(await r.json()); for (const a of Object.values(arms)) a.sendStatus = '設定を保存'; } else { for (const a of Object.values(arms)) a.sendStatus = `設定保存 HTTP ${r.status}`; } }
   catch(e) { for (const a of Object.values(arms)) a.sendStatus = '設定保存 失敗(サーバなし)'; }
   if (renderer.xr.isPresenting && anchorsOk) for (const id of armIds()) anchorReq.add(id);   // 保存した台の位置をアンカーとして登録し直す
 }
@@ -891,6 +968,58 @@ window.koch4 = {
   anchorState, mkPose: b => baseToPose(b), updateAnchors,   // 実機の開発者ツールや自動テストから、アンカーの状態を読み書きする
 };
 // 自己診断（デスクトップのコンソールで koch4AnchorSelfTest()）: 差分の往復と、原点が変わったときに台がアンカーと一緒に動くこと
+// ───────── Mac の操作ページとの連携: 操作キュー（/op → /state.op）と状態報告（/status → /state.page） ─────────
+const SPOT_R_MIN = 0.08, SPOT_R_MAX = 0.30;   // 置き場所を近く／遠くするときの台からの距離の範囲 [m]
+async function postOp(kind, extra){
+  try { await fetch('/op', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(Object.assign({ op: kind, arm: selArm }, extra || {})) }); }
+  catch(e) { /* サーバなし */ }
+}
+function runOp(op){   // ブリッジ経由で届いた操作。reset と reload は全ページ、残りはゴーグル（握る側）のページだけ
+  if (op.op === 'reload') { location.reload(); return; }
+  if (op.op === 'reset') { resetPlacement(); return; }
+  if (SPECTATOR) return;
+  if (op.arm && arms[op.arm]) selArm = op.arm;
+  if (op.op === 'select_arm') { buildButtons(); return; }
+  if (op.op === 'calib_start') { if (!calib.on) startCalib(); }
+  else if (op.op === 'calib_save') { if (calib.on) stopCalib(true); }
+  else if (op.op === 'calib_cancel') { if (calib.on) { loadConfig(); stopCalib(false); } }
+  else if (op.op === 'calib_undo') { if (calib.on) undoCalibPoint(); }
+  else if (op.op === 'anchor_clear') { clearAnchors(); }
+  else if (op.op === 'ghost') { cycleGhost(); }
+  unlockAudio(); chime([440]);
+}
+async function reportStatus(){   // 1 秒ごと: 位置合わせの点数・残差・アンカーの状態を Mac へ（ゴーグルには文字が出ないので）
+  if (SPECTATOR) return;
+  const a = arms[selArm] || prim(), an = anchorState[selArm];
+  const body = { arm: selArm, presenting: renderer.xr.isPresenting, ar: arActive, calib_on: calib.on, points: calib.points.length,
+    residual_cm: (a && calib.points.length >= 2) ? +(calibResidual(a) * 100).toFixed(1) : null, anchor: an ? an.status : '', grab: !!grab.ctrl, base: a ? a.cfg.base : null };
+  try { await fetch('/status', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }); } catch(e) { /* サーバなし */ }
+}
+setInterval(reportStatus, 1000);
+function nudgeDesk(d){ const dk = CONFIG.scene.desk; dk.y = +(((dk.y || 0) + d).toFixed(3)); buildDesk(); buildTargets(); saveConfig(); }
+function scaleSpots(f){   // 置き場所を台から近く／遠くへ（距離を f 倍・8〜30 cm に収める）
+  for (const o of Object.values(CONFIG.objects)) {
+    const [x, y, z] = o.spot, r = Math.hypot(x, z); if (r < 1e-6) continue;
+    const nr = Math.min(SPOT_R_MAX, Math.max(SPOT_R_MIN, r * f)), k = nr / r;
+    o.spot = [+(x * k).toFixed(3), y, +(z * k).toFixed(3)];
+  }
+  saveConfig();
+}
+window.koch4.grab = grab; window.koch4.startCalib = startCalib; window.koch4.stopCalib = stopCalib;   // Mac からの遠隔操作（DevTools）用
+window.koch4.postOp = postOp; window.koch4.runOp = runOp; window.koch4.nudgeDesk = nudgeDesk; window.koch4.scaleSpots = scaleSpots;
+window.koch4.saveConfig = saveConfig; window.koch4.loadConfig = loadConfig; window.koch4.resetPlacement = resetPlacement;
+// 自己診断（デスクトップのコンソールで koch4GrabSelfTest()）: 手を平行移動すれば台も同じだけ動き、手をその場で回せば台は手の周りを同じ角度だけ回る
+window.koch4GrabSelfTest = function(){
+  const base0 = { x:0.1, y:0.75, z:-0.6, yaw_deg:15 };
+  const hand0 = { p:new THREE.Vector3(0.3, 1.0, -0.4), q:new THREE.Quaternion().setFromAxisAngle(UP, rad(-20)) };
+  const rel = relativePose(hand0, baseToPose(base0));
+  const moved = composePose({ p: hand0.p.clone().add(new THREE.Vector3(0.1, 0.05, -0.2)), q: hand0.q.clone() }, rel);   // 平行移動だけ
+  const e1 = moved.p.distanceTo(new THREE.Vector3(base0.x + 0.1, base0.y + 0.05, base0.z - 0.2)), e2 = Math.abs(deg(yawOf(moved.q)) - base0.yaw_deg);
+  const turned = composePose({ p: hand0.p.clone(), q: new THREE.Quaternion().setFromAxisAngle(UP, rad(-20 + 30)) }, rel);   // その場で 30° 回す
+  const r0 = hand0.p.distanceTo(new THREE.Vector3(base0.x, base0.y, base0.z)), r1 = hand0.p.distanceTo(turned.p);
+  const e3 = Math.abs(r1 - r0), e4 = Math.abs(deg(yawOf(turned.q)) - (base0.yaw_deg + 30)), e5 = Math.abs(turned.p.y - base0.y);
+  return { ok: e1 < 1e-6 && e2 < 1e-6 && e3 < 1e-6 && e4 < 1e-6 && e5 < 1e-6, e1, e2, e3, e4, e5 };
+};
 window.koch4AnchorSelfTest = function(){
   const arm = prim(); const keepBase = structuredClone(arm.cfg.base), keepSt = anchorState[arm.id];
   const A = { p:new THREE.Vector3(0.3, 0.1, -0.2), q:new THREE.Quaternion().setFromAxisAngle(UP, rad(25)) };
@@ -912,7 +1041,7 @@ const _buildObjects = buildObjects;
 buildObjects = function(){ _buildObjects(); buildButtons(); };
 addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 renderer.setAnimationLoop((t, frame) => {
-  if (renderer.xr.isPresenting) { paneA.style.display = paneB.style.display = 'none'; updateAnchors(frame); applyPose(t); renderer.render(scene, camera); return; }
+  if (renderer.xr.isPresenting) { paneA.style.display = paneB.style.display = 'none'; updateGrab(); updateAnchors(frame); applyPose(t); renderer.render(scene, camera); return; }
   updateCam(); applyPose(t); renderer.setViewport(0, 0, innerWidth, innerHeight); renderInline();
 });
 </script>

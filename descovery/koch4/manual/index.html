@@ -115,6 +115,9 @@ uv sync</pre>
 <table class="table table-striped align-middle">
 <thead><tr><th style="width:22%">やりたいこと</th><th style="width:34%">コマンド</th><th>動くもの・開く画面</th></tr></thead>
 <tbody>
+<tr><td><strong>VR 1 人目（リーダー B＋Quest #1・Mac 1）</strong></td><td><code>koch4/mac/3_VR1人目_リーダーB.command</code>（＝<code>PAIR=B ./koch4/mac/koch.sh vr-leader</code>）</td><td>ブリッジ 8444・腕の制御・Mac の操作ページ・Quest の許可待ち→ページを開く→USB の見張り。10/19 から VR の正本</td></tr>
+<tr><td><strong>VR 2 人目（フォロワー B＋Quest #2・Mac 2）</strong></td><td><code>koch4/mac/4_VR2人目_フォロワーB.command</code>（＝<code>koch.sh vr-follower</code>）</td><td>同上をフォロワー機で（8443）。腕を支えてから Enter</td></tr>
+<tr><td>Quest を繋ぎ直す（koch.sh で起動したとき）</td><td><code>koch4/mac/7_Quest再接続.command</code>（＝<code>koch.sh quest</code>）</td><td>動いているブリッジの口に reverse を張り直し、ゴーグルでページを開く</td></tr>
 <tr><td>握手（2 ペア）</td><td><code>./koch4/start.sh handshake</code></td><td>リーダー 2・フォロワー 2。パネル <code>http://127.0.0.1:8780</code></td></tr>
 <tr><td>握手（ペア A だけ）</td><td><code>./koch4/start.sh handshake --pair A</code></td><td>リーダー A・フォロワー A。ペア B を VR に使う日の形</td></tr>
 <tr><td>握手の受け側（2 台目の Mac）</td><td><code>./koch4/start.sh host A ＜ポート＞</code></td><td>フォロワーを無線で受ける。操作者側に書く宛先も表示する</td></tr>

@@ -7,6 +7,10 @@ safety rules there apply to everything here: the Magician is a real arm.
 Read @README.md for the script inventory, each script's hardware risk, the quick start, and the
 first-time setup manual.
 
+When the task is to run or re-set-up the bench demo, read [`HANDOFF.md`](HANDOFF.md) next: it holds
+the verified configuration (port, camera lock, heights, zones, calibration) and the exact commands to
+redo each step.
+
 ## Rules for this directory
 
 - Run `uv` commands here (`uv sync`, `uv run python …`, `uv run pytest`). This is an independent uv

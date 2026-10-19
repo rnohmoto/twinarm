@@ -36,8 +36,8 @@ class TrackingRobot(DryRunRobot):
         super().__init__(cfg)
         self.moves: list[tuple[float, float, float]] = []
 
-    def _move(self, x, y, z, r, wait):
-        super()._move(x, y, z, r, wait)
+    def _move(self, x, y, z, r, wait, linear=True):
+        super()._move(x, y, z, r, wait, linear)
         self.moves.append((x, y, z))
 
 

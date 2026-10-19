@@ -22,7 +22,8 @@ cd dobot && ./start.sh        # Mac/Linux。Finder なら start.command をダ�
 | ロボット | Dobot Magician、吸盤。ポート `/dev/cu.usbserial-5A9E0126111`（CH9102）、backend `magician`（非常停止レーン付き） |
 | カメラ | Logicool C922 俯瞰、OpenCV index 0、1280×720。Logi Options+ で AF OFF・手動フォーカス（机）・自動露出 OFF、WB は自動（手動だと青被り） |
 | 物 | 木のブロック 4 色（赤・緑・青・黄）、厚み 16 mm |
-| 高さ | ブロック上面 z=-56.1 → `z_pick`=-57.1（4 色）。机面 z=-72.2 → `z_place`=-54.1（面＋厚み＋2）。`z_safe`=40、`z_min`=-80 |
+| 高さ | ブロック上面 z=-56.1 → `z_pick`=-57.1（4 色）。机面 z=-72.2 → `z_place`=-54.1（面＋厚み＋2）。`z_safe`=20、`z_min`=-80 |
+| 速さ | `speed_pct`=100、`travel_mode`=movj、`ee_settle_s`=0.4（§6） |
 | 置き場 | `tray_right`=(211,-125)。`tray_left`(230,110)・`box_front`(170,0)・`box_back`(280,0)・`start`(235,0) は既定 |
 | 較正 | `assets/homography.json`: `calibrate.py --drive` で 9 点、RMS 1.91 mm（2026-10-16 18:37）。git 管理外なので別 PC では取り直すかコピーする |
 | 音声 | faster-whisper `small`（`~/.cache/huggingface`、初回 480 MB）。マイクは Mac 内蔵。ターミナルにマイクの許可が必要 |
@@ -108,7 +109,22 @@ Windows は `start.bat`（ポートは `COMn`、カメラ index は `check_camer
 - `uv run pytest` は実機の較正ファイルがあっても通る（2026-10-19 修正）。ポート 8790 を実演が使っている間はパネルのテスト 2 件が落ちる
 - `config.bak_*.json` はウィザードと `zones_view.py` が保存前に残すコピー（git 管理外）
 
-## 6. 新しい会話の起動プロンプト（コピペ）
+## 6. 速さの調整
+
+2026-10-16 のログでは 1 回のピック＆プレースに 20 秒かかっていた（速度比 30 %・全区間が直線補間・退避高さ 40）。
+2026-10-19 に次の 4 つを変えた（`config.json` の `robot`）。遅く戻すときもここ。
+
+| 項目 | 前 | 今 | 意味・戻し方 |
+| --- | --- | --- | --- |
+| `speed_pct` | 30 | 100 | Magician の速度比・加速度比（%）。J1〜J4 の**脱調アラーム**が出たり、物を振り落とすなら 70 に下げる |
+| `travel_mode` | （直線） | `movj` | 退避・横移動・持ち上げを関節補間に（速い。経路は少し曲がる）。物へ下りる区間は常に直線。箱の縁すれすれを通すなら `movl` |
+| `z_safe` | 40 | 20 | 退避高さ。運んでいる物の底（吸盤 −16 mm）が箱やトレイの縁より上になる値にする。縁が高い箱を使うなら 40 に戻す |
+| `ee_settle_s` | 0.6 | 0.4 | 吸着が効くまでの待ち秒数。吸えずに落とすなら 0.6 に戻す |
+
+確認の順番: パネルの「往復（試運転）」→ 文字で 1 回ピック → 連続（ループ ×3）。落とす・止まる・アラームが出たら上の表の順に戻す。
+もっと速くする次の手は、PTP の座標／関節パラメータ（SetPTPCoordinateParams / SetPTPJointParams）を明示的に上げること（未実装・実機で上限を測ってから）。
+
+## 7. 新しい会話の起動プロンプト（コピペ）
 
 ```
 twinarm-main の dobot で Dobot Magician の実演を再開します。dobot/AGENTS.md → dobot/HANDOFF.md の順に読んでください。

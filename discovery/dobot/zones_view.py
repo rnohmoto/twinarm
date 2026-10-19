@@ -36,6 +36,11 @@ KEY_TAB = 9
 KEY_NONE = 255  # waitKey が -1 のとき & 0xFF
 
 
+def mirror_u(u: float, width: int) -> float:
+    """左右反転表示の画素 u と元画像の u を相互に変換する（自己逆）。"""
+    return width - 1 - u
+
+
 def _px(uv: tuple[float, float]) -> tuple[int, int]:
     """(u,v) を描画用の整数ピクセルに。"""
     return round(uv[0]), round(uv[1])
@@ -75,12 +80,18 @@ def click_to_zone(zones: Sequence[Zone], index: int, u: float, v: float, p2r: Pi
 
 
 def render(frame: np.ndarray, zones: Sequence[Zone], selected: int, p2r: PixelToRobot, robot: RobotConfig,
-           dirty: bool) -> np.ndarray:
-    """枠・置き場・凡例を描いた新しい画像を返す（frame は変更しない）。画面の文字は OpenCV の都合で英語。"""
+           dirty: bool, mirror: bool = False) -> np.ndarray:
+    """枠・置き場・凡例を描いた新しい画像を返す（frame は変更しない）。画面の文字は OpenCV の都合で英語。
+    mirror=True なら実演画面（demo.panel_mirror）と同じ左右反転で描く（座標は元の向きで計算し、描く位置だけ反転）。"""
     import cv2
     font = cv2.FONT_HERSHEY_SIMPLEX
-    vis = frame.copy()
-    outline = np.array(workspace_outline(robot, p2r), dtype=np.int32)
+    width = frame.shape[1]
+    vis = np.ascontiguousarray(frame[:, ::-1]) if mirror else frame.copy()
+
+    def mu(u: int) -> int:
+        return int(mirror_u(u, width)) if mirror else u
+
+    outline = np.array([(mu(u), v) for u, v in workspace_outline(robot, p2r)], dtype=np.int32)
     cv2.polylines(vis, [outline], True, OUTLINE_COLOR, 1)
     cv2.putText(vis, "arm workspace", (int(outline[:, 0].min()) + 4, int(outline[:, 1].min()) + 16),
                 font, 0.5, OUTLINE_COLOR, 1)
@@ -88,16 +99,17 @@ def render(frame: np.ndarray, zones: Sequence[Zone], selected: int, p2r: PixelTo
         color = ZONE_COLORS[i % len(ZONE_COLORS)]
         thick = 3 if i == selected else 1
         (u, v), r_px, slots = zone_overlay(zone, p2r)
+        u = mu(u)
         cv2.circle(vis, (u, v), r_px, color, thick)
         cv2.drawMarker(vis, (u, v), color, cv2.MARKER_CROSS, 16, thick)
         for s in slots:
-            cv2.circle(vis, s, 3, color, -1)
+            cv2.circle(vis, (mu(s[0]), s[1]), 3, color, -1)
         cv2.putText(vis, f"{i + 1} {zone.name}", (u + 10, v - 10), font, 0.6, color, 2)
     for i, zone in enumerate(zones):
         mark = ">" if i == selected else " "
         cv2.putText(vis, f"{mark}{i + 1} {zone.name} ({zone.x:.0f},{zone.y:.0f})",
                     (10, 24 + LEGEND_LINE_PX * i), font, 0.6, ZONE_COLORS[i % len(ZONE_COLORS)], 2)
-    status = "UNSAVED (s=save)" if dirty else "saved"
+    status = ("UNSAVED (s=save)" if dirty else "saved") + (" | MIRRORED like the demo panel" if mirror else "")
     cv2.putText(vis, f"click = move '{zones[selected].name}' | 1-9/Tab select | r=revert s=save q=quit | {status}",
                 (10, vis.shape[0] - 12), font, 0.55, TEXT_COLOR, 2)
     return vis
@@ -106,6 +118,7 @@ def render(frame: np.ndarray, zones: Sequence[Zone], selected: int, p2r: PixelTo
 def run(cfg: AppConfig, config_path: Path, camera, p2r: PixelToRobot) -> None:
     import cv2
     zones: list[Zone] = list(cfg.zones)
+    mirror = bool(cfg.demo.panel_mirror)      # 実演画面と同じ向きで見せる。クリックは元の画素に戻してから使う
     selected, dirty, quit_armed = 0, False, False
     clicks: list[tuple[float, float]] = []
 
@@ -121,11 +134,13 @@ def run(cfg: AppConfig, config_path: Path, camera, p2r: PixelToRobot) -> None:
         frame = camera.read()
         while clicks:
             u, v = clicks.pop(0)
+            if mirror:
+                u = mirror_u(u, frame.shape[1])
             zones, ok, msg = click_to_zone(zones, selected, u, v, p2r, cfg.robot)
             dirty = dirty or ok
             quit_armed = False
             print(msg)
-        cv2.imshow(win, render(frame, zones, selected, p2r, cfg.robot, dirty))
+        cv2.imshow(win, render(frame, zones, selected, p2r, cfg.robot, dirty, mirror))
         k = cv2.waitKey(30) & 0xFF
         if k == KEY_NONE:
             continue

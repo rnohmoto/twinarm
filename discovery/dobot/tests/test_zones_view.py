@@ -12,7 +12,7 @@ sys.path.insert(0, str(HERE.parent))
 from calibrate import Pair, PixelToRobot
 from config import AppConfig
 from setup_wizard import place_zone, zone_fits_workspace
-from zones_view import click_to_zone, render, workspace_outline, zone_overlay
+from zones_view import click_to_zone, mirror_u, render, workspace_outline, zone_overlay
 
 
 def _p2r() -> PixelToRobot:
@@ -74,3 +74,15 @@ def test_click_to_zone_refuses_a_centre_whose_slots_fall_outside_the_workspace()
     new, ok2, _ = click_to_zone(zones, i, 1176, 380, p2r, cfg.robot)     # u=1176 → y=-134 → スロット -149 は内
     assert ok2 and new[i].y == -134.0 and all(sy >= -150 for _, sy in new[i].slots)
     assert zone_fits_workspace(same[i], cfg.robot) and not zone_fits_workspace(place_zone(same[i], 215, -142), cfg.robot)
+
+
+def test_render_mirror_draws_the_zone_on_the_flipped_side():
+    p2r, cfg = _p2r(), AppConfig.default()
+    frame = np.zeros((720, 1280, 3), np.uint8)
+    start = _zone(cfg, "start")                                   # 中心は (640,300)、左右対称なので x を少しずらす
+    zones = [place_zone(start, 235.0, -50.0)]                     # y=-50 → u = 640 + 200 = 840
+    plain = render(frame, zones, 0, p2r, cfg.robot, dirty=False)
+    mirrored = render(frame, zones, 0, p2r, cfg.robot, dirty=False, mirror=True)
+    assert plain[300, 840].any() and not plain[300, 1280 - 1 - 840].any()
+    assert mirrored[300, 1280 - 1 - 840].any() and not mirrored[300, 840].any()
+    assert mirror_u(10, 1280) == 1269 and mirror_u(1269, 1280) == 10

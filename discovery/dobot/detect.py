@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -116,6 +116,17 @@ def _color_for(name: str) -> tuple[int, int, int]:
         if name.startswith(k):
             return v
     return (200, 200, 200)
+
+
+def mirror_view(frame_bgr: np.ndarray, dets: Sequence[Detection]) -> tuple[np.ndarray, list[Detection]]:
+    """表示用に左右反転した画像と、画素座標だけ反転した検出のコピー。ロボット座標・大きさは変えない。
+
+    較正は元の向きの画像で取っているので、処理は元のまま、見せる絵だけ反転する（demo.panel_mirror、2026-10-19）。
+    """
+    w = frame_bgr.shape[1]
+    out = [replace(d, cx=float(w - 1 - d.cx), bbox=(w - d.bbox[0] - d.bbox[2], d.bbox[1], d.bbox[2], d.bbox[3]),
+                   extra=dict(d.extra)) for d in dets]
+    return np.ascontiguousarray(frame_bgr[:, ::-1]), out
 
 
 def annotate(frame_bgr: np.ndarray, dets: Sequence[Detection], status: str = "",

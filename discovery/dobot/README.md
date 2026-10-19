@@ -25,8 +25,12 @@ serial number `DT1426040100`, firmware 4.0.6, and accepts the suction command (`
 ON, then OFF). On 2026-10-15 (fest Mac D bench, C922 overhead) the user confirmed on the real arm: `jog.py` step
 moves, the workspace guard refusing x > 300, Esc stopping a held move, the cup holding a wood block;
 `demo.py --robot magician` homed at start, and the stop lane (往復（試運転） → 非常停止 → 停止解除 →
-ホーム) was accepted within the same second in the panel events. Camera lock on the Mac, calibration
-(wizard 3–8) and the 20-cycle run are still open.
+ホーム) was accepted within the same second in the panel events. On 2026-10-16 the
+bench was completed end to end: C922 locked through Logi Options+, eye-to-hand calibration with `calibrate.py --drive`
+(RMS 1.91 mm), zones placed on the camera image with `zones_view.py`, pick/place heights measured, and red blocks
+picked and placed into both trays by text command on the `magician` backend. The resulting `config.json` is
+committed; `assets/homography.json` is per bench (git-ignored). **Start from [`HANDOFF.md`](HANDOFF.md)** (Japanese)
+to run or redo the setup. The 20-cycle run is still open.
 
 ## Quick start
 
@@ -36,7 +40,8 @@ stop), M1/M2 (camera lock and calibration), M3 (20 cycles), then voice, and asks
 
 ```bash
 cd dobot
-./start.sh            # Mac/Linux: wizard if not configured yet, otherwise the demo panel (.\start.bat on Windows)
+./start.sh            # Mac/Linux: wizard if not configured yet, otherwise the demo panel (.\start.bat on Windows;
+                      # double-click start.command in Finder for the same thing)
 ./start.sh dry        # no hardware: synthetic camera + recording robot, panel at http://127.0.0.1:8790
 ./start.sh check      # read-only: cameras, candidate ports, offline tests
 ./start.sh suction --port /dev/cu.usbserial-XXXX   # suction ON/OFF panel only, at http://127.0.0.1:8791

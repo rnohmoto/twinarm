@@ -27,6 +27,7 @@ from jog import (
     ID_QUEUE_CLEAR,
     ID_QUEUE_FORCE_STOP,
     ID_QUEUE_START,
+    PTP_MOVJ_XYZ,
     PTP_MOVL_XYZ,
     RANGE_ALARMS,
     MagicianArm,
@@ -83,8 +84,12 @@ class IndexedArm(MagicianArm):
         self._command(ID_QUEUE_FORCE_STOP, CTRL_WRITE_IMMEDIATE)
 
     def move_linear_queued(self, x: float, y: float, z: float, r: float) -> int:
-        """直線移動をキューに積み、その命令の index を返す（到着は待たない・StartExec は送らない）。"""
-        params = self._command(ID_PTP_CMD, CTRL_WRITE_QUEUED, struct.pack("<B4f", PTP_MOVL_XYZ, x, y, z, r))
+        return self.move_queued(PTP_MOVL_XYZ, x, y, z, r)
+
+    def move_queued(self, mode: int, x: float, y: float, z: float, r: float) -> int:
+        """PTP 移動（mode: PTP_MOVL_XYZ=直線 / PTP_MOVJ_XYZ=関節補間）をキューに積み、その命令の index を返す
+        （到着は待たない・StartExec は送らない）。"""
+        params = self._command(ID_PTP_CMD, CTRL_WRITE_QUEUED, struct.pack("<B4f", mode, x, y, z, r))
         if len(params) < 8:
             raise RuntimeError(f"SetPTPCmd: 応答に index がない ({len(params)} bytes)")
         return struct.unpack_from("<Q", params, 0)[0]
@@ -160,9 +165,9 @@ class MagicianRobot(RobotBase):
         return float(x), float(y), float(z), float(r)
 
     # ------------------------------------------------------------- motion
-    def _move(self, x: float, y: float, z: float, r: float, wait: bool) -> None:
+    def _move(self, x: float, y: float, z: float, r: float, wait: bool, linear: bool = True) -> None:
         self._before_move()
-        target = self.dev.move_linear_queued(x, y, z, r)
+        target = self.dev.move_queued(PTP_MOVL_XYZ if linear else PTP_MOVJ_XYZ, x, y, z, r)
         if wait:
             self._wait_motion(target)
 

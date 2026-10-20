@@ -18,7 +18,7 @@ from demo import DemoRunner, SharedCamera, ThermalGuard, attract_due, parse_args
 from detect import make_synthetic_frame
 from panel_web import PanelServer, PanelState
 from rule_parser import loop_count, parse
-from setup_wizard import grid_slots, summarize
+from setup_wizard import grid_slots, hardware_backend, summarize
 
 
 def test_attract_due_rules():
@@ -164,9 +164,20 @@ def test_wizard_helpers():
     assert "カメラ" in s and "置き場" in s and "start" in s
 
 
+def test_wizard_keeps_a_configured_hardware_backend():
+    # 2026-10-16 のベンチ: ウィザードが backend を無条件に pydobot へ書き換え、検証済みの magician
+    # (非常停止レーン付き) を config.json から消しかけた。実機バックエンドはそのまま、dry だけ pydobot へ。
+    assert hardware_backend("magician") == "magician"
+    assert hardware_backend("pydobot") == "pydobot"
+    assert hardware_backend("dry") == "pydobot"
+    assert hardware_backend("") == "pydobot"
+
+
 def test_parse_args_shapes_for_main_build():
     a = parse_args(["--dry-run", "--camera-index", "1"])
-    assert isinstance(a, SimpleNamespace) and a.camera_index == 1 and a.keyboard is True and a.text is None and a.tune is False
+    assert isinstance(a, SimpleNamespace) and a.camera_index == 1 and a.text is None and a.tune is False
+    # keyboard は既定 False: True だと main.build が asr.engine を "text" にしてパネルのマイクが使えない（2026-10-16）
+    assert a.keyboard is False and parse_args(["--keyboard"]).keyboard is True
 
 
 def test_round_trip_moves_within_workspace_and_returns_home(tmp_path):

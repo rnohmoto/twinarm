@@ -8,6 +8,7 @@ import time
 import urllib.request
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -350,7 +351,8 @@ def _runner(tmp_path) -> DemoRunner:
     cfg.log_dir = str(tmp_path / "logs")
     cfg.demo.confirm_auto_run_s = 0.05
     cfg.save(tmp_path / "config.json")
-    args = parse_args(["--dry-run", "--no-llm", "--no-panel", "--config", str(tmp_path / "config.json")])
+    # --keyboard: 文字入力だけの構成（マイク無し）を試す。無いと config の asr.engine（Whisper）を実際に読みに行く
+    args = parse_args(["--dry-run", "--no-llm", "--no-panel", "--keyboard", "--config", str(tmp_path / "config.json")])
     return DemoRunner(args)
 
 
@@ -390,3 +392,49 @@ def test_demo_panel_voice_roundtrip(tmp_path):
     finally:
         runner.shutdown()
         runner._panel.stop()
+
+
+def _front_with_factory(cfg: AppConfig, factory):
+    return VoiceFront(cfg, PanelState(), submit=lambda i: None, parse=lambda t: parse(t, cfg), asr_factory=factory)
+
+
+def test_voice_front_warmup_loads_the_asr_once_and_says_ready():
+    # 2026-10-16: 初めてマイクを押した瞬間に faster-whisper のモデル読み込み（初回はダウンロード）が始まり、
+    # 終わるまで何も表示されず「効かない」ように見えた。起動時に先読みし、できたら知らせる。
+    cfg = AppConfig.default()
+    calls: list[int] = []
+
+    def factory():
+        calls.append(1)
+        return SimpleNamespace(rec=FakeRecorder())
+
+    front = _front_with_factory(cfg, factory)
+    try:
+        front.warmup()
+        assert wait_for(lambda: len(calls) == 1 and "できました" in front.view["message"])
+        assert front.view["phase"] == "idle"
+        front.ptt_start()
+        assert wait_for(lambda: front.view["phase"] == "recording")
+        assert len(calls) == 1                                    # 2 回は読み込まない
+    finally:
+        front.close()
+
+
+def test_ptt_start_before_the_asr_is_ready_says_preparing_and_asks_to_press_again():
+    cfg = AppConfig.default()
+
+    def slow_factory():
+        time.sleep(1.2)                                           # 読み込みに時間がかかる（初回ダウンロードの体）
+        return SimpleNamespace(rec=FakeRecorder())
+
+    front = _front_with_factory(cfg, slow_factory)
+    try:
+        front.ptt_start()
+        assert wait_for(lambda: "準備しています" in front.view["message"])
+        assert front.view["phase"] == "idle"                      # 録音は始めない（離した後に始まっても困る）
+        front.ptt_stop()                                          # 待っている間に離す
+        assert wait_for(lambda: "もう一度" in front.view["message"])
+        front.ptt_start()
+        assert wait_for(lambda: front.view["phase"] == "recording")
+    finally:
+        front.close()

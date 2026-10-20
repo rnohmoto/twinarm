@@ -23,6 +23,7 @@ import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
+from typing import ClassVar
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -166,11 +167,14 @@ class DemoRunner:
         self.asr = None
         self.tts = None
         self._panel: PanelServer | None = None
+        self._frame_thread: threading.Thread | None = None
         # 声の UI: 解析と確認は voice_front（ASR スレッド）、実行はワーカー（"intent" コマンド）
         self.rule_agent = agent if isinstance(agent, RuleAgent) else RuleAgent(cfg, executor, logger)
         self.voice = VoiceFront(cfg, self.state, submit=self.queue.put, parse=lambda t: parse(t, cfg),
                                 asr_factory=self._make_asr, last_object=lambda: self.rule_agent.last_object,
                                 on_stop=self._voice_stop, on_activity=self._touch, logger=logger)
+        if not getattr(args, "dry_run", False):
+            self.voice.warmup()   # 初回のモデル読み込み（ダウンロード）を最初の押下まで待たせない
         if hasattr(logger, "listeners"):
             logger.listeners.append(self._on_event)
         cam_info = {"backend": cfg.camera.backend, "index": str(cfg.camera.index)}
@@ -253,11 +257,14 @@ class DemoRunner:
         elif kind == "llm_unavailable":
             self.state.push_event("LLM が使えないためルール解析で動作")
 
-    def _publish(self, dets, status: str) -> None:
+    def _publish(self, dets, status: str, frame=None) -> None:
         import cv2
 
-        from detect import annotate
-        frame = self.executor.last_frame if self.executor.last_frame is not None else self.camera.read()
+        from detect import annotate, mirror_view
+        if frame is None:
+            frame = self.executor.last_frame if self.executor.last_frame is not None else self.camera.read()
+        if self.cfg.demo.panel_mirror:          # 見せる絵だけ左右反転（検出・座標は元の向き）
+            frame, dets = mirror_view(frame, dets)
         vis = annotate(frame, dets, status)
         ok, buf = cv2.imencode(".jpg", vis, [int(cv2.IMWRITE_JPEG_QUALITY), self.cfg.demo.jpeg_quality])
         if ok:
@@ -454,13 +461,32 @@ class DemoRunner:
         self.state.push_event(msg)
         return Result(done > 0, msg, {"cycles": done})
 
+    _STATUS_TEXT: ClassVar[dict[str, str]] = {
+        "idle": "ready: talk / tidy / attract", "estop": "E-STOP (resume to continue)",
+        "moving": "moving...", "listening": "listening...", "thinking": "thinking..."}
+
     def _tick_frame(self, status: str) -> None:
+        """最新フレームを検出つきで配信する（表示用。executor の状態やログには触らない）。"""
         try:
-            dets = self.executor.observe()
+            frame = self.camera.read()
+            dets = self.executor.detect(frame)
         except Exception as e:  # noqa: BLE001
             self.state.update(error=f"camera: {e!r}")
             return
-        self._publish(dets, status)
+        self._publish(dets, status, frame)
+
+    def _frame_loop(self) -> None:
+        """映像配信のスレッド。ワーカー（ロボット）と独立なので、腕が動いている間も画面が止まらない（2026-10-19）。"""
+        period = 1.0 / max(1, self.cfg.demo.stream_fps)
+        n, t0 = 0, time.time()
+        while self.running.is_set():
+            t = time.time()
+            self._tick_frame(self._STATUS_TEXT.get(self.state.snapshot().get("state", "idle"), ""))
+            n += 1
+            if t - t0 >= 2.0:
+                self.state.update(fps=round(n / (t - t0), 1))
+                n, t0 = 0, t
+            time.sleep(max(0.0, period - (time.time() - t)))
 
     # ------------------------------------------------------------------ run
     _VOICE_TYPES = ("ptt_start", "ptt_stop", "heard", "confirm", "cancel")
@@ -517,11 +543,9 @@ class DemoRunner:
     def run(self, seconds: float | None = None) -> None:
         d = self.cfg.demo
         t_start = time.time()
-        frame_period = 1.0 / max(1, d.stream_fps)
-        last_frame = 0.0
         last_temp = 0.0
-        n_frames = 0
-        fps_t0 = time.time()
+        self._frame_thread = threading.Thread(target=self._frame_loop, name="frame-publish", daemon=True)
+        self._frame_thread.start()
         try:
             self.executor.go_home()
         except Exception as e:  # noqa: BLE001
@@ -544,15 +568,6 @@ class DemoRunner:
             if d.temp_eio and now - last_temp >= d.temp_period_s:
                 self.read_temperature()
                 last_temp = now
-            if now - last_frame >= frame_period:
-                status = {"idle": "ready: talk / tidy / attract", "estop": "E-STOP (resume to continue)"}.get(
-                    self.state.snapshot().get("state", "idle"), "")
-                self._tick_frame(status)
-                last_frame = now
-                n_frames += 1
-                if now - fps_t0 >= 2.0:
-                    self.state.update(fps=round(n_frames / (now - fps_t0), 1))
-                    n_frames, fps_t0 = 0, now
             if attract_due(now, self.last_activity, d.idle_s, self.paused_until, len(self._recent_cycles()),
                            d.max_cycles_per_hour, self.attract_on, self.robot.estop.is_set()) and self.guard.can_run(now):
                 try:
@@ -565,6 +580,8 @@ class DemoRunner:
 
     def shutdown(self) -> None:
         self.running.clear()
+        if self._frame_thread is not None:
+            self._frame_thread.join(timeout=1.0)
         self.voice.close()
         try:
             if not self.robot.estop.is_set():
@@ -592,12 +609,15 @@ def parse_args(argv=None):
     ap.add_argument("--no-panel", action="store_true")
     ap.add_argument("--once", default=None, help="この 1 発話だけ処理して終了")
     ap.add_argument("--seconds", type=float, default=None, help="この秒数で自動終了（動作確認用）")
+    ap.add_argument("--keyboard", action="store_true",
+                    help="マイクを使わず文字入力だけにする（パネルの入力欄・端末）。既定はマイク（config の asr.engine）")
     args = ap.parse_args(argv)
     if args.camera_index is not None and str(args.camera_index).isdigit():
         args.camera_index = int(args.camera_index)
-    # main.build が見る属性を揃える（demo は常にキーボード/パネル入力・OpenCV パネルは使わない）
+    # main.build が見る属性を揃える（OpenCV パネルは使わない）。keyboard は --keyboard のときだけ True:
+    # 以前は常に True で build が asr.engine を "text" に書き換え、パネルのマイクが一度も使えなかった（2026-10-16）
     d = dict(vars(args))
-    d.update(text=None, keyboard=True, tune=False)
+    d.update(text=None, tune=False)
     return SimpleNamespace(**d)
 
 

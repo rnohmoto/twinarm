@@ -49,7 +49,8 @@ class RobotConfig:
     velocity: float = 150.0          # pydobot speed(velocity, acceleration)（pydobot バックエンドのみ）
     acceleration: float = 150.0
     # magician バックエンド（robot_magician.py）
-    speed_pct: float = 30.0          # PTP 共通パラメータの速度比・加速度比（%・1〜100。低速から始めて M3 の実測で決める）
+    speed_pct: float = 30.0          # PTP 共通パラメータの速度比・加速度比（%・1〜100。低速から始めて M3 の実測で決める。ベンチは 100）
+    travel_mode: str = "movj"        # 退避・横移動・持ち上げの補間: movj=関節補間（速い）/ movl=直線。物へ下りる区間は常に直線
     move_timeout_s: float = 10.0     # 1 区間の移動で index が進まないとき、ForceStop して諦めるまでの秒数
     poll_s: float = 0.03             # 移動待ちで index と estop を見る間隔
     alarm_poll_s: float = 0.25       # 移動待ちでアラームを読む間隔
@@ -121,8 +122,9 @@ class DemoConfig:
     confirm_auto_run_s: float = 2.0  # 自動実行までの秒数。0＝表示して即実行・負＝常に Enter／はい を待つ
     confirm_ask_ambiguous: bool = True  # 曖昧な発話（否定・複数・直前参照・リセット）は「これですか？」と確認してから
     panel_port: int = 8790           # ブラウザ UI（http://127.0.0.1:8790）
-    stream_fps: int = 8
+    stream_fps: int = 15             # 映像の配信 fps（専用スレッド。腕が動いている間も更新される）
     jpeg_quality: int = 70
+    panel_mirror: bool = False       # 画面の映像だけ左右反転（来場者がロボットと向かい合うとき）。検出・較正は元の向き
 
 
 @dataclass

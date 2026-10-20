@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -25,6 +25,7 @@ class Detection:
     angle_deg: float = 0.0     # minAreaRect の角度（グリッパ回転用）
     x_mm: float | None = None      # ロボット座標（キャリブ後に planner が埋める）
     y_mm: float | None = None
+    size_mm: float | None = None   # 外接矩形の長辺 [mm]（planner が埋める。置くときに他の物と重ねないための大きさ）
     score: float = 1.0
     circularity: float = 0.0
     aspect: float = 1.0        # 長辺/短辺
@@ -37,6 +38,8 @@ class Detection:
         if self.x_mm is not None:
             d["x_mm"] = round(self.x_mm, 1)
             d["y_mm"] = round(self.y_mm, 1)
+        if self.size_mm is not None:
+            d["size_mm"] = round(self.size_mm, 1)
         return d
 
 
@@ -113,6 +116,17 @@ def _color_for(name: str) -> tuple[int, int, int]:
         if name.startswith(k):
             return v
     return (200, 200, 200)
+
+
+def mirror_view(frame_bgr: np.ndarray, dets: Sequence[Detection]) -> tuple[np.ndarray, list[Detection]]:
+    """表示用に左右反転した画像と、画素座標だけ反転した検出のコピー。ロボット座標・大きさは変えない。
+
+    較正は元の向きの画像で取っているので、処理は元のまま、見せる絵だけ反転する（demo.panel_mirror、2026-10-19）。
+    """
+    w = frame_bgr.shape[1]
+    out = [replace(d, cx=float(w - 1 - d.cx), bbox=(w - d.bbox[0] - d.bbox[2], d.bbox[1], d.bbox[2], d.bbox[3]),
+                   extra=dict(d.extra)) for d in dets]
+    return np.ascontiguousarray(frame_bgr[:, ::-1]), out
 
 
 def annotate(frame_bgr: np.ndarray, dets: Sequence[Detection], status: str = "",

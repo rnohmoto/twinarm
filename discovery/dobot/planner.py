@@ -44,12 +44,53 @@ def in_zone(det: Detection, zone: Zone) -> bool:
     return math.hypot(det.x_mm - zone.x, det.y_mm - zone.y) <= zone.radius_mm
 
 
-def choose_slot(zone: Zone, dets: list[Detection], clearance_mm: float = 25.0) -> tuple[float, float]:
-    """置く位置。スロットがあれば「近くに物が無い」最初のスロット、無ければゾーン中心。"""
-    for sx, sy in zone.slots:
-        if all(d.x_mm is None or math.hypot(d.x_mm - sx, d.y_mm - sy) > clearance_mm for d in dets):
-            return float(sx), float(sy)
-    return zone.x, zone.y
+PLACE_MARGIN_MM = 8.0        # 置くときに、隣の物との間に空ける余裕
+DEFAULT_ITEM_MM = 40.0       # 大きさが分からない物（較正前など）の仮の長辺
+PLACE_SEARCH_STEP_MM = 10.0  # スロットも中心もふさがっているときに置き場の中を探す格子の間隔
+
+
+def _is_clear(x: float, y: float, dets: list[Detection], item_half: float, margin: float) -> bool:
+    for d in dets:
+        if d.x_mm is None:
+            continue
+        need = item_half + (d.size_mm or DEFAULT_ITEM_MM) / 2 + margin
+        if math.hypot(d.x_mm - x, d.y_mm - y) < need:
+            return False
+    return True
+
+
+def _search_points(zone: Zone, step: float) -> list[tuple[float, float]]:
+    """置き場の半径内の格子点を中心に近い順に。"""
+    n = int(zone.radius_mm // step)
+    pts = [(round(zone.x + i * step, 1), round(zone.y + j * step, 1))
+           for i in range(-n, n + 1) for j in range(-n, n + 1) if math.hypot(i * step, j * step) <= zone.radius_mm]
+    return sorted(pts, key=lambda q: math.hypot(q[0] - zone.x, q[1] - zone.y))
+
+
+def choose_place(zone: Zone, dets: list[Detection], item_size_mm: float | None, guard=None, z: float = 0.0,
+                 margin_mm: float = PLACE_MARGIN_MM) -> tuple[float, float] | None:
+    """置く位置。見えている物（dets、ロボット座標と大きさ入り）の上に乗せない場所を、スロット → 中心 →
+    置き場の半径内の格子（中心に近い順）の順に探す。guard を渡せば腕の作業域の外も除く。無ければ None。
+
+    以前は「スロットから 25 mm 以内に物が無ければ可、全部ふさがれば中心」だったので、40 mm 超の木片を 30 mm
+    間隔のスロットに重ねて置いたり、箱の中心の物の上に置いたりした（2026-10-19）。
+    """
+    item_half = (item_size_mm or DEFAULT_ITEM_MM) / 2
+    cands: list[tuple[float, float]] = [(float(sx), float(sy)) for sx, sy in zone.slots]
+    cands.append((zone.x, zone.y))
+    cands.extend(_search_points(zone, PLACE_SEARCH_STEP_MM))
+    seen: set[tuple[float, float]] = set()
+    for x, y in cands:
+        if (x, y) in seen:
+            continue
+        seen.add((x, y))
+        if math.hypot(x - zone.x, y - zone.y) > zone.radius_mm:
+            continue
+        if guard is not None and not guard.inside(x, y, z):
+            continue
+        if _is_clear(x, y, dets, item_half, margin_mm):
+            return x, y
+    return None
 
 
 class TaskExecutor:
@@ -71,15 +112,21 @@ class TaskExecutor:
         spec = self.cfg.object_by_name(name) if name else None
         return spec.z_pick if (spec and spec.z_pick is not None) else self.cfg.robot.z_pick
 
-    def observe(self) -> list[Detection]:
-        frame = self.camera.read()
+    def detect(self, frame: np.ndarray) -> list[Detection]:
+        """画像 1 枚から検出し、ロボット座標・大きさ・届くかを埋める。状態もログも触らないので表示スレッドからも呼べる。"""
         dets = detect_objects(frame, self.cfg.objects, self.cfg.min_area_px, self.cfg.max_area_px)
         if self.p2r is not None:
             for d in dets:
                 d.x_mm, d.y_mm = self.p2r.to_robot(d.cx, d.cy)
+                d.size_mm = max(d.bbox[2], d.bbox[3]) * self.p2r.mm_per_px(d.cx, d.cy)
         for d in dets:  # ロボット座標が作業範囲外の検出は「見えているが拾えない」として印を付ける
             d.extra["reachable"] = bool(d.x_mm is not None and
                                         self.robot.guard.inside(d.x_mm, d.y_mm, self._z_pick(d.name)))
+        return dets
+
+    def observe(self) -> list[Detection]:
+        frame = self.camera.read()
+        dets = self.detect(frame)
         self.last_frame, self.last_dets = frame, dets
         self.logger({"ev": "observe", "n": len(dets), "dets": [d.to_public() for d in dets]})
         return dets
@@ -142,7 +189,17 @@ class TaskExecutor:
                                       {"unreachable": [d.to_public() for d in seen]})
                     return Result(False, f"{label}が見つかりません。")
                 break
-            px, py = choose_slot(zone, [d for d in dets if d is not target])
+            others = [d for d in dets if d is not target]
+            z_place = zone.z_place if zone.z_place is not None else self.cfg.robot.z_place
+            place = choose_place(zone, others, target.size_mm, self.robot.guard, z_place)
+            if place is None:   # 見えている物の上に乗せない。空きが無ければ拾いにも行かない
+                self.logger({"ev": "zone_full", "zone": zone.name,
+                             "in_zone": len([d for d in others if in_zone(d, zone)])})
+                if done:
+                    break
+                return Result(False, f"{self.cfg.zone_label(zone.name)}に空きがありません。先に片付けてください。",
+                              {"full": zone.name})
+            px, py = place
             try:
                 self.logger({"ev": "pick", "target": target.to_public(), "zone": zone.name, "place": [px, py]})
                 self.ctrl.pick_and_place(target.x_mm, target.y_mm, px, py, r=None,

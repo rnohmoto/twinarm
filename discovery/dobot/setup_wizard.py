@@ -13,6 +13,7 @@ import argparse
 import shutil
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -23,9 +24,21 @@ for _s in (sys.stdout, sys.stderr):
     except Exception:  # noqa: BLE001
         pass
 
-from config import AppConfig
+from config import AppConfig, RobotConfig, Zone
 
 STEPS = ["カメラ", "ロボット", "マーカー印刷と配置", "キャリブレーション", "置き場の座標", "物の高さ", "検出の確認", "試運転"]
+
+
+HARDWARE_BACKENDS = ("pydobot", "magician")
+
+
+def hardware_backend(current: str) -> str:
+    """ウィザードは実機を相手にする: dry や未設定なら pydobot、実機バックエンドが設定済みならそれを保つ。
+
+    以前は無条件に pydobot へ書き換えていて、検証済みの magician(非常停止レーン付き)を config.json から
+    消しかけた(2026-10-16)。
+    """
+    return current if current in HARDWARE_BACKENDS else "pydobot"
 
 
 def grid_slots(cx: float, cy: float, dx: float = 50.0, dy: float = 40.0, nx: int = 2, ny: int = 3) -> list[list[float]]:
@@ -33,6 +46,41 @@ def grid_slots(cx: float, cy: float, dx: float = 50.0, dy: float = 40.0, nx: int
     xs = [cx + (i - (nx - 1) / 2) * dx for i in range(nx)]
     ys = [cy + (j - (ny - 1) / 2) * dy for j in range(ny)]
     return [[round(x, 1), round(y, 1)] for x in xs for y in ys]
+
+
+def place_zone(zone: Zone, x: float, y: float) -> Zone:
+    """中心を (x,y) にした新しい Zone。スロットを持つ置き場は中心の周りに作り直す（start は 2×3、他は 2×2）。
+
+    5 番（腕を合わせて Enter）と zones_view.py（画像をクリック）の両方が使う。元の zone は変更しない。
+    """
+    cx, cy = round(x, 1), round(y, 1)
+    if not zone.slots:
+        return replace(zone, x=cx, y=cy)
+    if zone.name == "start":
+        return replace(zone, x=cx, y=cy, slots=grid_slots(cx, cy, 45.0, 40.0, 2, 3))
+    return replace(zone, x=cx, y=cy, slots=grid_slots(cx, cy, 30.0, 30.0, 2, 2))
+
+
+def zone_fits_workspace(zone: Zone, robot: RobotConfig) -> bool:
+    """中心と置く位置（スロット）が全部、腕の作業域（WorkspaceGuard）に入っているか。
+
+    planner はスロットを先頭から使い、作業域の外なら配置が失敗する。中心が入っていてもスロットは外に出うる
+    （2026-10-16: tray_right を y=-142 に置いたら先頭スロットが y=-157 で y_min=-150 の外）。
+    """
+    from robot_dobot import WorkspaceGuard
+    z = zone.z_place if zone.z_place is not None else robot.z_place
+    guard = WorkspaceGuard(robot)
+    return guard.inside(zone.x, zone.y, z) and all(guard.inside(sx, sy, z) for sx, sy in zone.slots)
+
+
+def save_config_with_backup(cfg: AppConfig, path: Path) -> Path | None:
+    """config.json を書く前に config.bak_<時刻>.json を残す。戻り値はバックアップのパス（初回は None）。"""
+    bak = None
+    if path.exists():
+        bak = path.with_suffix(f".bak_{time.strftime('%Y%m%d_%H%M%S')}.json")
+        shutil.copy(path, bak)
+    cfg.save(path)
+    return bak
 
 
 def summarize(cfg: AppConfig, homography_path: Path) -> str:
@@ -66,10 +114,7 @@ class Wizard:
 
     # ------------------------------------------------------------ persistence
     def save(self) -> None:
-        if self.config_path.exists():
-            bak = self.config_path.with_suffix(f".bak_{time.strftime('%Y%m%d_%H%M%S')}.json")
-            shutil.copy(self.config_path, bak)
-        self.cfg.save(self.config_path)
+        save_config_with_backup(self.cfg, self.config_path)
         print(f"  → 保存しました: {self.config_path}")
 
     # ---------------------------------------------------------------- devices
@@ -84,7 +129,7 @@ class Wizard:
     def open_robot(self):
         if self.robot is None:
             from robot_dobot import make_robot
-            self.cfg.robot.backend = "pydobot"
+            self.cfg.robot.backend = hardware_backend(self.cfg.robot.backend)
             self.robot = make_robot(self.cfg.robot)
             self.robot.connect()
         return self.robot
@@ -201,21 +246,24 @@ class Wizard:
 
     def step5_zones(self) -> None:
         print("\n[5/8] 置き場 — 各置き場の中心に吸盤の先端を合わせて Enter（s で飛ばす）。スタート台は片付け先")
+        print("  カメラ画像の上でクリックして決めるなら、代わりに zones_view.py を使う（較正済みなら）")
+        zones = []
         for z in self.cfg.zones:
             a = ask(f"  {z.name}（{z.aliases[0] if z.aliases else ''}）に合わせたら Enter / s=スキップ", "")
-            if a.lower() == "s":
-                continue
-            x, y, zz = self.pose_xy()
-            z.x, z.y = round(x, 1), round(y, 1)
-            if z.slots:
-                nx, ny = (2, 3) if z.name == "start" else (2, 2)
-                z.slots = grid_slots(z.x, z.y, 45.0 if z.name == "start" else 30.0, 40.0 if z.name == "start" else 30.0, nx, ny)
-            print(f"    {z.name} = ({z.x}, {z.y})  slots={len(z.slots)}")
-        a = ask("  トレイの底に吸盤が触れる高さまで下げたら Enter（z_place を決める）/ s=スキップ", "")
+            if a.lower() != "s":
+                x, y, _ = self.pose_xy()
+                z = place_zone(z, x, y)
+                print(f"    {z.name} = ({z.x}, {z.y})  slots={len(z.slots)}")
+                if not zone_fits_workspace(z, self.cfg.robot):
+                    print("    ! 置く位置の一部が腕の作業域の外です。もう少し内側に合わせてやり直してください")
+            zones.append(z)
+        self.cfg.zones = zones
+        # 置くときは吸盤をそのまま z_place まで下げる（物の厚みは planner が足さない）ので、物をつかんだ状態で測る
+        a = ask("  物を吸盤に付けたまま、その物がトレイの底に触れる高さまで下げたら Enter（z_place を決める）/ s=スキップ", "")
         if a.lower() != "s":
             _, _, zz = self.pose_xy()
-            self.cfg.robot.z_place = round(zz + 3.0, 1)
-            print(f"    z_place = {self.cfg.robot.z_place}（底 +3mm）")
+            self.cfg.robot.z_place = round(zz + 2.0, 1)
+            print(f"    z_place = {self.cfg.robot.z_place}（物の底が面の 2mm 上で離す）")
         self.save()
 
     def step6_heights(self) -> None:
@@ -265,8 +313,8 @@ class Wizard:
         self.save()
         print("\n=== 設定のまとめ ===")
         print(summarize(self.cfg, self.homography_path))
-        print("\n次: uv run python demo.py --config config.json --robot pydobot --port", self.cfg.robot.port,
-              "--camera-index", self.cfg.camera.index, "--no-llm   → http://127.0.0.1:%d" % self.cfg.demo.panel_port)
+        print(f"\n次: ./start.sh demo（または uv run python demo.py --config config.json --no-llm）"
+              f"  → http://127.0.0.1:{self.cfg.demo.panel_port}  ロボットは config.json の backend={self.cfg.robot.backend}")
 
     def close(self) -> None:
         try:

@@ -71,14 +71,16 @@ def build(args) -> tuple:
 
     p2r = None
     hp = (HERE / cfg.homography_path) if not Path(cfg.homography_path).is_absolute() else Path(cfg.homography_path)
-    if hp.exists():
-        p2r = PixelToRobot.load(hp)
-    elif args.dry_run:
-        # ドライラン用の仮ホモグラフィ: 画像中央(640,360)→(220,0)、1px=0.25mm、画像 x→ロボット -y、画像 y→ロボット -x
+    if frame is not None:
+        # 合成カメラには合成ホモグラフィ: 画像中央(640,360)→(220,0)、1px=0.25mm、画像 x→ロボット -y、画像 y→ロボット -x。
+        # 実機の assets/homography.json があっても使わない（2026-10-16: 実機の較正で合成画像のブロックが作業域の外へ写り、
+        # dry-run のテストが落ちた）
         from calibrate import Pair
         pairs = [Pair(u, v, 220 - (v - 360) * 0.25, -(u - 640) * 0.25) for u, v in [(200, 100), (1000, 100), (1000, 600), (200, 600)]]
         p2r = PixelToRobot.fit(pairs, (cfg.camera.width, cfg.camera.height))
-        print("[dry-run] using synthetic homography (RMS %.3f mm)" % p2r.rms_error_mm(pairs))
+        print(f"[dry-run] using synthetic homography (RMS {p2r.rms_error_mm(pairs):.3f} mm)")
+    elif hp.exists():
+        p2r = PixelToRobot.load(hp)
     else:
         print(f"[warn] homography not found at {hp}; run calibrate.py first (pick_and_place will refuse)")
 

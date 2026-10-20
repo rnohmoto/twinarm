@@ -25,8 +25,15 @@ serial number `DT1426040100`, firmware 4.0.6, and accepts the suction command (`
 ON, then OFF). On 2026-10-15 (fest Mac D bench, C922 overhead) the user confirmed on the real arm: `jog.py` step
 moves, the workspace guard refusing x > 300, Esc stopping a held move, the cup holding a wood block;
 `demo.py --robot magician` homed at start, and the stop lane (往復（試運転） → 非常停止 → 停止解除 →
-ホーム) was accepted within the same second in the panel events. Camera lock on the Mac, calibration
-(wizard 3–8) and the 20-cycle run are still open.
+ホーム) was accepted within the same second in the panel events. On 2026-10-16 the
+bench was completed end to end: C922 locked through Logi Options+, eye-to-hand calibration with `calibrate.py --drive`
+(RMS 1.91 mm), zones placed on the camera image with `zones_view.py`, pick/place heights measured, and red blocks
+picked and placed into both trays by text command on the `magician` backend. The resulting `config.json` is
+committed; `assets/homography.json` is per bench (git-ignored). **Start from [`HANDOFF.md`](HANDOFF.md)** (Japanese)
+to run or redo the setup. On 2026-10-19 the bench was moved and recalibrated (`--drive`, RMS 3.1 mm), motion
+was sped up (one pick-and-place 20 s → 7 s), the camera stream got its own thread, and the operator side was
+finished: `launcher.py` (start/stop/adjust page), `setup.command` for a fresh Mac, and the documents under
+[`docs/`](docs/) (要件定義書・操作マニュアル・導入手順・作業記録). The 20-cycle run is still open.
 
 ## Quick start
 
@@ -34,9 +41,16 @@ Bench session with Claude Code on the fest Mac (role D): paste the prompt in
 [`../docs/fest_start_prompts.md`](../docs/fest_start_prompts.md) section 4 D. It walks M0 (link-up and
 stop), M1/M2 (camera lock and calibration), M3 (20 cycles), then voice, and asks you for the port.
 
+Operator path (no terminal knowledge needed): double-click **`setup.command`** once on a new Mac (installs uv, the
+dependencies, the Whisper model, runs the offline tests), then **`start.command`** every day: it opens the launcher
+page (http://127.0.0.1:8789) with start / stop / restart, recalibrate, zone placement, the settings form and the log.
+The manuals are in [`docs/`](docs/): [要件定義書](docs/requirements.md), [操作マニュアル](docs/operation-manual.md),
+[導入手順](docs/setup-manual.md), [作業記録](docs/worklog-2026-10.md).
+
 ```bash
 cd dobot
-./start.sh            # Mac/Linux: wizard if not configured yet, otherwise the demo panel (.\start.bat on Windows)
+./start.sh launcher   # the same launcher page from a terminal (--dry: practice without hardware)
+./start.sh            # Mac/Linux: wizard if not configured yet, otherwise the demo panel directly (.\start.bat on Windows)
 ./start.sh dry        # no hardware: synthetic camera + recording robot, panel at http://127.0.0.1:8790
 ./start.sh check      # read-only: cameras, candidate ports, offline tests
 ./start.sh suction --port /dev/cu.usbserial-XXXX   # suction ON/OFF panel only, at http://127.0.0.1:8791
@@ -135,18 +149,21 @@ Risk classes: **read-only** (no motion), **moves arm** (commands motion), **came
 
 | Script | Purpose | Hardware risk |
 | ------ | ------- | ------------- |
-| `setup_wizard.py` | Guided first-time setup: camera + exposure lock, port + homing check, ArUco markers, calibration, zone teaching (hand-guide with the forearm unlock key), per-object `z_pick`, detection tuning, smoke test. Saves `config.json` after each step. | reads only by default; **moves arm** only after `y` (home / smoke test) |
-| `demo.py` | Demo runner: browser panel + dialog mode + attract loop. One worker thread owns camera and robot; the panel only queues commands (the e-stop button additionally sets the stop event on the HTTP thread). | **moves arm** with `--robot pydobot` / `--robot magician`; `--dry-run` never does |
+| `launcher.py` | Operator page on port 8789: starts `demo.py` as a child process, stops it through the panel's `quit` (the arm homes first), restarts, opens the `--drive` calibration in a Terminal window, opens `zones_view.py`, takes a camera snapshot while the demo is stopped, edits the common settings in `config.json` with validation and a backup, tails the demo log. | **moves arm** only through its start / restart / calibrate buttons (each labelled) |
+| `setup.sh` / `setup.command` / `start.command` | One-time preparation of a fresh Mac (uv → `uv sync --extra voice --extra llm` → Whisper model → offline tests → port and calibration check) and the double-click launcher. | none |
+| `setup_wizard.py` | Guided first-time setup: camera + exposure lock, port + homing check, ArUco markers, calibration, zone teaching (hand-guide with the forearm unlock key, or click on the image with `zones_view.py`), per-object `z_pick`, detection tuning, smoke test. Saves `config.json` after each step. | reads only by default; **moves arm** only after `y` (home / smoke test) |
+| `demo.py` | Demo runner: browser panel + dialog mode + attract loop. Pre-loads the Whisper model at start (the first load downloads ~480 MB; the panel says 準備しています / できました). The mic follows `asr.engine` in `config.json`; `--keyboard` switches to text input only (until 2026-10-16 the demo always forced text input, so the panel mic never worked). One worker thread owns the robot; a separate thread grabs frames, detects and publishes the MJPEG stream at `stream_fps` so the picture keeps moving while the arm does (`panel_mirror` flips the shown picture only); the panel only queues commands (the e-stop button additionally sets the stop event on the HTTP thread). | **moves arm** with `--robot pydobot` / `--robot magician`; `--dry-run` never does |
 | `panel_web.py` | stdlib HTTP server: `/` page, `/stream` MJPEG, `/status` JSON, `POST /cmd`. | none |
 | `check_camera.py` | Enumerate cameras; open one, lock exposure/WB and autofocus (read back), measure brightness jitter, save a snapshot to `logs/`. | camera only |
 | `suction.py` | Suction pump ON/OFF only: `on` / `off` / `status` / `pulse` commands and a two-button browser panel (port 8791). Talks the Dobot protocol directly (immediate command, no queue, no pydobot). | **runs the pump**; never moves the arm; `--dry` touches nothing |
 | `jog.py` | Filming controller: browser panel (port 8791) with step moves on X/Y/Z, stop, alarm clear and suction ON/OFF. Reuses `suction.py`'s worker and panel; targets pass the workspace guard. | **moves arm** on every button press; `--dry` never does |
 | `check_robot.py` | List candidate ports (`--list`); connect and print pose; `--home` / `--round-trip` move the arm; `--dry` rehearses without hardware. | read-only by default; **moves arm** with flags |
-| `calibrate.py` | Eye-to-hand calibration: print ArUco markers (`--make-markers`), then fit pixels→robot XY into `assets/homography.json` while *you* jog the arm. | read-only |
+| `calibrate.py` | Eye-to-hand calibration: print ArUco markers (`--make-markers`) or use an object as the marker (`--object blue_cube`), then fit pixels→robot XY into `assets/homography.json` while *you* move the arm. Each recorded point is saved at once to `assets/homography.pairs.json`, so a crash loses nothing: rerun to continue, `--fresh` to start over. `--drive --object blue_cube` instead lets the **robot** visit a 3×3 grid, stop just above the block height, wait for you to put the block under the cup, park aside and read the camera — pairs are then commanded-position → pixel, which removes the hand-teaching bias (the 2026-10-16 picks aimed a few mm outward). | read-only; **moves arm** with `--drive` |
+| `zones_view.py` | Zone placement on the camera image (needs the calibration): draws the arm workspace and every zone in `config.json` over the live frame; pick a zone with `1`–`9`/Tab, click where it should be and `s` saves (`config.bak_*` kept). Clicks outside the arm's workspace are refused. Replaces the hand-guided step 5 of the wizard; `--image file.jpg` previews on a still. | camera only; never connects to the robot |
 | `main.py` | CLI app (OpenCV window): `--tune` (camera only), `--dry-run`, or live with `--robot pydobot`. `demo.py` reuses its `build()`. | **moves arm** when `--robot pydobot` |
 | `robot_dobot.py` | pydobot wrapper with workspace guard (AABB + reach annulus), emergency stop, dry-run robot; refuses to guess a port. | **moves arm** with `--live` |
-| `robot_magician.py` | Direct-protocol backend (`--robot magician`, built on `jog.py`/`suction.py`): queue-index motion wait that watches the e-stop event, ForceStop → Clear → pump-off halt lane, two-stage suction release (both immediate commands), alarm read before and during motion. No pydobot. | **moves arm** with `--robot magician` |
-| `camera.py` / `detect.py` / `planner.py` | UVC/RealSense/file camera with exposure lock and read-back; HSV + shape detection; TaskExecutor (observe → select → pick and place, tidy up, zone slots). | camera / via robot |
+| `robot_magician.py` | Direct-protocol backend (`--robot magician`, built on `jog.py`/`suction.py`): queue-index motion wait that watches the e-stop event, ForceStop → Clear → pump-off halt lane, two-stage suction release (both immediate commands), alarm read before and during motion; joint-interpolated travel (MOVJ) with straight-line descents (`travel_mode`). No pydobot. | **moves arm** with `--robot magician` |
+| `camera.py` / `detect.py` / `planner.py` | UVC/RealSense/file camera with exposure lock and read-back; HSV + shape detection; TaskExecutor (observe → select → pick and place, tidy up; placement avoids every detected object using its size in mm and refuses when the zone is full). | camera / via robot |
 | `rule_parser.py` / `llm_agent.py` | Japanese rule parser (offline; flags ambiguous utterances and takes the last-named object after a negation; wider stop words; home before tidy) / Claude tool-use agent (enum-only arguments, no coordinates from the LLM; tools: list_objects, pick_and_place, tidy_up, go_home, stop). | none |
 | `asr.py` / `tts.py` | Hold-to-talk recorder (ring buffer with pre/post-roll, no Enter) + faster-whisper with per-segment confidence and a hallucination/confidence gate / VOICEVOX-say-SAPI. Optional extras. | none |
 | `voice_front.py` | Voice dialog state machine on its own ASR thread: record → transcribe → rule parse → show heard text + interpretation → countdown run, 「これですか？」 for ambiguous ones, stop words → e-stop lane. Hands only confirmed intents to the worker. | none (serial untouched) |

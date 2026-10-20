@@ -9,25 +9,36 @@
     "exposure": -6.0,
     "auto_wb": false,
     "wb_temperature": 4500,
+    "auto_focus": false,
+    "focus": null,
     "rotation_deg": 0,
-    "warmup_frames": 10
+    "warmup_frames": 10,
+    "mirror": false,
+    "reference_roi": null,
+    "reference_gray": 170
   },
   "robot": {
-    "backend": "dry",
-    "port": null,
+    "backend": "magician",
+    "port": "/dev/cu.usbserial-5A9E0126111",
     "end_effector": "suction",
-    "ee_settle_s": 0.6,
-    "z_safe": 40.0,
+    "ee_settle_s": 0.4,
+    "z_safe": 20.0,
     "z_pick": -30.0,
-    "z_place": -25.0,
+    "z_place": -54.1,
     "r": 0.0,
     "velocity": 150.0,
     "acceleration": 150.0,
+    "speed_pct": 100.0,
+    "travel_mode": "movj",
+    "move_timeout_s": 10.0,
+    "poll_s": 0.03,
+    "alarm_poll_s": 0.25,
+    "ee_release_blow_s": 0.2,
     "x_min": 150.0,
     "x_max": 300.0,
     "y_min": -150.0,
     "y_max": 150.0,
-    "z_min": -60.0,
+    "z_min": -80.0,
     "z_max": 120.0,
     "reach_max": 315.0,
     "reach_min": 140.0,
@@ -39,7 +50,7 @@
     ]
   },
   "llm": {
-    "enabled": true,
+    "enabled": false,
     "provider": "anthropic",
     "model": "claude-sonnet-5",
     "effort": "low",
@@ -57,7 +68,16 @@
     "sample_rate": 16000,
     "max_record_s": 6.0,
     "silence_rms": 0.01,
-    "silence_hold_s": 0.8
+    "silence_hold_s": 0.8,
+    "preroll_s": 0.4,
+    "postroll_s": 0.3,
+    "min_avg_logprob": -1.0,
+    "max_no_speech_prob": 0.6,
+    "hallucination_phrases": [
+      "ご視聴ありがとうございました",
+      "ご視聴ありがとうございます",
+      "チャンネル登録"
+    ]
   },
   "tts": {
     "engine": "auto",
@@ -85,9 +105,12 @@
     "temp_adc_fullscale_v": 3.3,
     "temp_stop_c": 60.0,
     "temp_resume_c": 50.0,
+    "confirm_auto_run_s": 2.0,
+    "confirm_ask_ambiguous": true,
     "panel_port": 8790,
-    "stream_fps": 8,
-    "jpeg_quality": 70
+    "stream_fps": 15,
+    "jpeg_quality": 70,
+    "panel_mirror": true
   },
   "zones": [
     {
@@ -100,26 +123,26 @@
         "右のお皿",
         "right"
       ],
-      "x": 230.0,
-      "y": -110.0,
+      "x": 211.2,
+      "y": -125.3,
       "z_place": null,
       "radius_mm": 60.0,
       "slots": [
         [
-          215.0,
-          -125.0
+          196.2,
+          -140.3
         ],
         [
-          245.0,
-          -125.0
+          196.2,
+          -110.3
         ],
         [
-          215.0,
-          -95.0
+          226.2,
+          -140.3
         ],
         [
-          245.0,
-          -95.0
+          226.2,
+          -110.3
         ]
       ]
     },
@@ -268,8 +291,8 @@
       "max_area_px": null,
       "min_circularity": 0.0,
       "aspect_min": 1.0,
-      "aspect_max": 1.6,
-      "z_pick": null,
+      "aspect_max": 4.0,
+      "z_pick": -57.1,
       "ee": "suction"
     },
     {
@@ -287,7 +310,7 @@
         [
           [
             40,
-            80,
+            50,
             60
           ],
           [
@@ -301,8 +324,8 @@
       "max_area_px": null,
       "min_circularity": 0.0,
       "aspect_min": 1.0,
-      "aspect_max": 1.6,
-      "z_pick": null,
+      "aspect_max": 4.0,
+      "z_pick": -57.1,
       "ee": "suction"
     },
     {
@@ -334,8 +357,8 @@
       "max_area_px": null,
       "min_circularity": 0.0,
       "aspect_min": 1.0,
-      "aspect_max": 1.6,
-      "z_pick": null,
+      "aspect_max": 4.0,
+      "z_pick": -57.1,
       "ee": "suction"
     },
     {
@@ -351,7 +374,7 @@
       "ranges": [
         [
           [
-            20,
+            16,
             120,
             100
           ],
@@ -366,8 +389,8 @@
       "max_area_px": null,
       "min_circularity": 0.0,
       "aspect_min": 1.0,
-      "aspect_max": 1.6,
-      "z_pick": null,
+      "aspect_max": 4.0,
+      "z_pick": -57.1,
       "ee": "suction"
     },
     {
@@ -404,38 +427,6 @@
       "aspect_max": 1.25,
       "z_pick": null,
       "ee": "suction"
-    },
-    {
-      "name": "eraser",
-      "label": "消しゴム",
-      "aliases": [
-        "消しゴム",
-        "けしごむ",
-        "ケシゴム",
-        "MONO",
-        "モノ"
-      ],
-      "ranges": [
-        [
-          [
-            95,
-            120,
-            60
-          ],
-          [
-            130,
-            255,
-            255
-          ]
-        ]
-      ],
-      "min_area_px": null,
-      "max_area_px": null,
-      "min_circularity": 0.0,
-      "aspect_min": 2.2,
-      "aspect_max": 8.0,
-      "z_pick": null,
-      "ee": "gripper"
     },
     {
       "name": "golf_ball",

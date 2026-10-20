@@ -55,6 +55,7 @@ ID_QUEUE_FORCE_STOP = 242      # SetQueuedCmdForceStopExec（動作中でもす�
 ID_QUEUE_CLEAR = 245           # SetQueuedCmdClear
 CTRL_WRITE_QUEUED = 3
 PTP_MOVL_XYZ = 2               # 直交座標の直線移動
+PTP_MOVJ_XYZ = 1               # 直交座標の目標へ関節補間で（経路は曲がるが速い。robot_magician の退避・横移動用）
 
 AXES = ("x", "y", "z")
 STEPS_MM = (1, 5, 10, 20)

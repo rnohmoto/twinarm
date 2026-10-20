@@ -7,6 +7,10 @@ safety rules there apply to everything here: the Magician is a real arm.
 Read @README.md for the script inventory, each script's hardware risk, the quick start, and the
 first-time setup manual.
 
+When the task is to run or re-set-up the bench demo, read [`HANDOFF.md`](HANDOFF.md) next: it holds
+the verified configuration (port, camera lock, heights, zones, calibration) and the exact commands to
+redo each step.
+
 ## Rules for this directory
 
 - Run `uv` commands here (`uv sync`, `uv run python …`, `uv run pytest`). This is an independent uv
@@ -30,6 +34,9 @@ first-time setup manual.
   that split when adding UI features. `suction.py panel` (pump only) and `jog.py` (step moves
   plus pump) also open the Magician's port, with the same split: one worker thread owns the serial
   port and HTTP handlers only submit jobs to it. Only one of these processes can run at a time.
+- `launcher.py` is the operator's entry point. It must never move the arm on its own: the arm moves only through
+  its start / restart / calibrate buttons, each labelled as such, and it stops the demo before opening any tool that
+  needs the camera or the serial port. Keep the settings it exposes to the few knobs an operator tunes on site.
 - `config.json` is generated from `config.py` defaults (`uv run python config.py config.json`)
   and then edited by `setup_wizard.py` on the real bench. Do not hand-write coordinates into it
   from here; they come from the arm's pose on site.

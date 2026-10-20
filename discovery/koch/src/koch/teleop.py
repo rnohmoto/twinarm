@@ -54,7 +54,6 @@ import argparse
 import csv
 import inspect
 import json
-import logging
 import math
 import socket
 import subprocess
@@ -65,6 +64,7 @@ from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
+from koch.console import install_clamp_filter, reconfigure_stdout
 from koch.feedback import (
     JOINT_SPAN_DEG,
     LINK_M,
@@ -110,11 +110,7 @@ from koch.motors import (
     hw_error_names,
     to_signed16,
 )
-from koch.paths import CONFIG_DIR, WORK_DIR
-
-_reconfigure = getattr(sys.stdout, "reconfigure", None)
-if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
-    _reconfigure(errors="replace")
+from koch.paths import CONFIG_DIR, WORK_DIR, calibration_dir
 
 DEFAULT_CONFIG_DIR = CONFIG_DIR
 DEFAULT_WORK_DIR = WORK_DIR
@@ -127,17 +123,6 @@ WALL_TTL_SEC = (
 )
 TELEMETRY_HOST = "127.0.0.1"
 ALERT_TTL_SEC = 4.0
-
-
-class _DropClampWarning(logging.Filter):
-    """Silence lerobot's per-frame clamp warning (harmless, caused by pose gaps)."""
-
-    def filter(self, record):
-        """Drop records that mention the safety clamp."""
-        return "clamped to be safe" not in str(record.getMessage())
-
-
-logging.getLogger().addFilter(_DropClampWarning())
 
 
 def parse_wall(spec):
@@ -1102,6 +1087,8 @@ def open_csv(work_dir):
 
 def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purpose
     """Run one leader/follower pair until Ctrl+C."""
+    reconfigure_stdout()
+    install_clamp_filter()
     args = build_parser().parse_args()
     if args.selftest:
         selftest()
@@ -1168,13 +1155,11 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     KochFollower, KochFollowerConfig, KochLeader, KochLeaderConfig, retry_errors = (
         load_lerobot()
     )
-    cal_f = (
-        None
-        if args.lerobot_cache
-        else args.config_dir / "calibration" / "koch_follower"
+    cal_f = calibration_dir(
+        args.config_dir, "koch_follower", use_lerobot_cache=args.lerobot_cache
     )
-    cal_l = (
-        None if args.lerobot_cache else args.config_dir / "calibration" / "koch_leader"
+    cal_l = calibration_dir(
+        args.config_dir, "koch_leader", use_lerobot_cache=args.lerobot_cache
     )
     cal_label = (
         "lerobot既定(~/.cache)"

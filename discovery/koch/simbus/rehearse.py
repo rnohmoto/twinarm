@@ -324,6 +324,11 @@ def handshake(r):
         )
     code = r.finish([8766, 8768])
     r.check("ランチャが正常終了", code == 0, code)
+    teleop_logs = "".join(r.log(f"work/logs/dual_{p}_teleop.log") for p in "AB")
+    r.check(
+        "teleop のログに毎フレームのクランプ警告が出ない",
+        "clamped to be safe" not in teleop_logs,
+    )
     recs, _ = r.bus_checks(["LA", "FA", "LB", "FB"])
     caps = [
         x

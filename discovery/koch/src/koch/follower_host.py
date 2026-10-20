@@ -32,35 +32,16 @@ Risk class: moves motors（起動時にフォロワーへ接続し、目標角�
 
 import argparse
 import json
-import logging
 import socket
 import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
 
+from koch.console import install_clamp_filter, reconfigure_stdout
 from koch.link import LinkPolicy, LinkState, accept_packet, link_health
 from koch.motors import MOTORS, to_signed16
-from koch.paths import CONFIG_DIR
-
-_reconfigure = getattr(sys.stdout, "reconfigure", None)
-if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
-    _reconfigure(errors="replace")
-
-
-class _DropClampWarning(logging.Filter):
-    """Silence lerobot's per-frame clamp warning (harmless, caused by pose gaps).
-
-    Same filter as koch-teleop: while the gripper is blocked (a hand, an object)
-    the goal stays beyond max_relative_target and lerobot would log it every frame.
-    """
-
-    def filter(self, record):
-        """Drop records that mention the safety clamp."""
-        return "clamped to be safe" not in str(record.getMessage())
-
-
-logging.getLogger().addFilter(_DropClampWarning())
+from koch.paths import CONFIG_DIR, calibration_dir
 
 DEFAULT_CONFIG_DIR = CONFIG_DIR
 RAMP_SEC = 1.5
@@ -151,10 +132,8 @@ def open_real_follower(args):
     """Create lerobot's KochFollower with the project's calibration folder."""
     from lerobot.robots.koch_follower import KochFollower, KochFollowerConfig
 
-    cal = (
-        None
-        if args.lerobot_cache
-        else args.config_dir / "calibration" / "koch_follower"
+    cal = calibration_dir(
+        args.config_dir, "koch_follower", use_lerobot_cache=args.lerobot_cache
     )
     return KochFollower(
         KochFollowerConfig(
@@ -205,6 +184,8 @@ def build_parser():
 
 def main():
     """Serve one follower over UDP until Ctrl+C."""
+    reconfigure_stdout()
+    install_clamp_filter()
     args = build_parser().parse_args()
     if not args.sim and not args.port:
         sys.exit("--port を指定するか --sim を付けてください(ポートは推測しません)")

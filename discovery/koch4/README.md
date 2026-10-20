@@ -8,7 +8,7 @@ Successor of the `mock/v0/` scripts for the Learning Fest setup (2026-10-26/27):
 leader/follower pairs run side by side as the rule (one panel, one set of gains),
 everything machine-specific lives in this folder, and — as a separate track — a single
 leader can "grasp" a virtual object seen in a Quest Pro, feeling its stiffness on the
-trigger and its weight on the arm. Part of [descovery](../README.md); the repository's
+trigger and its weight on the arm. Part of [discovery](../README.md); the repository's
 hardware safety rules apply to every script here.
 
 ## Layout
@@ -73,7 +73,7 @@ Mac ── USB ── leader                 handshake table: host PC ── USB
 - Backup: `koch4_dual_launch.py --follower wired` uses the USB `follower_port` again with the
   same config. A Raspberry Pi is not required — any computer that runs lerobot works.
 
-## Quick start (Mac, from `descovery/`)
+## Quick start (Mac, from `discovery/`)
 
 The shortest path is `./koch4/start.sh` (`check` / `handshake` / `host` / `vr` / `vr2` / `sim` /
 `rehearse` / `quest` / `wifi` / `manual`); the HTML manuals in [`manual/`](manual/index.html) walk
@@ -113,7 +113,7 @@ asked. The full procedure with pass criteria and record fields is in [CHECKLIST.
 
 The laws are pure functions mirrored from
 [`twinarm/src/twinarm/domain/gripper_feedback.py`](../../twinarm/src/twinarm/domain/gripper_feedback.py),
-which is unit-tested (`mise run test` in `twinarm/`). descovery scripts may not import the
+which is unit-tested (`mise run test` in `twinarm/`). discovery scripts may not import the
 library (separate uv projects, standalone-script rule), so the two copies are kept in sync by
 hand; `koch4_teleop.py --selftest` checks the mirrored copy against the same vectors.
 

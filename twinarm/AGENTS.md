@@ -24,13 +24,13 @@ Read @README.md for what this package is, its current state, and its layout.
   imports are relative, everything else absolute.
 - The `/stream` and `/ctl` wire contract is owned by the zod schemas in
   [`../twinarm-web-ui/src/shared/api/`](../twinarm-web-ui/src/shared/api/README.md), derived from
-  [`../descovery/mock/v0/koch_web_panel.py`](../descovery/mock/v0/koch_web_panel.py). Reconcile there first before
+  [`../discovery/mock/v0/koch_web_panel.py`](../discovery/mock/v0/koch_web_panel.py). Reconcile there first before
   implementing the `telemetry` or `control` placeholder slices. Slice pydantic schemas translate
   between that wire format and the domain model — wire shapes must not leak into `domain/`.
 - The version lives in `pyproject.toml` and nowhere else — `src/twinarm/__init__.py` re-exports it
   from the installed package metadata, so there is no second copy to keep in sync.
 - This is the only directory that builds (uv_build backend, src layout). Code that only makes sense
-  with arms attached belongs in [`../descovery/`](../descovery/AGENTS.md) instead.
+  with arms attached belongs in [`../discovery/`](../discovery/AGENTS.md) instead.
 - Use the mise tasks listed in [README.md](README.md) rather than bare `uv run ruff` / `uv run ty`
   in this directory.
 - Implement changes test-first (TDD) — the workflow is defined in

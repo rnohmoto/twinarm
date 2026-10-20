@@ -13,7 +13,7 @@ env:
   MISE_VERSION: 2026.8.9
 
 jobs:
-  # Runs exactly what `mise run check` runs locally. descovery/ is absent on
+  # Runs exactly what `mise run check` runs locally. discovery/ is absent on
   # purpose: its scripts need real arms attached.
   check:
     name: check (twinarm, twinarm-web-ui)

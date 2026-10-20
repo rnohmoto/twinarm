@@ -1,4 +1,4 @@
-# AGENTS.md — descovery
+# AGENTS.md — discovery
 
 Hardware experiment sandbox for the Koch v1.1 arms. Repository-wide instructions are in
 [`../AGENTS.md`](../AGENTS.md), and the hardware safety rules there apply to everything here.

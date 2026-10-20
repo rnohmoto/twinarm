@@ -14,7 +14,7 @@
 set -e
 here="$(cd "$(dirname "$0")" && pwd)"        # koch4/mac
 koch4="$(cd "$here/.." && pwd)"
-cd "$koch4/.."                               # descovery（uv プロジェクトの場所）
+cd "$koch4/.."                               # discovery（uv プロジェクトの場所）
 
 PY=".venv/bin/python3"
 F_HTTP=8443                                  # 2 人目のページ（1 人目は 8444）

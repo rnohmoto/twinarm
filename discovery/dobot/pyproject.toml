@@ -34,5 +34,5 @@ extend = "../pyproject.toml"
 
 [tool.ruff.lint.per-file-ignores]
 # Sandbox scripts ported from robotics/scripts/magician_pnp (S30). Docstring style is
-# not enforced here, on the same standing as descovery/.
+# not enforced here, on the same standing as discovery/.
 "*.py" = ["D"]

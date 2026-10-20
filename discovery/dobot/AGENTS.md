@@ -10,7 +10,7 @@ first-time setup manual.
 ## Rules for this directory
 
 - Run `uv` commands here (`uv sync`, `uv run python …`, `uv run pytest`). This is an independent uv
-  project like `descovery/`; nothing is built or published from it.
+  project like `discovery/`; nothing is built or published from it.
 - **Never pick a serial port for the user.** `check_robot.py --list` only lists candidates;
   `--port` (or `robot.port` in `config.json`) must be given explicitly, and `PydobotRobot.connect()`
   refuses to guess. Leader/follower confusion does not exist here, but the Magician still moves.

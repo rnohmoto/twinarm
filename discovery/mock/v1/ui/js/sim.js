@@ -41,7 +41,7 @@
     max_rel: 40,
   };
 
-  /* Right pair = the real ports from the descovery docstrings;
+  /* Right pair = the real ports from the discovery docstrings;
    * left pair = plausible siblings for the second, future pair. */
   const PORTS = {
     left: { leader: '/dev/tty.usbmodem5B141157061', follower: '/dev/tty.usbmodem5B141157401' },

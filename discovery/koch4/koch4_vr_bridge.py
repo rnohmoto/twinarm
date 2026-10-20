@@ -25,7 +25,7 @@ render the object's weight. This bridge never opens a serial port. Risk class:
 network only, but it commands live teleop sessions (every field is clamped by the
 teleop and the wall is released after WALL_TTL_SEC without a refresh).
 
-使い方（Mac・descovery で `uv run`）:
+使い方（Mac・discovery で `uv run`）:
   uv run python koch4/koch4_vr_bridge.py --sim                       # 1 本・テレオペなし
   uv run python koch4/koch4_vr_bridge.py --sim --arms B,F            # 2 本の模擬
   uv run python koch4/koch4_vr_bridge.py --arms B --telemetry 8770 --ctl-port 8768

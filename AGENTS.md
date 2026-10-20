@@ -9,18 +9,18 @@ development commands.
 
 ## Working in this repo
 
-- Run `uv` commands inside the subproject you are changing (`twinarm/` or `descovery/`), and `npm`
+- Run `uv` commands inside the subproject you are changing (`twinarm/` or `discovery/`), and `npm`
   commands inside `twinarm-web-ui/`. The root project is configuration only — never run `uv sync` or
   `npm install` at the root.
 - After changing code, run the affected subproject's checks before you finish and make them pass:
   `mise run check` in `twinarm/` and `twinarm-web-ui/`, or the ruff and ty commands directly in
-  `descovery/`, which has no tasks. If it reports formatting violations, run `mise run format` and
+  `discovery/`, which has no tasks. If it reports formatting violations, run `mise run format` and
   re-run it. From the root, `mise run check` runs both task-based subprojects at once.
 - Do not add dependencies, entry points, or top-level directories without an explicit request.
 
 ## Hardware safety
 
-The scripts in `descovery/` drive real robot arms.
+The scripts in `discovery/` drive real robot arms.
 
 - Never run anything that moves motors, releases torque, or writes motor configuration unless the user
   explicitly asked for it in the current session.
@@ -33,11 +33,11 @@ The scripts in `descovery/` drive real robot arms.
 
 Both task-based subprojects run their tests as part of `mise run check`. Inside either one,
 `mise run test --coverage` reports line coverage. Playwright is deliberately **not** part of
-`check`; run `mise run e2e` in `twinarm-web-ui/` when it matters. `descovery/` has no tests and no
+`check`; run `mise run e2e` in `twinarm-web-ui/` when it matters. `discovery/` has no tests and no
 tasks: its scripts need arms attached.
 
 CI is GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), running the same mise
-tasks a developer runs locally. `descovery/` is excluded because it needs real hardware.
+tasks a developer runs locally. `discovery/` is excluded because it needs real hardware.
 
 Report what actually ran. Never claim tests passed on output you did not see.
 
@@ -55,7 +55,7 @@ to its README.md; everything else is a plain link. Keep it that way when editing
 When working inside a subdirectory, read its AGENTS.md first:
 
 - [`twinarm/AGENTS.md`](twinarm/AGENTS.md)
-- [`descovery/AGENTS.md`](descovery/AGENTS.md)
+- [`discovery/AGENTS.md`](discovery/AGENTS.md)
 - [`dobot/AGENTS.md`](dobot/AGENTS.md)
 - [`twinarm-web-ui/AGENTS.md`](twinarm-web-ui/AGENTS.md)
 
@@ -64,4 +64,4 @@ When working inside a subdirectory, read its AGENTS.md first:
 - The root `pyproject.toml` has a `[tool.lint.isort]` table that has no effect; ruff would need
   `[tool.ruff.lint.isort]`. Known — leave it unless the user asks.
 - All three `pyproject.toml` files still carry the placeholder `description = "Add your description
-  here"`, and `descovery/` reuses the `twinarm` package name. Known — leave them unless the user asks.
+  here"`, and `discovery/` reuses the `twinarm` package name. Known — leave them unless the user asks.

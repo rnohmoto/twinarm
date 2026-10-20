@@ -21,7 +21,7 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
     サーボ内部の位置ループに任せ（Operating_Mode 5・Goal_Position=壁・Goal_Current=上限・
     Position_P_Gain=硬さ）、ホストは「壁に触れているか」だけを 30fps で切り替える
   * 制御則（spring / error / virtual wall / 温度ガード）は
-    twinarm/src/twinarm/domain/gripper_feedback.py の写し。descovery は独立スクリプトの
+    twinarm/src/twinarm/domain/gripper_feedback.py の写し。discovery は独立スクリプトの
     規則なので import しない。変更するときは両方を直し、twinarm 側のテストで固定する
 
 力覚 FB の3方式:
@@ -38,7 +38,7 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
   - 温度ガード: 60°C でゲイン半減（spring=ff_gain / error=ff_ke）・65°C で FB 停止（Temperature Limit 70°C 手前。停止後は冷えてから再起動）
   - 実機を動かす・トルクを抜くのはユーザーが明示的に頼んだときだけ（AGENTS.md）
 
-使い方（Mac・descovery で `uv run`）:
+使い方（Mac・discovery で `uv run`）:
   uv run python koch4/koch4_teleop.py \
       --follower-port /dev/tty.usbmodemXXXX --follower-id koch_follower_A \
       --leader-port   /dev/tty.usbmodemYYYY --leader-id   koch_leader_A \

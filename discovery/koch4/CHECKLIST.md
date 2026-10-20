@@ -10,7 +10,7 @@ koch4 のコマンドに置き換えて 1 枚にしたもの。**合格は、ユ
 方針（2026-09-20 裁定）: **2ペアが原則**（`--pair both` 既定・パネル 1 枚・ゲインは全ペア同じ値）。
 **VR は別枠**（リーダー 1 本で `--vr`。握手ペアと混ぜない）。
 
-前提: MacBook Pro／twinarm `descovery/` で `uv sync` 済み／lerobot 0.6.1（uv.lock）／
+前提: MacBook Pro／twinarm `discovery/` で `uv sync` 済み／lerobot 0.6.1（uv.lock）／
 電源 Leader=5V・Follower=12V／`max_relative_target=20` は安全リミッタ／終了は Ctrl+C の後に
 **両アームの AC アダプタを必ず抜く**（62_ §2.3）。
 
@@ -182,7 +182,7 @@ uv run python koch4/koch4_teleop.py --leader-port <L> --follower-port udp://127.
 
 ### W2 — 握手の場の PC で（5 GHz 自前ルータ越し）
 - その PC: `uv sync` 済み・フォロワーの USB・12 V 電源。`hostname -I`（Pi/Linux）や `ipconfig`（Windows）で IP を確認
-- **2 台目の MacBook Pro を使う場合（推奨）**: `git clone` → `cd twinarm/descovery && uv sync` → フォロワーを USB で挿す →
+- **2 台目の MacBook Pro を使う場合（推奨）**: `git clone` → `cd twinarm/discovery && uv sync` → フォロワーを USB で挿す →
   `./koch4/start.sh host A /dev/tty.usbmodemXXXX`（2 本目は `host B <port>`。起動時に、操作者側の設定に書く宛先を表示する。
   中身は `koch4_follower_host.py --port <port> --id koch_follower_A --listen 9101 --grip-ma 500`）。較正 JSON は `koch4/config/calibration/koch_follower/` に置く。Mac 本体はバッテリで動くので握手の場の電源はアームの 12 V だけ
 - Mac: config の `follower_host` に `udp://<IP>:9101` → `koch4_dual_launch.py --pair A --ff gripper`

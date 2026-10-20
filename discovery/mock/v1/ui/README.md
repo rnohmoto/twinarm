@@ -55,7 +55,7 @@ Plus PAUSE (freezes the sim clock — charts, REC elapsed, everything) and RECOR
   lamp shows the software temperature guard, which is distinct from the hardware overheat bit.
 - The posture view is **illustrative, not kinematic**: normalized joint values scale to drawing
   angles with fixed segment lengths (see the constants in `js/posture.js`).
-- The right arm's serial ports are the real ones from the descovery docstrings; the left pair's are
+- The right arm's serial ports are the real ones from the discovery docstrings; the left pair's are
   invented siblings.
 
 ## Files

@@ -102,12 +102,12 @@
 <ol class="mb-0">
   <li>4 本とも腕を机に寝かせ、AC アダプタを挿す（リーダー 5V・フォロワー 12V）。</li>
   <li><strong>握手用の Mac</strong> で受け側を 2 つ起動する（端末を 2 つ開く）。
-<pre>cd twinarm/descovery
+<pre>cd twinarm/discovery
 ./koch4/start.sh host A ＜フォロワー A のポート＞
 ./koch4/start.sh host B ＜フォロワー B のポート＞</pre>
   起動すると、操作者側の設定ファイルに書く宛先（この Mac の IP と番号）が表示されます。ポートは <code>uv run python koch4/koch4_dual_launch.py --list</code> で確かめて渡します。</li>
   <li><strong>操作者側の Mac</strong> で起動する。
-<pre>cd twinarm/descovery
+<pre>cd twinarm/discovery
 ./koch4/start.sh handshake</pre>
   フォロワーが 1.5 秒かけてリーダーの姿勢に合流し、パネルがブラウザで開きます。ペア A だけで握手する日は <code>./koch4/start.sh handshake --pair A</code>（ペア B を VR に使っていても同時に動かせます）。</li>
   <li>リーダーを動かし、フォロワーが付いてくることを 2 組とも確かめる。</li>

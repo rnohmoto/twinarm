@@ -17,7 +17,7 @@
 # 握手・VR は実機が動く。ポートは config/koch4_config.json に書いたものを使う（推測しない）。
 set -e
 here="$(cd "$(dirname "$0")" && pwd)"
-cd "$here/.."   # descovery（uv プロジェクトの場所）
+cd "$here/.."   # discovery（uv プロジェクトの場所）
 
 VR_PAIR="${VR_PAIR:-B}"
 GRIP_MA="${GRIP_MA:-500}"

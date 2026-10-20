@@ -20,7 +20,7 @@ Koch には lerobot 公式の bimanual 設定が無い（v0.6.1 に bi_koch な�
   work/logs/dual_<pair>_{teleop,vr}.log, dual_panel.log   各プロセスの標準出力
   work/csv/                                     --csv の記録
 
-使い方（Mac・descovery で `uv run`。ポートはユーザーが渡す＝推測しない）:
+使い方（Mac・discovery で `uv run`。ポートはユーザーが渡す＝推測しない）:
   uv run python koch4/koch4_dual_launch.py --list        # ポート+シリアル列挙(読み取りのみ)
   uv run python koch4/koch4_dual_launch.py --init        # config 雛形を作る → 記入
   uv run python koch4/koch4_dual_launch.py --doctor      # 準備状況(握手/VR/2 人で足りないもの)。腕には触れない

@@ -8,7 +8,7 @@ macOS over USB serial.
 ## Status
 
 Early development. The `twinarm` library is still a skeleton, and every line that drives an arm lives
-in the `descovery/` sandbox as a standalone script. `twinarm-web-ui/` is scaffolding plus one worked
+in the `discovery/` sandbox as a standalone script. `twinarm-web-ui/` is scaffolding plus one worked
 example slice; it has no backend and runs against mocks.
 
 ## Repository layout
@@ -16,13 +16,13 @@ example slice; it has no backend and runs against mocks.
 | Path | What it is |
 | ---- | ---------- |
 | [`twinarm/`](twinarm/README.md) | The installable Python library (src layout). |
-| [`descovery/`](descovery/README.md) | Hardware experiment sandbox: standalone Koch-arm scripts. `descovery/koch4/` is the Learning Fest setup (start at its HANDOFF.md). |
+| [`discovery/`](discovery/README.md) | Hardware experiment sandbox: standalone Koch-arm scripts. `discovery/koch4/` is the Learning Fest setup (start at its HANDOFF.md). |
 | [`dobot/`](dobot/README.md) | Dobot Magician pick-and-place sandbox: overhead camera → homography → pydobot, plus the first-time setup manual. |
 | [`twinarm-web-ui/`](twinarm-web-ui/README.md) | The web teleoperation UI: React and Vite, mock-backed. |
 | `docs/` | Documentation. `fest_start_prompts.md`: the Learning Fest bench sessions, one Mac per role (handshake A, VR leader B, VR follower C, desktop robot D), with the prompt to paste into Claude Code on each Mac. |
 | `pyproject.toml` | Configuration-only root project. Holds the shared ruff configuration. |
 
-`twinarm/` and `descovery/` are independent uv projects, each with its own `pyproject.toml` and
+`twinarm/` and `discovery/` are independent uv projects, each with its own `pyproject.toml` and
 `uv.lock` — this is not a uv workspace, so sync and run commands are issued inside a subproject rather
 than at the root. `twinarm-web-ui/` is a separate npm project with its own `package-lock.json`, and
 follows the same rule. The root project declares `package = false` and no dependencies; it exists to
@@ -44,14 +44,14 @@ Each subproject is synced separately:
 
 ```bash
 cd twinarm && uv sync           # the library
-cd descovery && uv sync         # the hardware sandbox
+cd discovery && uv sync         # the hardware sandbox
 cd twinarm-web-ui && mise run install   # the web UI (npm ci; run `mise install` first for Node)
 ```
 
 ## Hardware scripts
 
-Everything that talks to the arms lives in `descovery/`. Most of those scripts move motors, release
-torque, or rewrite motor configuration, so start from [`descovery/README.md`](descovery/README.md): it
+Everything that talks to the arms lives in `discovery/`. Most of those scripts move motors, release
+torque, or rewrite motor configuration, so start from [`discovery/README.md`](discovery/README.md): it
 lists every script with its purpose and hardware risk, and shows the safe read-only bus scan to begin
 with.
 
@@ -69,7 +69,7 @@ mise run check     # //twinarm:check and //twinarm-web-ui:check
 mise run format    # the same, for format
 ```
 
-`descovery/` is not part of those: it needs real hardware. It also has no tasks; run its tools
+`discovery/` is not part of those: it needs real hardware. It also has no tasks; run its tools
 directly from that directory:
 
 ```bash
@@ -85,7 +85,7 @@ each subproject inherits it through `extend = "../pyproject.toml"`. Change share
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and every pull
 request. It runs the same mise tasks as a developer does — `mise run check` at the root, plus the web
-UI's Playwright suite as a separate job. `descovery/` is excluded because its scripts need arms
+UI's Playwright suite as a separate job. `discovery/` is excluded because its scripts need arms
 attached.
 
 ## Documentation for AI coding agents

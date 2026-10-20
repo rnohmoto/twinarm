@@ -11,7 +11,7 @@ USB ケーブル 1 本で済ませる手順を 1 コマンドにしたもの。R
   2. Mac に adb を入れる（`brew install android-platform-tools` か Meta Quest Developer Hub）
   3. 初回接続時にヘッドセット内の「USB デバッグを許可」で「常に許可」
 
-使い方（Mac・descovery で。ブリッジは `--http` で起動しておく。ペア B の既定ポートは 8444）:
+使い方（Mac・discovery で。ブリッジは `--http` で起動しておく。ペア B の既定ポートは 8444）:
   uv run python koch4/koch4_quest_usb.py --check                 # adb と端末の状態だけ見る
   uv run python koch4/koch4_quest_usb.py --port 8444             # reverse を張って Quest Browser で開く
   uv run python koch4/koch4_quest_usb.py --port 8444 --spectator # 観客用 URL（?spectator=1）を開く

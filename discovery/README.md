@@ -1,6 +1,6 @@
-# Descovery
+# discovery
 
-Hardware experiment sandbox for the Koch v1.1 arms. (The directory name is spelled "descovery" on
+Hardware experiment sandbox for the Koch v1.1 arms. (The directory name is spelled "discovery" on
 purpose.) The scripts live in [`mock/v0/`](mock/v0/) and are flat and standalone — no package
 structure, no shared modules, and some deliberate duplication between them. Run them from this
 directory so `uv run` picks up the environment here.

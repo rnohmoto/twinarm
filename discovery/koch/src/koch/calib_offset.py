@@ -15,7 +15,7 @@ EEPROM の homing_offset は残るので座標は変わらないはず。それ�
 
 Risk class: torque off (both arms) — フォロワーは支えないと落ちる。
 
-使い方（Mac・discovery で `uv run`）:
+使い方（Mac・discovery/koch で `uv run`）:
   uv run koch-calib --leader-port /dev/tty.usbmodemXXXX \
       --follower-port /dev/tty.usbmodemYYYY --leader-id koch_leader_A --follower-id koch_follower_A
   # 較正 JSON は config/calibration/ から読む(--lerobot-cache で ~/.cache から)。--watch で連続表示

@@ -20,7 +20,7 @@ Koch には lerobot 公式の bimanual 設定が無い（v0.6.1 に bi_koch な�
   work/logs/dual_<pair>_{teleop,vr}.log, dual_panel.log   各プロセスの標準出力
   work/csv/                                     --csv の記録
 
-使い方（Mac・discovery で `uv run`。ポートはユーザーが渡す＝推測しない）:
+使い方（Mac・discovery/koch で `uv run`。ポートはユーザーが渡す＝推測しない）:
   uv run koch-launch --list        # ポート+シリアル列挙(読み取りのみ)
   uv run koch-launch --init        # config 雛形を作る → 記入
   uv run koch-launch --doctor      # 準備状況(握手/VR/2 人で足りないもの)。腕には触れない
@@ -46,11 +46,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from koch.console import reconfigure_stdout
 from koch.paths import CONFIG_DIR, CONFIG_NAME, TWIN_CONFIG_NAME, WEBXR_DIR, WORK_DIR
-
-_reconfigure = getattr(sys.stdout, "reconfigure", None)
-if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
-    _reconfigure(errors="replace")
 
 DEFAULT_CONFIG_DIR = CONFIG_DIR
 DEFAULT_WORK_DIR = WORK_DIR
@@ -463,7 +460,7 @@ def doctor(args, config_path):
     print(
         ""
         if asset.exists()
-        else "  → uv run uv run python webxr/setup_assets.py（要ネット・1 回）"
+        else "  → uv run python webxr/setup_assets.py（要ネット・1 回）"
     )
     print(f"  {mark[twin.exists()]} 分身と物体の設定 {twin.name}")
     if not config_path.exists():
@@ -570,6 +567,7 @@ def stop_all(procs, ctl_by_name=None):
 
 def main():
     """Entry point."""
+    reconfigure_stdout()
     args = build_parser().parse_args()
     config_path = args.config_dir / CONFIG_NAME
     if args.list:

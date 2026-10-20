@@ -59,7 +59,7 @@ When working inside a subdirectory, read its AGENTS.md first:
 
 - [`twinarm/AGENTS.md`](twinarm/AGENTS.md)
 - [`discovery/AGENTS.md`](discovery/AGENTS.md)
-- [`dobot/AGENTS.md`](dobot/AGENTS.md)
+- [`discovery/dobot/AGENTS.md`](discovery/dobot/AGENTS.md)
 - [`twinarm-web-ui/AGENTS.md`](twinarm-web-ui/AGENTS.md)
 
 ## Known quirks

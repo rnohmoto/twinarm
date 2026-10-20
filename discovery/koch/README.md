@@ -103,7 +103,7 @@ Risk classes are the ones defined in [`../README.md`](../README.md).
 | `koch-quest` | USB route for the headset: finds adb, `adb reverse tcp:<port> tcp:<port>`, opens `http://localhost:<port>/` in Quest Browser (`--spectator`, `--mirror` = scrcpy, `--wifi` = move adb to Wi-Fi so the headset's USB port can take a 45 W charger, `--check` = status and battery level only, `--wait N` = wait for the USB-debugging allow, `--watch` = keep running and re-add the reverse when the USB link re-enumerates, `--devtools` = also forward Chrome DevTools on 9222). Needs developer mode once (CHECKLIST U0). | none (network only) | adb over USB |
 | `koch-scan` | Broadcast-ping an assembled arm at 1 Mbps and 57600 bps (a motor fresh out of the box answers only there); prints ID, model and firmware. `--loop SECONDS` reads positions in a loop and counts failures (comms stability test). | read-only | — |
 | `koch-set-id` | `<port> <current-id> <new-id>`: change one motor's ID; refuses unless exactly that motor is on the bus. `--setup --port <port> [--id] [--type]`: lerobot's `setup_motors()` (IDs and baud, interactively). | writes motor config | — |
-| `koch-current` | Real-time current/load plots for one or two arms straight from the bus, with per-axis statistics on exit and a CSV under `work/csv/`. Cannot share a port with a running teleop. | read-only by default; `--torque on` energizes; torque off on exit | CSV out |
+| `koch-current` | Real-time current/load plots for one or two arms straight from the bus, with per-axis statistics on exit and a CSV under `work/csv/`. Cannot share a port with a running teleop. | **torque off** on every listed ID at start and at exit; `--torque on` energizes instead | CSV out |
 | `python -m koch.tools.<name>` | Bench diagnostics promoted from the old `work/tools/`: `preflight` (read-only go/no-go), `register_snapshot`, `reg_diff`, `pos_trace` (read-only), `match_leader` and `fit_twin` (rewrite calibration / twin JSON; no motor writes), `watchdog` (network only), `spawn_detached`, `torque_off` (**torque off**, cleanup after a crash). | read-only except `torque_off` | serial, files |
 | `webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. `start.sh check` runs it. | none | network (once) |
 | `simbus/rehearse.py` | Runs the launcher, teleop, bridge, panel and follower host against simulated servos (`simbus/dynamixel_sdk`, a stand-in for the SDK that lerobot loads from `PYTHONPATH`) and checks frame rate, feedback commands, register write order, refused EEPROM writes and torque at exit. Scenarios: `handshake` `vr` `vr2` `wireless` `mismatch` `dropout` `fest`. See [`simbus/README.md`](simbus/README.md). | none (no port is opened; fixed localhost ports, so not next to a live session) | logs in `work/rehearsal/` |
@@ -210,6 +210,10 @@ docs/CHECKLIST.md; write the test first (TDD rule in `../../.claude/rules/common
   exercised on the arms again.
 - `ruff check`, `ruff format --check`, `ty check` and the offline pytest suite pass (`mise run check`);
   the rehearsal's 25 fps checks sit a couple of fps below what a busy Mac delivers, so run it alone.
+- Line coverage is about 23 % overall: the extracted and ported modules sit at 88–100 %, but the
+  entry points' `main()` functions (`teleop`, `follower_host`, `launch`, `bridge`, `panel`, the
+  viewers, the tools) are only exercised by the rehearsal and by hand. `launch.py`'s pure helpers
+  and `follower_host`'s hold/ramp loop are the next pieces to lift and test.
 - The digital twin is the primitive model of robotics `84_`; joint spans are nominal until the
   editor's offsets are set against the real arm. Object widths are in lerobot's normalized
   0–100 gripper units; the weight lever arms use the twin's link lengths.
@@ -223,7 +227,10 @@ docs/CHECKLIST.md; write the test first (TDD rule in `../../.claude/rules/common
 ## Migrating a Mac from `discovery/koch4/` (temporary, until after the fest)
 
 `git pull` renames the tracked files but leaves the git-ignored ones behind in the old folder.
-`./start.sh check` moves them once: `koch4/config/koch4_config.json` → `config/config.json`,
+Run `./start.sh check` (that is what `mac/0_最初の確認.command` runs) **before** any other
+`.command`: those create a fresh `config/config.json` from the fest file, after which the old
+per-Mac config is only warned about.
+`./start.sh check` moves the files once: `koch4/config/koch4_config.json` → `config/config.json`,
 `koch4/webxr/three.module.js` → `webxr/`, `koch4/work/` → `work/`, then removes the empty
 `koch4/`. The venv is new (`discovery/koch/.venv`); `uv sync` reuses the download cache, and
 `discovery/.venv` can be deleted. Remove `migrate_from_koch4` from `start.sh` and this section

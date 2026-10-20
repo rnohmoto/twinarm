@@ -5,15 +5,14 @@ koch-teleop の UDP テレメトリをペアごとに受けてブラウザに配
 1本ずつゲインを変えない）。グラフは Canvas 直描き。
 
 使い方: 通常は koch-launch から起動される。単体起動:
-  python koch-panel --telemetry 8765,8767 --ctl-port 8766,8768 --labels A,B
-  python koch-panel                       # 1ペア(8765/8766)
+  koch-panel --telemetry 8765,8767 --ctl-port 8766,8768 --labels A,B
+  koch-panel                       # 1ペア(8765/8766)
 ポート: HTTP 8780 / テレメトリ受信 UDP(ペアごと) / 制御送信 UDP(ペアごと・同報)
 """
 
 import argparse
 import json
 import socket
-import sys
 import threading
 import time
 import webbrowser
@@ -21,9 +20,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from urllib.parse import parse_qs, unquote, urlparse
 
-_reconfigure = getattr(sys.stdout, "reconfigure", None)
-if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
-    _reconfigure(errors="replace")
+from koch.console import reconfigure_stdout
 
 LATEST: list[dict] = []  # ペアごとの最新テレメトリ
 LABELS: list[str] = []
@@ -173,6 +170,7 @@ def parse_int_list(spec):
 
 def main():
     """Entry point."""
+    reconfigure_stdout()
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )

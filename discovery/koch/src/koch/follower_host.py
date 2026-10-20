@@ -15,7 +15,7 @@ Risk class: moves motors（起動時にフォロワーへ接続し、目標角�
   - `--grip-ma` でフォロワー gripper の Goal_Current 上限（過負荷停止対策）。Mac の --follower-grip-ma も cfg で届く
   - Ctrl+C で終了。lerobot の既定どおり切断時にトルクが抜けるので、腕を畳んでから止める
 
-使い方（握手の場の PC・discovery で `uv run`）:
+使い方（握手の場の PC・discovery/koch で `uv run`）:
   uv run koch-host --port /dev/tty.usbmodemXXXX --id koch_follower_A --listen 9101
   uv run koch-host --sim --listen 9101          # ハード無し（配線・遅延の確認）
   Windows:  koch-host --port COM5 --id koch_follower_A --listen 9101

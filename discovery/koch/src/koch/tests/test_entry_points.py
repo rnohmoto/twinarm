@@ -9,16 +9,18 @@ from koch import feedback, motors
 
 PROBE = """
 import logging, sys
-import koch.teleop, koch.follower_host
+import koch.teleop, koch.follower_host, koch.launch, koch.bridge, koch.panel, koch.quest_usb
+import koch.calib_offset, koch.live_plot, koch.scan, koch.set_id, koch.current_monitor
 from koch.console import DropClampWarning
 filters = [f for f in logging.getLogger().filters if isinstance(f, DropClampWarning)]
 print("filters", len(filters))
 print("lerobot", "lerobot" in sys.modules)
+print("stdout", sys.stdout.errors)
 """
 
 
 @pytest.mark.integration
-def test_importing_the_entry_modules_touches_neither_the_root_logger_nor_lerobot() -> (
+def test_importing_the_entry_modules_touches_neither_the_root_logger_nor_lerobot_nor_stdout() -> (
     None
 ):
     out = subprocess.run(
@@ -26,6 +28,7 @@ def test_importing_the_entry_modules_touches_neither_the_root_logger_nor_lerobot
     ).stdout
     assert "filters 0" in out, out
     assert "lerobot False" in out, out
+    assert "stdout replace" not in out, out  # nobody reconfigured stdout at import
 
 
 @pytest.mark.unit

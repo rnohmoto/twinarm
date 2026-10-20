@@ -182,7 +182,7 @@ uv run koch-teleop --leader-port <L> --follower-port udp://127.0.0.1:9101 --ff g
 
 ### W2 — 握手の場の PC で（5 GHz 自前ルータ越し）
 - その PC: `uv sync` 済み・フォロワーの USB・12 V 電源。`hostname -I`（Pi/Linux）や `ipconfig`（Windows）で IP を確認
-- **2 台目の MacBook Pro を使う場合（推奨）**: `git clone` → `cd twinarm/discovery && uv sync` → フォロワーを USB で挿す →
+- **2 台目の MacBook Pro を使う場合（推奨）**: `git clone` → `cd twinarm/discovery/koch && uv sync` → フォロワーを USB で挿す →
   `./start.sh host A /dev/tty.usbmodemXXXX`（2 本目は `host B <port>`。起動時に、操作者側の設定に書く宛先を表示する。
   中身は `follower_host.py --port <port> --id koch_follower_A --listen 9101 --grip-ma 500`）。較正 JSON は `config/calibration/koch_follower/` に置く。Mac 本体はバッテリで動くので握手の場の電源はアームの 12 V だけ
 - Mac: config の `follower_host` に `udp://<IP>:9101` → `launch.py --pair A --ff gripper`

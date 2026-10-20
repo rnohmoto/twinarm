@@ -41,9 +41,7 @@ import sys
 import time
 from pathlib import Path
 
-_reconfigure = getattr(sys.stdout, "reconfigure", None)
-if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
-    _reconfigure(errors="replace")
+from koch.console import reconfigure_stdout
 
 ADB_CANDIDATES = [
     "adb",
@@ -275,6 +273,7 @@ def build_parser():
 
 def main():
     """Entry point."""
+    reconfigure_stdout()
     args = build_parser().parse_args()
     adb = find_adb(args.adb)
     if not adb:

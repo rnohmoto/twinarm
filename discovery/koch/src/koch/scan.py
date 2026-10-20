@@ -67,7 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--loop",
         type=float,
         default=0.0,
-        help="seconds of Present_Position reads after the scan",
+        help="seconds of Present_Position reads after the scan (always at 1 Mbps)",
     )
     return ap
 

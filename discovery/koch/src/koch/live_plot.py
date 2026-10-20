@@ -7,8 +7,8 @@
   4段目: フォロワー電流 — XL330 4軸=左軸[mA]・肩2軸XL430=右軸[%点線]・FF指令=黒破線
          (--no-current で4段目を消して3段にできる)
 
-使い方（通常は koch_teleop_plus.py --plot が自動起動するので手動起動は不要）:
-  python koch-plot --port 8765 --window 20
+使い方（通常は koch-teleop --plot が自動起動するので手動起動は不要）:
+  koch-plot --port 8765 --window 20
 終了: ウィンドウを閉じる / Ctrl+C / 無データ300秒で自動終了。
 """
 
@@ -58,7 +58,7 @@ def main():
         )
         return
     sock.setblocking(False)
-    print(f"UDP {args.port} で待受中… (koch_teleop_plus.py を起動してください)")
+    print(f"UDP {args.port} で待受中… (koch-teleop を起動してください)")
 
     maxlen = int(args.window * 35)
     t_buf = deque(maxlen=maxlen)

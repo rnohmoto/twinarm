@@ -38,7 +38,7 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
   - 温度ガード: 60°C でゲイン半減（spring=ff_gain / error=ff_ke）・65°C で FB 停止（Temperature Limit 70°C 手前。停止後は冷えてから再起動）
   - 実機を動かす・トルクを抜くのはユーザーが明示的に頼んだときだけ（AGENTS.md）
 
-使い方（Mac・discovery で `uv run`）:
+使い方（Mac・discovery/koch で `uv run`）:
   uv run koch-teleop \
       --follower-port /dev/tty.usbmodemXXXX --follower-id koch_follower_A \
       --leader-port   /dev/tty.usbmodemYYYY --leader-id   koch_leader_A \
@@ -47,7 +47,7 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
       --follower-port none --ff vwall --wall ball:45:800:300      # 壁を固定して手で確認
   uv run koch-teleop --leader-port /dev/tty.usbmodemZZZZ --leader-id koch_follower_B
       --leader-type koch_follower --follower-port none --ff vwall --vw --arm-label F   # 2 人目: フォロワー機を手で
-  python koch-teleop --selftest       # 制御則の自己診断（ハード・lerobot 不要）
+  koch-teleop --selftest       # 制御則の自己診断（ハード・lerobot 不要）
 """
 
 import argparse

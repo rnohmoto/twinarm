@@ -14,7 +14,8 @@
   koch-current <ポート> --torque on --duration 60 --csv noise_on.csv   # トルク ON の保持電流
 終了: Ctrl+C または --duration 秒経過。終了時に軸ごとの統計(平均/標準偏差/p-p)を表示。
 CSV の既定は work/csv/currents_<日時>.csv。
-Risk class: energizes (--torque on は Torque_Enable を書く); 終了時に全モーターをトルク OFF にする。
+Risk class: torque off — 起動時と終了時に対象 ID 全てへ Torque_Enable=0 を書く（トルクで支えている腕は落ちる）;
+--torque on は代わりに energizes（保持したまま測る）。
 """
 
 import argparse

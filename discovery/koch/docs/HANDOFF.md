@@ -11,7 +11,7 @@
 握手をすぐ動かす（操作者側の Mac。握手用の 2 台目でも同じ文で始められる）:
 
 ```
-twinarm の discovery/koch で握手を実機で立ち上げます。AGENTS.md（実機安全）→ discovery/docs/HANDOFF.md → manual/handshake.html の順に読んでください。
+twinarm の discovery/koch で握手を実機で立ち上げます。AGENTS.md（実機安全）→ discovery/koch/docs/HANDOFF.md → manual/handshake.html の順に読んでください。
 - いま動いている PC を最初に宣言する（操作者側の Mac か、握手用の 2 台目の Mac か）
 - 最初に git pull → cd discovery/koch → ./start.sh check を実行し、「起動できるもの」の表を私に見せる（腕は動かない）
 - 設定ファイルのポートは私が渡す（--list の結果から私が選ぶ。推測しない。リーダーとフォロワーは入替不可）
@@ -23,7 +23,7 @@ twinarm の discovery/koch で握手を実機で立ち上げます。AGENTS.md�
 VR をすぐ動かす（操作者側の Mac と Quest Pro）:
 
 ```
-twinarm の discovery/koch で VR を実機と Quest Pro で立ち上げます。AGENTS.md（実機安全）→ discovery/docs/HANDOFF.md → manual/vr.html の順に読んでください。Quest の準備（Meta アカウント・開発者モード）がまだなら manual/quest_setup.html から。
+twinarm の discovery/koch で VR を実機と Quest Pro で立ち上げます。AGENTS.md（実機安全）→ discovery/koch/docs/HANDOFF.md → manual/vr.html の順に読んでください。Quest の準備（Meta アカウント・開発者モード）がまだなら manual/quest_setup.html から。
 - 最初に git pull → cd discovery/koch → ./start.sh check を実行し、「起動できるもの」と Quest の接続・電池残量を私に見せる（腕は動かない）
 - 腕が動くコマンド（mac/3_VR1人目_リーダーB.command＝koch.sh vr-leader、4_VR2人目_フォロワーB.command＝vr-follower。従来の ./start.sh vr・vr2 も可）は、私がこの会話で明示的に頼んだときだけ実行する。ポートは fest 設定のシリアル番号で解決される（違う腕なら --list で私が直す）。実機の挙動は私の報告だけを事実にする
 - Meta アカウントの作成と開発者の登録は私が行う
@@ -33,7 +33,7 @@ twinarm の discovery/koch で VR を実機と Quest Pro で立ち上げます�
 どちらの会話にも共通:
 
 - 結果は robotics の TacitCapture に実機ログ md（61_ と同じ型・新番号）として残す
-- コードを直すときは twinarm の規則（AGENTS.md・.claude/rules）に従う。discovery のスクリプトは独立（import しない）。制御則を変えたら twinarm/src/twinarm/domain の写しとテストも直す。直したら `./start.sh rehearse` を通してから実機へ
+- コードを直すときは twinarm の規則（AGENTS.md・.claude/rules）に従う。koch のコードは `koch` パッケージのモジュール同士で import する（`uv` は discovery/koch で）。制御則は twinarm/src/twinarm/domain が正で、src/koch/feedback.py・link.py はその逐語の写し（tests/test_mirror.py が照合する）。変えるときは twinarm 側を先に直してから写す。直したら `./start.sh rehearse` を通してから実機へ
 - 入口は `./start.sh`（check／handshake／host／vr／vr2／sim／rehearse／quest／wifi／manual）。図解の手引きは `docs/manual/index.html`
 
 ## 2. 現状（何ができていて、何が未検証か）
@@ -128,7 +128,7 @@ GitHub から main を新しく取得して `uv sync` → `./start.sh check` →
 ## 6. Mac 側の準備（両方の Mac）
 
 ```bash
-git clone https://github.com/rnohmoto/twinarm.git && cd twinarm/discovery && uv sync
+git clone https://github.com/rnohmoto/twinarm.git && cd twinarm/discovery/koch && uv sync
 # main に入っている（2026-10-04 マージ）。rn/feat/koch4-vr-fps と rn/feat/koch4-vr-objects も同じ内容なので、どのブランチにいても git pull で届く
 ./start.sh check                                # 自己診断・準備状況・ポート・Quest の接続と電池（腕は動かない。VR ページの部品も取得）
 ./start.sh rehearse                             # 腕なしの通し稽古（仮想のサーボ・約 3 分）

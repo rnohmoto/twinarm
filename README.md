@@ -17,7 +17,7 @@ example slice; it has no backend and runs against mocks.
 | ---- | ---------- |
 | [`twinarm/`](twinarm/README.md) | The installable Python library (src layout). |
 | [`discovery/`](discovery/README.md) | Hardware experiment sandboxes. `discovery/koch/` is the Koch arms bench and the Learning Fest setup (start at its `docs/HANDOFF.md`); `discovery/dobot/` the Dobot bench. |
-| [`dobot/`](dobot/README.md) | Dobot Magician pick-and-place sandbox: overhead camera → homography → pydobot, plus the first-time setup manual. |
+| [`discovery/dobot/`](discovery/dobot/README.md) | Dobot Magician pick-and-place sandbox: overhead camera → homography → pydobot, plus the first-time setup manual. |
 | [`twinarm-web-ui/`](twinarm-web-ui/README.md) | The web teleoperation UI: React and Vite, mock-backed. |
 | `docs/` | Documentation. `fest_start_prompts.md`: the Learning Fest bench sessions, one Mac per role (handshake A, VR leader B, VR follower C, desktop robot D), with the prompt to paste into Claude Code on each Mac. |
 | `pyproject.toml` | Configuration-only root project. Holds the shared ruff configuration. |
@@ -44,32 +44,34 @@ Each subproject is synced separately:
 
 ```bash
 cd twinarm && uv sync           # the library
-cd discovery && uv sync         # the hardware sandbox
+cd discovery/koch && uv sync    # the Koch arms bench
+cd discovery/dobot && uv sync   # the Dobot bench
 cd twinarm-web-ui && mise run install   # the web UI (npm ci; run `mise install` first for Node)
 ```
 
 ## Hardware scripts
 
-Everything that talks to the arms lives in `discovery/`. Most of those scripts move motors, release
-torque, or rewrite motor configuration, so start from [`discovery/README.md`](discovery/README.md): it
-lists every script with its purpose and hardware risk, and shows the safe read-only bus scan to begin
-with.
+Everything that talks to the Koch arms lives in `discovery/koch/` (and the Dobot in `discovery/dobot/`).
+Most of those commands move motors, release torque, or rewrite motor configuration, so start from
+[`discovery/README.md`](discovery/README.md) for the risk classes and the safe read-only bus scan, then
+[`discovery/koch/README.md`](discovery/koch/README.md) for every console script with its purpose and risk.
 
 ## Development
 
-`twinarm/` and `twinarm-web-ui/` run their checks as mise tasks under the same names: `format`,
-`type`, `test`, `check` (plus `build`, `fsd` and `e2e` in the web UI). See
-[`twinarm/README.md`](twinarm/README.md) and
-[`twinarm-web-ui/README.md`](twinarm-web-ui/README.md) for the details.
+`twinarm/`, `twinarm-web-ui/` and `discovery/koch/` run their checks as mise tasks under the same
+names: `format`, `type`, `test`, `check` (plus `build`, `fsd` and `e2e` in the web UI, and `rehearse`
+in `discovery/koch/`: three minutes against simulated servos, not part of `check`). See
+[`twinarm/README.md`](twinarm/README.md), [`twinarm-web-ui/README.md`](twinarm-web-ui/README.md) and
+[`discovery/koch/README.md`](discovery/koch/README.md) for the details.
 
-From the repository root, aggregate tasks fan out to both:
+From the repository root, aggregate tasks fan out to the three:
 
 ```bash
-mise run check     # //twinarm:check and //twinarm-web-ui:check
+mise run check     # //twinarm:check, //twinarm-web-ui:check and //discovery/koch:check
 mise run format    # the same, for format
 ```
 
-`discovery/` is not part of those: it needs real hardware. It also has no tasks; run its tools
+`discovery/dobot/` is not part of those: it needs real hardware. It also has no tasks; run its tools
 directly from that directory:
 
 ```bash
@@ -79,7 +81,8 @@ uv run ty check        # type check
 ```
 
 Lint and format settings are shared: the root `pyproject.toml` holds the `[tool.ruff]` configuration and
-each subproject inherits it through `extend = "../pyproject.toml"`. Change shared rules in the root file.
+each subproject inherits it through `extend` (`../pyproject.toml`, or `../../pyproject.toml` from
+`discovery/koch/`). Change shared rules in the root file.
 
 ## Continuous integration
 

@@ -29,7 +29,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--setup", action="store_true", help="run lerobot's setup_motors() instead"
     )
-    ap.add_argument("--port", dest="port_opt", help="serial port for --setup")
+    ap.add_argument(
+        "--port", dest="port_opt", metavar="PORT", help="serial port for --setup"
+    )
     ap.add_argument(
         "--id", default=None, help="lerobot arm id for --setup (default: <type>_A)"
     )

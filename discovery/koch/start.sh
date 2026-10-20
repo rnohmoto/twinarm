@@ -56,13 +56,16 @@ migrate_from_koch4() {
   local old="$here/../koch4"
   [ -d "$old" ] || return 0
   if [ -f "$old/config/koch4_config.json" ] && [ ! -f config/config.json ]; then
-    mv "$old/config/koch4_config.json" config/config.json && echo "移行: koch4/config/koch4_config.json → config/config.json"
+    mv "$old/config/koch4_config.json" config/config.json || { echo "⚠ 移行に失敗: koch4/config/koch4_config.json"; exit 1; }
+    echo "移行: koch4/config/koch4_config.json → config/config.json"
   fi
   if [ -f "$old/webxr/three.module.js" ] && [ ! -f webxr/three.module.js ]; then
-    mv "$old/webxr/three.module.js" webxr/three.module.js && echo "移行: koch4/webxr/three.module.js → webxr/three.module.js"
+    mv "$old/webxr/three.module.js" webxr/three.module.js || { echo "⚠ 移行に失敗: koch4/webxr/three.module.js"; exit 1; }
+    echo "移行: koch4/webxr/three.module.js → webxr/three.module.js"
   fi
   if [ -d "$old/work" ] && [ ! -d work ]; then
-    mv "$old/work" work && echo "移行: koch4/work/ → work/"
+    mv "$old/work" work || { echo "⚠ 移行に失敗: koch4/work/"; exit 1; }
+    echo "移行: koch4/work/ → work/"
   fi
   local left
   left="$(find "$old" -type f -not -name .DS_Store -not -path '*/__pycache__/*' 2>/dev/null | head -1)"

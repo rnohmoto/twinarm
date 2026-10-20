@@ -31,7 +31,7 @@ render the object's weight. This bridge never opens a serial port. Risk class:
 network only, but it commands live teleop sessions (every field is clamped by the
 teleop and the wall is released after WALL_TTL_SEC without a refresh).
 
-使い方（Mac・discovery で `uv run`）:
+使い方（Mac・discovery/koch で `uv run`）:
   uv run koch-bridge --sim                       # 1 本・テレオペなし
   uv run koch-bridge --sim --arms B,F            # 2 本の模擬
   uv run koch-bridge --arms B --telemetry 8770 --ctl-port 8768
@@ -55,11 +55,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from koch.console import reconfigure_stdout
 from koch.paths import CONFIG_DIR, TWIN_CONFIG_NAME, WEBXR_DIR, WORK_DIR
-
-_reconfigure = getattr(sys.stdout, "reconfigure", None)
-if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
-    _reconfigure(errors="replace")
 
 DEFAULT_CONFIG_DIR = CONFIG_DIR
 DEFAULT_WORK_DIR = WORK_DIR
@@ -765,6 +762,7 @@ def build_parser():
 
 def main():
     """Entry point."""
+    reconfigure_stdout()
     args = build_parser().parse_args()
     if not (WEBXR_DIR / "three.module.js").exists():
         sys.exit(

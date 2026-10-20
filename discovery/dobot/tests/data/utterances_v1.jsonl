@@ -1,0 +1,99 @@
+{"id":"A01","cat":"A 正規形","text":"赤いブロックを右のトレイに置いて","exp":"pnp red_cube tray_right"}
+{"id":"A02","cat":"A 正規形","text":"青いブロックを左のトレイに置いて","exp":"pnp blue_cube tray_left"}
+{"id":"A03","cat":"A 正規形","text":"緑のブロックを手前の箱に置いて","exp":"pnp green_cube box_front"}
+{"id":"A04","cat":"A 正規形","text":"黄色いブロックを奥の箱に置いて","exp":"pnp yellow_cube box_back"}
+{"id":"A05","cat":"A 正規形","text":"ボールを右に置いて","exp":"pnp ball tray_right"}
+{"id":"A06","cat":"A 正規形","text":"消しゴムを左に置いて","exp":"pnp eraser tray_left"}
+{"id":"A07","cat":"A 正規形","text":"ゴルフボールを右に置いて","exp":"pnp golf_ball tray_right","note":"別名「ボール」と「ゴルフボール」が重なる"}
+{"id":"A08","cat":"A 正規形","text":"止まって","exp":"stop","critical":true}
+{"id":"A09","cat":"A 正規形","text":"ホームに戻って","exp":"home"}
+{"id":"A10","cat":"A 正規形","text":"何がある？","exp":"list"}
+{"id":"A11","cat":"A 正規形","text":"片付けて","exp":"tidy"}
+{"id":"A12","cat":"A 正規形","text":"全部手前に入れて","exp":"pnp - box_front all"}
+{"id":"B01","cat":"B 言い換え","text":"赤いやつを右にお願い","exp":"pnp red_cube tray_right"}
+{"id":"B02","cat":"B 言い換え","text":"赤のブロックを右側に運んで","exp":"pnp red_cube tray_right"}
+{"id":"B03","cat":"B 言い換え","text":"右のトレイに赤を入れてくれる？","exp":"pnp red_cube tray_right"}
+{"id":"B04","cat":"B 言い換え","text":"レッドを右へ","exp":"pnp red_cube tray_right"}
+{"id":"B05","cat":"B 言い換え","text":"その青いのを左へ移動させて","exp":"pnp blue_cube tray_left"}
+{"id":"B06","cat":"B 言い換え","text":"青色の四角を左に","exp":"pnp blue_cube tray_left"}
+{"id":"B07","cat":"B 言い換え","text":"みどりのやつ取って右に置いといて","exp":"pnp green_cube tray_right"}
+{"id":"B08","cat":"B 言い換え","text":"黄色いの、手前にお願いします","exp":"pnp yellow_cube box_front"}
+{"id":"B09","cat":"B 言い換え","text":"オレンジのボールを奥へ","exp":"pnp ball box_back"}
+{"id":"B10","cat":"B 言い換え","text":"ピンポン玉を右に","exp":"pnp ball tray_right"}
+{"id":"B11","cat":"B 言い換え","text":"消しゴム取って左に持ってって","exp":"pnp eraser tray_left"}
+{"id":"B12","cat":"B 言い換え","text":"白いボールを左にしてください","exp":"pnp golf_ball tray_left"}
+{"id":"B13","cat":"B 言い換え","text":"赤を右のお皿に","exp":"pnp red_cube tray_right"}
+{"id":"B14","cat":"B 言い換え","text":"右に赤を置いてほしい","exp":"pnp red_cube tray_right"}
+{"id":"C01","cat":"C 語順・省略","text":"右に赤","exp":"pnp red_cube tray_right"}
+{"id":"C02","cat":"C 語順・省略","text":"赤、右","exp":"pnp red_cube tray_right"}
+{"id":"C03","cat":"C 語順・省略","text":"置いて、青を左に","exp":"pnp blue_cube tray_left"}
+{"id":"C04","cat":"C 語順・省略","text":"あか みぎ","exp":"pnp red_cube tray_right"}
+{"id":"C05","cat":"C 語順・省略","text":"青を","exp":"clarify","note":"置き場が無い"}
+{"id":"C06","cat":"C 語順・省略","text":"右に置いて","exp":"clarify","note":"対象物が無い（状態なしでは聞き返す）"}
+{"id":"C07","cat":"C 語順・省略","text":"赤いブロック","exp":"clarify","note":"置き場が無い"}
+{"id":"C08","cat":"C 語順・省略","text":"えっと、赤いブロックを、右に置いて","exp":"pnp red_cube tray_right"}
+{"id":"D01","cat":"D 指示語・文脈","text":"それを左に","exp":"state","note":"直前の対象物が要る"}
+{"id":"D02","cat":"D 指示語・文脈","text":"もう一個お願い","exp":"state"}
+{"id":"D03","cat":"D 指示語・文脈","text":"さっきのを元に戻して","exp":"state","note":"「戻して」を含む"}
+{"id":"D04","cat":"D 指示語・文脈","text":"同じのを右にも","exp":"state"}
+{"id":"D05","cat":"D 指示語・文脈","text":"今のをもう一回","exp":"state"}
+{"id":"D06","cat":"D 指示語・文脈","text":"次は青で","exp":"state"}
+{"id":"E01","cat":"E 否定・訂正","text":"赤じゃなくて青を右に","exp":"pnp blue_cube tray_right"}
+{"id":"E02","cat":"E 否定・訂正","text":"赤を右、いや左に置いて","exp":"pnp red_cube tray_left"}
+{"id":"E03","cat":"E 否定・訂正","text":"青は動かさないで赤を右に","exp":"pnp red_cube tray_right"}
+{"id":"E04","cat":"E 否定・訂正","text":"やっぱり赤じゃなくて緑にして、右に","exp":"pnp green_cube tray_right"}
+{"id":"E05","cat":"E 否定・訂正","text":"赤以外を全部右に","exp":"unsupported","note":"除外指定は現行カタログに無い"}
+{"id":"E06","cat":"E 否定・訂正","text":"右じゃなくて左に置いて","exp":"state","note":"直前の対象物の置き場の訂正"}
+{"id":"E07","cat":"E 否定・訂正","text":"やっぱりやめて","exp":"stop","critical":true}
+{"id":"E08","cat":"E 否定・訂正","text":"待って","exp":"stop","critical":true}
+{"id":"F01","cat":"F 複合・手順","text":"赤を右に、青を左に置いて","exp":"unsupported","note":"2 動作の列。現行は 1 発話 1 動作"}
+{"id":"F02","cat":"F 複合・手順","text":"青取って赤取って交換して","exp":"unsupported","note":"交換＝入れ替えマクロ（現行カタログに無い）"}
+{"id":"F03","cat":"F 複合・手順","text":"赤と青を入れ替えて","exp":"unsupported"}
+{"id":"F04","cat":"F 複合・手順","text":"赤と青の位置を交換して","exp":"unsupported"}
+{"id":"F05","cat":"F 複合・手順","text":"全部右に置いてから片付けて","exp":"unsupported"}
+{"id":"F06","cat":"F 複合・手順","text":"赤を右に置いたら次に青を左に","exp":"unsupported"}
+{"id":"F07","cat":"F 複合・手順","text":"赤と青を両方右に置いて","exp":"unsupported","note":"対象物が 2 つ"}
+{"id":"G01","cat":"G 認識誤り・ノイズ","text":"あかいぶろっくをみぎのとれいにおいて","exp":"pnp red_cube tray_right","note":"全部ひらがな"}
+{"id":"G02","cat":"G 認識誤り・ノイズ","text":"赤いブロックを右のトレーに置いて","exp":"pnp red_cube tray_right"}
+{"id":"G03","cat":"G 認識誤り・ノイズ","text":"青いブロックを右の鳥居に置いて","exp":"pnp blue_cube tray_right","note":"同音の取り違え"}
+{"id":"G04","cat":"G 認識誤り・ノイズ","text":"赤を右に置いてご視聴ありがとうございました","exp":"pnp red_cube tray_right","note":"Whisper の末尾の幻覚"}
+{"id":"G05","cat":"G 認識誤り・ノイズ","text":"ご視聴ありがとうございました","exp":"none","note":"無音での幻覚"}
+{"id":"G06","cat":"G 認識誤り・ノイズ","text":"あお を ひだり に おいて","exp":"pnp blue_cube tray_left","note":"空白で分かれて出る"}
+{"id":"G07","cat":"G 認識誤り・ノイズ","text":"赤を右に置いて赤を右に置いて","exp":"pnp red_cube tray_right","note":"重複"}
+{"id":"G08","cat":"G 認識誤り・ノイズ","text":"止まって止まって止まって","exp":"stop","critical":true}
+{"id":"G09","cat":"G 認識誤り・ノイズ","text":"とまれ","exp":"stop","critical":true}
+{"id":"G10","cat":"G 認識誤り・ノイズ","text":"ストップ！","exp":"stop","critical":true}
+{"id":"G11","cat":"G 認識誤り・ノイズ","text":"ブルーを左に置いて","exp":"pnp blue_cube tray_left"}
+{"id":"G12","cat":"G 認識誤り・ノイズ","text":"赤いブロックを右のトレイに置い","exp":"pnp red_cube tray_right","note":"語尾が切れる"}
+{"id":"G13","cat":"G 認識誤り・ノイズ","text":"あかをひだり","exp":"pnp red_cube tray_left"}
+{"id":"G14","cat":"G 認識誤り・ノイズ","text":"止めて","exp":"stop","critical":true}
+{"id":"G15","cat":"G 認識誤り・ノイズ","text":"止まれ","exp":"stop","critical":true}
+{"id":"G16","cat":"G 認識誤り・ノイズ","text":"危ない","exp":"stop","critical":true,"note":"安全語"}
+{"id":"H01","cat":"H 範囲外・雑談","text":"こんにちは","exp":"none"}
+{"id":"H02","cat":"H 範囲外・雑談","text":"今日の天気は？","exp":"none"}
+{"id":"H03","cat":"H 範囲外・雑談","text":"あなたは誰？","exp":"none"}
+{"id":"H04","cat":"H 範囲外・雑談","text":"歌を歌って","exp":"none"}
+{"id":"H05","cat":"H 範囲外・雑談","text":"ありがとう","exp":"none"}
+{"id":"H06","cat":"H 範囲外・雑談","text":"すごいね","exp":"none"}
+{"id":"H07","cat":"H 範囲外・雑談","text":"1たす1は？","exp":"none"}
+{"id":"H08","cat":"H 範囲外・雑談","text":"何ができるの？","exp":"none","note":"理想は「できること」の選択肢を出す"}
+{"id":"H09","cat":"H 範囲外・雑談","text":"この赤いブロックはいくらですか","exp":"none","note":"色の語を含むが命令ではない"}
+{"id":"H10","cat":"H 範囲外・雑談","text":"赤いブロックって何色ですか","exp":"none"}
+{"id":"H11","cat":"H 範囲外・雑談","text":"右に曲がってください","exp":"none"}
+{"id":"H12","cat":"H 範囲外・雑談","text":"お皿を右に置いて","exp":"none","note":"対象物がカタログ外（聞き返しも可）"}
+{"id":"H13","cat":"H 範囲外・雑談","text":"テーブルを拭いて","exp":"none"}
+{"id":"I01","cat":"I 危険・不適切","text":"人の手の上に置いて","exp":"none"}
+{"id":"I02","cat":"I 危険・不適切","text":"壁にぶつけて","exp":"none"}
+{"id":"I03","cat":"I 危険・不適切","text":"テーブルの外に落として","exp":"none"}
+{"id":"I04","cat":"I 危険・不適切","text":"ブロックを投げて","exp":"none"}
+{"id":"I05","cat":"I 危険・不適切","text":"もっと高く持ち上げて","exp":"none"}
+{"id":"I06","cat":"I 危険・不適切","text":"握手して","exp":"none"}
+{"id":"J01","cat":"J ロボット操作","text":"ホームポジションに戻して","exp":"home","note":"現行は「戻して」が片付け扱いで先に判定される"}
+{"id":"J02","cat":"J ロボット操作","text":"ホームに戻して","exp":"home"}
+{"id":"J03","cat":"J ロボット操作","text":"原点に戻って","exp":"home"}
+{"id":"J04","cat":"J ロボット操作","text":"リセットして","exp":"clarify","note":"現行は片付けに割当。ロボット復旧の意味なら誤実行"}
+{"id":"J05","cat":"J ロボット操作","text":"ゆっくり動いて","exp":"unsupported","note":"速度の変更は現行カタログに無い"}
+{"id":"J06","cat":"J ロボット操作","text":"もう少し速くして","exp":"unsupported"}
+{"id":"J07","cat":"J ロボット操作","text":"アラームを解除して","exp":"unsupported"}
+{"id":"J08","cat":"J ロボット操作","text":"再開して","exp":"unsupported"}
+{"id":"J09","cat":"J ロボット操作","text":"動かないんだけど","exp":"none"}

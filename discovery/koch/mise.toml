@@ -1,0 +1,35 @@
+[tasks.format]
+description = "Auto-fix lint violations, then format; pass --check to verify only"
+usage = 'flag "-c --check" help="Report violations without writing files"'
+run = '''
+set -e
+if [ -n "${usage_check:-}" ]; then
+  uv run ruff check .
+  uv run ruff format --check .
+else
+  uv run ruff check --fix-only .
+  uv run ruff format .
+fi
+'''
+
+[tasks.type]
+description = "Type check; pass --fix to apply fixes"
+usage = '''
+flag "-f --fix" help="Apply fixes to resolve errors"
+arg "[paths]" var=#true help="Paths to check (default: whole project)"
+'''
+run = "uv run ty check ${usage_fix:+--fix} ${usage_paths:-}"
+
+[tasks.test]
+description = "Run the offline test suite; pass --coverage for a line-coverage report"
+usage = 'flag "-c --coverage" help="Report line coverage, including the lines no test reaches"'
+run = "uv run pytest ${usage_coverage:+--cov=koch --cov-report=term-missing}"
+
+[tasks.check]
+description = "Verify formatting, types, and tests without writing files"
+depends = ["format --check", "type", "test"]
+
+[tasks.rehearse]
+description = "Launch paths against simulated servos: no arms, about 3 minutes, binds the live session's localhost ports; pass scenario names to run some"
+usage = 'arg "[scenarios]" var=#true help="handshake | vr | vr2 | wireless | mismatch | dropout | fest (default: all)"'
+run = "uv run python simbus/rehearse.py ${usage_scenarios:-}"

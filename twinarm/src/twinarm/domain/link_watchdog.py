@@ -1,6 +1,6 @@
 """Watchdog for a follower link carried over UDP (stdlib only).
 
-The wireless follower (``descovery/koch4/koch4_follower_host.py``) and the
+The wireless follower (``discovery/koch4/koch4_follower_host.py``) and the
 Mac-side ``RemoteFollower`` in ``koch4_teleop.py`` mirror these functions:
 packets carry a sequence number, only newer packets are accepted, and the age
 of the last accepted packet grades the link as ok / alert / hold / stale.

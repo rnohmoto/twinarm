@@ -1,7 +1,7 @@
 """Force-feedback laws for the leader gripper.
 
 Pure functions over frozen dataclasses: no I/O, no lerobot, no serial. The
-hardware scripts in ``descovery/koch4/`` mirror these functions verbatim
+hardware scripts in ``discovery/koch4/`` mirror these functions verbatim
 because that sandbox cannot import this package (separate uv projects); keep
 the two copies in sync by hand and let the tests here pin the semantics.
 

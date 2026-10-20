@@ -35,7 +35,7 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
 
 安全（変更しない値の根拠は robotics web_research/bilateral_force_feedback_koch_20260803.md）:
   - Goal_Current 上限は既定 450mA（M077 ストール 1.47A@5V の ~30%）。最大 900
-  - 温度ガード: 60°C でゲイン半減・65°C で FB 停止（Temperature Limit 70°C 手前）
+  - 温度ガード: 60°C でゲイン半減（spring=ff_gain / error=ff_ke）・65°C で FB 停止（Temperature Limit 70°C 手前。停止後は冷えてから再起動）
   - 実機を動かす・トルクを抜くのはユーザーが明示的に頼んだときだけ（AGENTS.md）
 
 使い方（Mac・descovery で `uv run`）:
@@ -2004,22 +2004,29 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 end="",
                 flush=True,
             )
-            args.ff_gain, stop = thermal_derate(guard, temp, args.ff_gain)
+            # 減衰させるゲインは方式ごと: spring=ff_gain / error=ff_ke(差分ゲイン)
+            if args.ff_style == "error":
+                args.ff_ke, stop = thermal_derate(guard, temp, args.ff_ke)
+                derated = args.ff_ke
+            else:
+                args.ff_gain, stop = thermal_derate(guard, temp, args.ff_gain)
+                derated = args.ff_gain
             if stop:
                 print(
                     f"\n[ff] リーダーgripper {temp}°C — FBを停止します(冷えたら再起動)"
                 )
-                teleop.bus.write(
-                    "Goal_Current", "gripper", args.ff_floor, normalize=False
+                teleop.bus.write(  # error 式は Mode 0 なので床電流ではなく 0(フリー)
+                    "Goal_Current",
+                    "gripper",
+                    0 if args.ff_style == "error" else args.ff_floor,
+                    normalize=False,
                 )
                 ff_on = False
                 raise_alert(
                     "ltemp", f"⛔ リーダーgripper {temp}°C — 力覚FBを停止", ttl=10.0
                 )
             elif temp >= guard.derate_c:
-                print(
-                    f"\n[ff] リーダーgripper {temp}°C — ゲインを{args.ff_gain:.2f}に減衰"
-                )
+                print(f"\n[ff] リーダーgripper {temp}°C — ゲインを{derated:.2f}に減衰")
                 raise_alert("ltemp", f"⚠ リーダーgripper {temp}°C — ゲイン減衰中")
 
     def wall_feedback(action):

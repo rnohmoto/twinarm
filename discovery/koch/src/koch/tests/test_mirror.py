@@ -16,6 +16,7 @@ from koch import paths
 DOMAIN = paths.ROOT.parents[1] / "twinarm" / "src" / "twinarm" / "domain"
 PAIRS = [
     ("feedback.py", "gripper_feedback.py"),
+    ("link.py", "link_watchdog.py"),
 ]
 
 

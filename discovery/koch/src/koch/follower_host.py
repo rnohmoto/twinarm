@@ -33,14 +33,14 @@ Risk class: moves motors（起動時にフォロワーへ接続し、目標角�
 import argparse
 import json
 import logging
-import math
 import socket
 import sys
 import time
-from dataclasses import dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
 
+from koch.link import LinkPolicy, LinkState, accept_packet, link_health
+from koch.motors import MOTORS, to_signed16
 from koch.paths import CONFIG_DIR
 
 _reconfigure = getattr(sys.stdout, "reconfigure", None)
@@ -63,66 +63,9 @@ class _DropClampWarning(logging.Filter):
 logging.getLogger().addFilter(_DropClampWarning())
 
 DEFAULT_CONFIG_DIR = CONFIG_DIR
-MOTORS = [
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-    "gripper",
-]
 RAMP_SEC = 1.5
 SLOW_EVERY = 60  # frames between temperature / hardware-error reads (2 s at 30 fps)
 STATUS_EVERY = 60
-
-
-# ---- mirror of twinarm/src/twinarm/domain/link_watchdog.py (keep in sync) ----
-
-
-@dataclass(frozen=True)
-class LinkPolicy:
-    """Ages [s] at which the link is downgraded."""
-
-    alert_after_s: float = 0.3
-    hold_after_s: float = 0.5
-    stale_after_s: float = 3.0
-
-
-DEFAULT_LINK_POLICY = LinkPolicy()
-
-
-@dataclass(frozen=True)
-class LinkState:
-    """Bookkeeping of what arrived: last sequence, its time and the counters."""
-
-    last_seq: int = -1
-    last_rx: float = -math.inf
-    received: int = 0
-    dropped: int = 0
-    missed: int = 0
-
-
-def accept_packet(state, seq, now):
-    """Register a packet; only a newer sequence number is accepted."""
-    if seq <= state.last_seq:
-        return replace(state, dropped=state.dropped + 1), False
-    gap = seq - state.last_seq - 1 if state.last_seq >= 0 else 0
-    return (
-        LinkState(seq, now, state.received + 1, state.dropped, state.missed + gap),
-        True,
-    )
-
-
-def link_health(state, now, policy=DEFAULT_LINK_POLICY):
-    """Grade the link by the age of the last accepted packet."""
-    age = now - state.last_rx
-    if state.received == 0 or age >= policy.stale_after_s:
-        return "stale"
-    if age >= policy.hold_after_s:
-        return "hold"
-    if age >= policy.alert_after_s:
-        return "alert"
-    return "ok"
 
 
 # ---------------------------------------------------------------- sim follower
@@ -221,11 +164,6 @@ def open_real_follower(args):
             max_relative_target=float(args.max_rel) if args.max_rel > 0 else None,
         )
     )
-
-
-def to_signed16(v):
-    """Interpret a 16-bit register value as signed."""
-    return v - 65536 if v > 32767 else v
 
 
 def build_parser():

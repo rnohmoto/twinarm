@@ -61,10 +61,9 @@ import subprocess
 import sys
 import threading
 import time
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
-from typing import TypedDict
 
 from koch.feedback import (
     JOINT_SPAN_DEG,
@@ -90,6 +89,27 @@ from koch.feedback import (
     virtual_weight_step,
     wall_tick,
 )
+from koch.link import LinkState, accept_packet, link_health, loss_ratio
+from koch.motors import (
+    ARM_CAP_MAX_MA,
+    ARM_FF_JOINTS,
+    ASSIST_CAP_MAX_MA,
+    ASSIST_JOINTS,
+    DEVICE_MODELS,
+    FF_CAP_MAX_MA,
+    FF_CAP_WARN_MA,
+    FF_GRIPPER_P_GAIN,
+    MODE_EXTENDED_POSITION,
+    MODE_PWM,
+    MOTORS,
+    PWM_CAP_MAX,
+    PWM_LIMIT_DEFAULT,
+    VW_JOINTS,
+    XL430_JOINTS,
+    gripper_ticks,
+    hw_error_names,
+    to_signed16,
+)
 from koch.paths import CONFIG_DIR, WORK_DIR
 
 _reconfigure = getattr(sys.stdout, "reconfigure", None)
@@ -100,90 +120,12 @@ DEFAULT_CONFIG_DIR = CONFIG_DIR
 DEFAULT_WORK_DIR = WORK_DIR
 LEADER_ONLY = "none"
 
-XL430_JOINTS = {"shoulder_pan", "shoulder_lift"}  # フォロワーの XL430（負荷 0.1%/unit）
-ARM_FF_JOINTS = ["elbow_flex", "wrist_flex", "wrist_roll"]  # 電流が読める XL330 の腕3軸
-VW_JOINTS = [
-    "shoulder_lift",
-    "elbow_flex",
-]  # 仮想重さを返すリーダー腕関節(どちらも XL330-M077)
-
-
-# 入力装置の機種差。koch_follower を手で動かす 2 人目用: 肩 2 軸は XL430-W250 で
-# 電流制御(Mode 0/5)が無い → 肩の重さは PWM モード(Mode 16・Goal_PWM 0.113 %/count・
-# 上限 885)で返す。ストール 1.5 N*m @ 12 V なので duty ≈ トルク / 1.5 N*m。肘は M288 の電流制御。
-# M288 のストールは M077 の約 2.4 倍(0.52 vs 0.215 N*m @ 5V, 同じ 1.47 A)なので Kt が違い、
-# 握りの電流上限も同じ力になるよう縮める。
-class PwmJoint(TypedDict):
-    """A joint without current control (XL430): weight is rendered in PWM mode."""
-
-    stall_nm: float
-    pwm_limit: int
-
-
-class DeviceModel(TypedDict):
-    """What differs between a Koch leader and a Koch follower used as the input device."""
-
-    kt: float
-    vw_joints: list[str]
-    pwm_joints: dict[str, PwmJoint]
-    wall_scale: float
-    hand_joints: list[str]
-
-
-DEVICE_MODELS: dict[str, DeviceModel] = {
-    "koch_leader": {
-        "kt": 0.146,
-        "vw_joints": ["shoulder_lift", "elbow_flex"],
-        "pwm_joints": {},
-        "wall_scale": 1.0,
-        "hand_joints": [],
-    },
-    "koch_follower": {
-        "kt": 0.354,
-        "vw_joints": ["shoulder_lift", "elbow_flex"],
-        "pwm_joints": {"shoulder_lift": {"stall_nm": 1.5, "pwm_limit": 885}},
-        "wall_scale": 0.45,
-        "hand_joints": [
-            "shoulder_pan",
-            "shoulder_lift",
-            "elbow_flex",
-            "wrist_flex",
-            "wrist_roll",
-        ],
-    },
-}
-# 位置ループ剛性。既定のままでは偏差 158 ticks で ~124mA しか要求せず、Goal_Current を
-# 450 まで上げても実電流が頭打ち（9/4 実測）。Operating_Mode を書くと既定へ戻るので
-# 必ずモード設定の後に書く。
-FF_GRIPPER_P_GAIN = 800
-FF_CAP_MAX_MA = 900
-FF_CAP_WARN_MA = 500
-ARM_CAP_MAX_MA = 400
-ASSIST_JOINTS = [
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-]  # 手で動かすフォロワー機の XL330-M288(電流制御できる軸)
-ASSIST_CAP_MAX_MA = (
-    80  # 摩擦アシストの上限。関節の摩擦より大きいと手を離しても動き続ける
-)
-PWM_CAP_MAX = 400  # 肩 PWM の上限(885 = 100 %)。400 ≈ 45 % ≈ 0.68 N*m
-PWM_LIMIT_DEFAULT = 885
-MODE_PWM = 16
-MODE_EXTENDED_POSITION = 4
 MAX_RECONNECTS = 20
 TEMP_CHECK_EVERY = 60  # frames (2 s at 30 fps)
 WALL_TTL_SEC = (
     3.0  # VR ブリッジからの壁更新が途絶えたら壁を解除する秒数(固定壁は無期限)
 )
 TELEMETRY_HOST = "127.0.0.1"
-HW_ERROR_BITS = {
-    0: "入力電圧",
-    2: "過熱",
-    3: "エンコーダ",
-    4: "電気ショック",
-    5: "過負荷",
-}
 ALERT_TTL_SEC = 4.0
 
 
@@ -343,11 +285,6 @@ def selftest_pwm_joints():
     assert pwm.write("shoulder_lift", 50) == 0  # release 後は書かない
 
 
-def to_signed16(v):
-    """Interpret a 16-bit register value as signed."""
-    return v - 65536 if v > 32767 else v
-
-
 def load_lerobot():
     """Import lerobot lazily, injecting bus retries (lerobot 0.5+: retry=0 default)."""
     from lerobot.motors.motors_bus import MotorsBus
@@ -376,21 +313,6 @@ def load_lerobot():
     except Exception:  # noqa: BLE001 - older lerobot without the error module
         retry_errors = (ConnectionError,)
     return KochFollower, KochFollowerConfig, KochLeader, KochLeaderConfig, retry_errors
-
-
-def gripper_ticks(bus):
-    """Return (closed_tick, open_tick) from calibration, or None if uncalibrated.
-
-    実測（較正値 2036-2773 に対し握り込み時の生値 2106）: 握ると raw は range_min 方向へ
-    減る。したがって range_max が全開端、range_min が閉端（9/4 commit）。
-    """
-    cal = getattr(bus, "calibration", None) or {}
-    g = cal.get("gripper")
-    if g is None:
-        return None
-    if int(getattr(g, "drive_mode", 0) or 0) == 1:  # 反転モーターは端が入れ替わる
-        return int(g.range_max), int(g.range_min)
-    return int(g.range_min), int(g.range_max)
 
 
 def setup_gripper_ff(
@@ -593,67 +515,8 @@ def apply_follower_grip_cap(robot, cap_ma):
 # ===================================================== wireless follower (UDP)
 # link 判定は twinarm/src/twinarm/domain/link_watchdog.py の写し（同期を保つこと）
 
-FOLLOWER_MOTORS = [
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-    "gripper",
-]
 LINK_HELLO_TIMEOUT_SEC = 3.0
 LINK_RX_TIMEOUT_SEC = 0.2
-
-
-@dataclass(frozen=True)
-class LinkPolicy:
-    """Ages [s] at which the follower link is downgraded."""
-
-    alert_after_s: float = 0.3
-    hold_after_s: float = 0.5
-    stale_after_s: float = 3.0
-
-
-DEFAULT_LINK_POLICY = LinkPolicy()
-
-
-@dataclass(frozen=True)
-class LinkState:
-    """Bookkeeping of what arrived from the host: last sequence, time, counters."""
-
-    last_seq: int = -1
-    last_rx: float = -math.inf
-    received: int = 0
-    dropped: int = 0
-    missed: int = 0
-
-
-def accept_packet(state, seq, now):
-    """Register a packet; only a newer sequence number is accepted."""
-    if seq <= state.last_seq:
-        return replace(state, dropped=state.dropped + 1), False
-    gap = seq - state.last_seq - 1 if state.last_seq >= 0 else 0
-    return LinkState(
-        seq, now, state.received + 1, state.dropped, state.missed + gap
-    ), True
-
-
-def link_health(state, now, policy=DEFAULT_LINK_POLICY):
-    """Grade the link by the age of the last accepted packet."""
-    age = now - state.last_rx
-    if state.received == 0 or age >= policy.stale_after_s:
-        return "stale"
-    if age >= policy.hold_after_s:
-        return "hold"
-    if age >= policy.alert_after_s:
-        return "alert"
-    return "ok"
-
-
-def loss_ratio(state):
-    """Fraction of packets that never arrived."""
-    total = state.received + state.missed
-    return state.missed / total if total else 0.0
 
 
 class RemoteBus:
@@ -661,7 +524,7 @@ class RemoteBus:
 
     def __init__(self, owner):
         self._owner = owner
-        self.motors = list(FOLLOWER_MOTORS)
+        self.motors = list(MOTORS)
 
     def sync_read(self, data_name, motors=None, *, normalize=True, num_retry=0):
         """Positions, raw currents and error bits from the last state message."""
@@ -967,9 +830,7 @@ def check_hw_errors(dev, label):
         v = int(v)
         if v:
             hit = True
-            names = "/".join(n for b, n in HW_ERROR_BITS.items() if v >> b & 1) or str(
-                v
-            )
+            names = hw_error_names(v) or str(v)
             print(
                 f"[hw] ⚠ {label}の{m} がエラー停止中({names}) — 電源を10秒抜いて入れ直すまで動きません"
             )
@@ -1478,7 +1339,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         for label, key in (("リーダー", "L"), ("フォロワー", "F")):
             bits = hw_bits[key]
             if bits:
-                names = "/".join(n for b, n in HW_ERROR_BITS.items() if bits >> b & 1)
+                names = hw_error_names(bits)
                 raise_alert(
                     f"hw{key}",
                     f"⛔ {label}gripper エラー停止({names or bits}) — 電源を10秒抜いて入れ直す",

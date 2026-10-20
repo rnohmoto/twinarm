@@ -3,7 +3,7 @@
 Hardware experiment sandbox for the Koch v1.1 arms. Repository-wide instructions are in
 [`../AGENTS.md`](../AGENTS.md), and the hardware safety rules there apply to everything here.
 
-Read @README.md for the script inventory, each script's hardware risk, and how to run them.
+Read @README.md for what lives here and the risk classes every inventory uses.
 
 ## Rules for this directory
 
@@ -11,11 +11,13 @@ Read @README.md for the script inventory, each script's hardware risk, and how t
   *energizes*, *torque off*, or *writes motor config* needs an explicit request from the user in the
   current session: a *torque off* script makes a raised arm drop, and *writes motor config* changes
   EEPROM that then has to be undone by hand.
-- The scripts are deliberately standalone and repeat each other's helpers. Do not refactor them into
-  shared modules or a package unless asked.
-- Nothing is built or published from here; the packaging config is vestigial. Do not rename the
-  directory or "fix" the package-name collision with `twinarm/`.
-- New experiments belong here as new standalone scripts, not in the `twinarm/` library.
-- `koch4/` can be rehearsed with no arms attached: `./koch4/start.sh rehearse` runs its launch
-  paths against simulated servos and checks them (see `koch4/simbus/README.md`). Run it after
-  changing a koch4 script. A pass says the software path holds together, nothing about the arms.
+- `koch/` and `dobot/` are independent uv projects: run `uv` inside them, never here.
+  `discovery/pyproject.toml` only relays the shared ruff configuration (it keeps the `twinarm`
+  package name; known, leave it).
+- Koch work goes into the `koch` package (`koch/src/koch/`, a console script only when an operator
+  needs one), with its offline tests; see [`koch/AGENTS.md`](koch/AGENTS.md). Pure control laws
+  belong to `twinarm/domain` and are mirrored, not forked.
+- `koch/` can be rehearsed with no arms attached: `cd koch && ./start.sh rehearse` (or
+  `mise run rehearse`) runs its launch paths against simulated servos and checks them (see
+  `koch/simbus/README.md`). Run it, alone, after changing anything under `koch/src/koch/`. A pass
+  says the software path holds together, nothing about the arms.

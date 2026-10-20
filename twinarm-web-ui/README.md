@@ -72,7 +72,8 @@ Each layer has a README explaining what belongs in it; the rules themselves are 
 
 [`src/shared/api`](src/shared/api/README.md) defines the telemetry and command contract as zod
 schemas, derived from the working prototype
-[`../discovery/mock/v0/koch_web_panel.py`](../discovery/mock/v0/koch_web_panel.py) — Server-Sent Events on
+(`discovery/mock/v0/koch_web_panel.py`, in git history; its multi-pair successor is
+[`../discovery/koch/src/koch/panel.py`](../discovery/koch/src/koch/panel.py)) — Server-Sent Events on
 `GET /stream`, commands on `GET /ctl?c=<url-encoded JSON>`. Treat it as **provisional**: when a real
 backend appears, reconcile it there first.
 

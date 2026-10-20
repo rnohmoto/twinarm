@@ -4,12 +4,12 @@ monorepo_root = true
 uv = "0.12.5"
 
 [monorepo]
-config_roots = ["twinarm", "twinarm-web-ui"]
+config_roots = ["twinarm", "twinarm-web-ui", "discovery/koch"]
 
 [tasks.format]
 description = "Run format in every subproject"
-depends = ["//twinarm:format", "//twinarm-web-ui:format"]
+depends = ["//twinarm:format", "//twinarm-web-ui:format", "//discovery/koch:format"]
 
 [tasks.check]
-description = "Run check in every subproject (discovery is excluded: it needs real hardware)"
-depends = ["//twinarm:check", "//twinarm-web-ui:check"]
+description = "Run check in every subproject (discovery/dobot is excluded: it needs real hardware)"
+depends = ["//twinarm:check", "//twinarm-web-ui:check", "//discovery/koch:check"]

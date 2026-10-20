@@ -27,7 +27,7 @@
   <rect x="370" y="40" width="200" height="90" rx="10" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
   <text x="470" y="72" text-anchor="middle" font-weight="bold" font-size="15">Mac</text>
   <text x="470" y="94" text-anchor="middle" font-size="12">腕の制御＋VR のページを配信</text>
-  <text x="470" y="112" text-anchor="middle" font-size="12">./koch4/start.sh vr</text>
+  <text x="470" y="112" text-anchor="middle" font-size="12">./start.sh vr</text>
   <rect x="40" y="50" width="210" height="70" rx="10" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
   <text x="145" y="80" text-anchor="middle" font-weight="bold">リーダー B（1 人目が握る）</text>
   <text x="145" y="100" text-anchor="middle" font-size="12">5V の AC アダプタ</text>
@@ -86,7 +86,7 @@
 <tr><td>6</td><td><a href="quest_setup.html#s7">Mac に adb を入れ、USB で繋いで許可</a></td><td>Mac とゴーグル</td></tr>
 </tbody>
 </table>
-<div class="gate"><strong>関門 2</strong>: <code>./koch4/start.sh check</code> に「接続済み」とバッテリー残量が出る。出ないときは <a href="quest_setup.html#s9">Quest の準備 §9</a>。</div>
+<div class="gate"><strong>関門 2</strong>: <code>./start.sh check</code> に「接続済み」とバッテリー残量が出る。出ないときは <a href="quest_setup.html#s9">Quest の準備 §9</a>。</div>
 
 <!-- ===================================================== -->
 <h2 id="s3">3. 起動（毎回）</h2>
@@ -94,13 +94,13 @@
 <ol class="mb-0">
   <li>リーダー B の AC アダプタ（5V）を挿す。腕は机に寝かせておく。1 人で遊ぶときに使うのはリーダーだけで、フォロワー B は繋がなくて構いません。</li>
   <li>ゴーグルを USB-C ケーブルで Mac に繋ぐ。</li>
-  <li>Mac で起動する。Finder で <code>koch4/mac/3_VR1人目_リーダーB.command</code> をダブルクリック（ターミナルなら <code>cd twinarm/discovery</code> → <code>PAIR=B ./koch4/mac/koch.sh vr-leader</code>）。
+  <li>Mac で起動する。Finder で <code>mac/3_VR1人目_リーダーB.command</code> をダブルクリック（ターミナルなら <code>cd twinarm/discovery</code> → <code>PAIR=B ./mac/koch.sh vr-leader</code>）。
   依存の同期 → 設定（無ければ fest 設定から作る）→ ポートの解決（USB シリアル番号）→ ブリッジと腕の制御 → Mac のブラウザに<strong>操作ページ</strong>（観客モード＋文字）→ Quest の許可を待って <code>http://localhost:8444/</code> をゴーグルで開く、まで自動で進みます。USB が切れても見張りが張り直します（10/19 から）。</li>
   <li>ゴーグルを被り、ページ下の <strong>「AR表示（パススルー）」</strong> をコントローラで押す。現実の机とアームが見え、その上に仮想の物が 3 つ浮かびます。</li>
   <li>初回と、ゴーグルの境界（ガーディアン）を引き直した後は、<a href="#s4">§4 の位置合わせ</a>をする。</li>
 </ol>
 </div>
-<p>先に実機なしで画面だけ見たいときは <code>./koch4/start.sh sim</code>（Mac のブラウザに模擬の腕と物体が出ます）。ゴーグルを繋ぎ直したいときは <code>koch4/mac/7_Quest再接続.command</code>（＝<code>./koch4/mac/koch.sh quest</code>）。従来の <code>./koch4/start.sh vr</code> も使えますが、Quest の見張りと操作ページは <code>koch.sh</code> 側だけです。握手（ペア A）を別の端末で動かしたままでも起動できます。</p>
+<p>先に実機なしで画面だけ見たいときは <code>./start.sh sim</code>（Mac のブラウザに模擬の腕と物体が出ます）。ゴーグルを繋ぎ直したいときは <code>mac/7_Quest再接続.command</code>（＝<code>./mac/koch.sh quest</code>）。従来の <code>./start.sh vr</code> も使えますが、Quest の見張りと操作ページは <code>koch.sh</code> 側だけです。握手（ペア A）を別の端末で動かしたままでも起動できます。</p>
 <p><strong>Mac の操作ページ</strong>（<code>http://localhost:8444/?spectator=1&amp;info=1</code>・自動で開く）には、ゴーグルの状態（AR 中か・位置合わせの点数と残差・アンカー）が 1 秒ごとに出て、下のボタンでゴーグルのページを遠隔操作できます: 「ゴーグル: C 位置合わせ」「確定(保存)」「取消(1 点)」「中止」「ゴーグル: A アンカー解除」「ゴーグル: 再読込」「高さ ±1 cm」「置き場所 近く／遠く」「R 配置リセット」。<kbd>E</kbd> で直した設定もゴーグルに 1 秒以内に反映されます。</p>
 <div class="gate"><strong>関門 3</strong>: ゴーグルの中で、アームを動かすと半透明の分身が同じ姿勢で動く。AR 中はゴーグルにボタンも文字も出ない（Quest Browser は DOM overlay を描かない・10/19 実機）ので、「実機」「送信OK」の文字は Mac のブラウザで <code>http://localhost:8444/?spectator=1&amp;info=1</code> を開いて見る。</div>
 
@@ -200,9 +200,9 @@
 <ol class="mb-0">
   <li>MacBook Pro 2 にフォロワー B を USB で繋ぎ、AC アダプタ（12V）を挿す。Quest Pro #2 も USB で繋ぐ（この Mac でも「USB デバッグを許可」→「常に許可」が要る。<a href="quest_setup.html#s7">Quest の準備 §7</a>）。</li>
   <li>フォロワー B の腕を<strong>手で支える</strong>（起動直後に腕の力が抜けて落ちます）。</li>
-  <li>Finder で <code>koch4/mac/4_VR2人目_フォロワーB.command</code> をダブルクリック（ターミナルなら <code>PAIR=B ./koch4/mac/koch.sh vr-follower</code>）。案内に従って Enter。ページは <code>http://localhost:8443/</code>（ゴーグルは自動で開く・Mac は操作ページ）。</li>
+  <li>Finder で <code>mac/4_VR2人目_フォロワーB.command</code> をダブルクリック（ターミナルなら <code>PAIR=B ./mac/koch.sh vr-follower</code>）。案内に従って Enter。ページは <code>http://localhost:8443/</code>（ゴーグルは自動で開く・Mac は操作ページ）。</li>
   <li>2 人目も <a href="#s4">§4</a> と同じく、ゴーグルの中で分身をつかんで実機に重ねる。</li>
-  <li>Mac 1 台にまとめるとき（ゴーグル 1 台＋モニタ）は従来の <code>./koch4/start.sh vr2</code>（分身 2 体が 1 ページ。<kbd>Tab</kbd> で切替）か、同じ Mac で <code>vr-leader</code> と <code>vr-follower</code> の両方（ページ 2 枚）。</li>
+  <li>Mac 1 台にまとめるとき（ゴーグル 1 台＋モニタ）は従来の <code>./start.sh vr2</code>（分身 2 体が 1 ページ。<kbd>Tab</kbd> で切替）か、同じ Mac で <code>vr-leader</code> と <code>vr-follower</code> の両方（ページ 2 枚）。</li>
 </ol>
 </div>
 <table class="table table-striped">
@@ -216,7 +216,7 @@
 <ul>
   <li>同じ物は、先に握った人のものです。放すと相手が拾えます。投げて渡すこともできます。</li>
   <li>2 人目の肩の重さの向きと強さは、最初に <a href="#s10">§10</a> の手順で確かめます。</li>
-  <li>この起動のあいだ、フォロワー B は握手には使えません（握手に戻すときは一度止めて <code>./koch4/start.sh handshake</code>）。</li>
+  <li>この起動のあいだ、フォロワー B は握手には使えません（握手に戻すときは一度止めて <code>./start.sh handshake</code>）。</li>
 </ul>
 
 <!-- ===================================================== -->
@@ -226,7 +226,7 @@
 <tbody>
 <tr><td>観客ページ</td><td>握る人の目線に近い位置から見た、腕と物の 3D 画面（現実の映像は入らない）</td><td>Mac のブラウザで <code>http://localhost:8444/?spectator=1</code></td></tr>
 <tr><td>ゴーグルの実画面（Cast）</td><td>ゴーグルの中の見え方そのまま（現実＋仮想）</td><td>Meta Quest Developer Hub の Cast（USB のまま使える。16:9 の表示を選べる）</td></tr>
-<tr><td>ゴーグルの実画面（scrcpy）</td><td>同上</td><td><code>uv run python koch4/koch4_quest_usb.py --port 8444 --mirror</code>（<code>brew install scrcpy</code> が必要）</td></tr>
+<tr><td>ゴーグルの実画面（scrcpy）</td><td>同上</td><td><code>uv run koch-quest --port 8444 --mirror</code>（<code>brew install scrcpy</code> が必要）</td></tr>
 </tbody>
 </table>
 
@@ -273,7 +273,7 @@
   <path d="M570 86 L608 86" stroke="#8e44ad" stroke-width="2.5" stroke-dasharray="6 4"/>
   <rect x="599" y="126" width="92" height="30" rx="6" fill="#fff8f0" stroke="#e67e22"/><text x="645" y="146" text-anchor="middle" font-size="12">45W アダプター</text>
   <line x1="645" y1="106" x2="645" y2="126" stroke="#e67e22" stroke-width="2.5"/>
-  <text x="589" y="186" text-anchor="middle" font-size="12">./koch4/start.sh wifi の後</text>
+  <text x="589" y="186" text-anchor="middle" font-size="12">./start.sh wifi の後</text>
   <text x="589" y="206" text-anchor="middle" font-size="12">USB を抜いて充電に差し替える</text>
   <text x="589" y="254" text-anchor="middle" font-size="12" fill="#495057">電気は確実。ルータが要る</text>
   <!-- C -->
@@ -292,7 +292,7 @@
 <thead><tr><th style="width:22%">組み方</th><th style="width:30%">要る物</th><th>注意</th></tr></thead>
 <tbody>
 <tr><td>A. USB のまま</td><td>データ対応の USB-C ケーブル</td><td>USB の口が機器へ出せる電気は規格の値で 15W で、ゴーグルの指定（45W）に届かない。減りが遅くなるだけのことがあるので、30 分測って決める</td></tr>
-<tr><td>A+. 充電口つきケーブル</td><td>充電ポート付きの Link 用ケーブル（5 m）と、付属の 45W 電源アダプター・充電ケーブル</td><td>市販品はパソコン側が USB-A のものが多く、Mac には変換アダプタが要る。対応機種に Quest Pro と書かれていない製品が多いので、買ったら最初に <code>./koch4/start.sh check</code> で「接続済み」と「充電中」が両方出ることを確かめる</td></tr>
+<tr><td>A+. 充電口つきケーブル</td><td>充電ポート付きの Link 用ケーブル（5 m）と、付属の 45W 電源アダプター・充電ケーブル</td><td>市販品はパソコン側が USB-A のものが多く、Mac には変換アダプタが要る。対応機種に Quest Pro と書かれていない製品が多いので、買ったら最初に <code>./start.sh check</code> で「接続済み」と「充電中」が両方出ることを確かめる</td></tr>
 <tr><td>B. Wi-Fi 接続＋充電</td><td>自前の 5 GHz ルータと、付属の 45W 電源アダプター・充電ケーブル</td><td>電気は確実に足りる。Wi-Fi への切り替えが通るかを先に 1 回確かめる（古い機種で通らなかった報告がある）。通らないときは <a href="#s9">§9 の https</a> で繋ぐ。ゴーグルを再起動したら切り替えをやり直す</td></tr>
 <tr><td>C. 休憩ごとにドック</td><td>付属の充電ドック</td><td>体験を止める時間が要るので、A や B の補助にする</td></tr>
 </tbody>
@@ -300,9 +300,9 @@
 <div class="step">
 <p class="mb-1"><strong>減り方を測る（本番の前に 1 回）</strong></p>
 <ol class="mb-0">
-  <li>満充電にして <code>./koch4/start.sh vr</code> で AR 表示のまま 30 分使う。</li>
-  <li><code>./koch4/start.sh check</code> でバッテリー残量（%）と「充電中／放電中」を読む。30 分で減った分から、何時間もつかを計算する。</li>
-  <li>1 日分に足りなければ B に切り替える。Mac とゴーグルを同じ自前ルータに繋ぎ、USB を挿した状態で <code>./koch4/start.sh wifi</code> を実行する。「Wi-Fi 越しに張れました」と出たら USB を抜いて、付属の 45W 電源アダプターに繋いだ充電ケーブルに差し替える。「張れません」と出たら、<a href="#s9">§9 の https</a> で繋ぐ（充電は同じようにできる）。</li>
+  <li>満充電にして <code>./start.sh vr</code> で AR 表示のまま 30 分使う。</li>
+  <li><code>./start.sh check</code> でバッテリー残量（%）と「充電中／放電中」を読む。30 分で減った分から、何時間もつかを計算する。</li>
+  <li>1 日分に足りなければ B に切り替える。Mac とゴーグルを同じ自前ルータに繋ぎ、USB を挿した状態で <code>./start.sh wifi</code> を実行する。「Wi-Fi 越しに張れました」と出たら USB を抜いて、付属の 45W 電源アダプターに繋いだ充電ケーブルに差し替える。「張れません」と出たら、<a href="#s9">§9 の https</a> で繋ぐ（充電は同じようにできる）。</li>
 </ol>
 </div>
 <p>ゴーグルは顔から外すとしばらくして休止し、消費が下がります。来場者の入れ替えの間は外して置くだけでも持ちが延びます。</p>
@@ -314,8 +314,8 @@
 <ol class="mb-0">
   <li>Mac とゴーグルを同じ自前ルータに繋ぐ（会場のゲスト Wi-Fi は端末どうしが通信できないので使わない）。</li>
   <li>https で起動する（<code>--vr-http</code> を付けない）。
-<pre>uv run python koch4/koch4_dual_launch.py --pair B --vr B --vw --no-panel --follower none</pre></li>
-  <li>記録 <code>koch4/work/logs/dual_B_vr.log</code> に出る <code>https://＜Mac の IP＞:8444/</code> を、ゴーグルのブラウザに入力する。</li>
+<pre>uv run koch-launch --pair B --vr B --vw --no-panel --follower none</pre></li>
+  <li>記録 <code>work/logs/dual_B_vr.log</code> に出る <code>https://＜Mac の IP＞:8444/</code> を、ゴーグルのブラウザに入力する。</li>
   <li>「この接続ではプライバシーが保護されません」と出たら、詳細設定 → アクセスする、で進む（最初の 1 回だけ）。</li>
 </ol>
 </div>
@@ -328,7 +328,7 @@
 <p>置き場所の既定は 10/19 に台から 12〜15 cm へ寄せました（それまでの 22〜27 cm は腕の全長に近く、机の面の物は「地面より下」でないと掴めなかったため）。置く的の丸も、置き場所の平均距離の 0.65 倍の弧に出ます。</p>
 <h3>10.2 起動時に指定するもの</h3>
 <p>初めて重さを試すときは、上限を下げて起動し、向きを確かめてから上げます。</p>
-<pre>./koch4/start.sh vr --extra "--vw-cap 60"</pre>
+<pre>./start.sh vr --extra "--vw-cap 60"</pre>
 <table class="table table-striped">
 <thead><tr><th style="width:34%">指定</th><th>意味</th><th style="width:18%">既定</th></tr></thead>
 <tbody>
@@ -349,12 +349,12 @@
 <thead><tr><th style="width:30%">症状</th><th>確かめること・直し方</th></tr></thead>
 <tbody>
 <tr><td>Quest が見えない（check に「端末が見えません」）</td><td>ケーブルがデータ対応か。ゴーグルの電源。開発者モードがオンか。ケーブルを挿し直してゴーグルを被り、許可の画面で「常に許可」</td></tr>
-<tr><td>ページが開かない</td><td><code>./koch4/start.sh quest</code> をやり直す。ゴーグルのブラウザに <code>http://localhost:8444/</code> と手で入れてもよい</td></tr>
+<tr><td>ページが開かない</td><td><code>./start.sh quest</code> をやり直す。ゴーグルのブラウザに <code>http://localhost:8444/</code> と手で入れてもよい</td></tr>
 <tr><td>「AR表示」のボタンが出ない</td><td>アドレスが <code>http://localhost:8444/</code> か <code>https://…</code> か。<code>http://＜IP＞</code> では出ない</td></tr>
 <tr><td>起動してすぐ「…が終了しました」と出る</td><td>すぐ下に <code>|</code> で始まる行（記録の末尾）が出る。そこに理由が書かれている</td></tr>
-<tr><td>「three.module.js がありません」</td><td>ネットに繋がる場所で <code>./koch4/start.sh check</code> を 1 回実行する（描画ライブラリを取得する）</td></tr>
+<tr><td>「three.module.js がありません」</td><td>ネットに繋がる場所で <code>./start.sh check</code> を 1 回実行する（描画ライブラリを取得する）</td></tr>
 <tr><td>「較正が、サーボ内の値とファイルで一致しません」</td><td>ポートの取り違え（A と B、リーダーとフォロワー）か、較正をやり直した後にファイルを入れ替えていない。設定ファイルのポートと id を確かめる</td></tr>
-<tr><td>分身が動かない・「未接続」の赤い帯</td><td>腕の制御が止まっている。Mac の端末と <code>koch4/work/logs/dual_B_teleop.log</code> を見る。ポートの書き間違い、AC アダプタ</td></tr>
+<tr><td>分身が動かない・「未接続」の赤い帯</td><td>腕の制御が止まっている。Mac の端末と <code>work/logs/dual_B_teleop.log</code> を見る。ポートの書き間違い、AC アダプタ</td></tr>
 <tr><td>分身が実物とずれる</td><td>位置合わせ（§4）をやり直す。関節の曲がる向きが逆なら <kbd>E</kbd> で、その関節の向き（＋／−）と offset を直して保存</td></tr>
 <tr><td>AR にボタンや文字が出ない</td><td>仕様（Quest Browser は DOM overlay を描かない・10/19 実機）。位置合わせは分身をつかんで動かす（§4）。文字は Mac のブラウザで見る。Mac から操作するなら Chrome DevTools: <code>adb forward tcp:9222 localabstract:chrome_devtools_remote</code> → <code>http://127.0.0.1:9222/json</code> のページに接続して <code>koch4.startCalib()</code>／<code>koch4.stopCalib(true)</code></td></tr>
 <tr><td>土台の回転だけ分身に出ない（他の関節は動く）</td><td>shoulder_pan の読み値が 100（または −100）に張り付いている。較正は 1 回転ぶんで、サーボは多回転モードなので、電源を入れてから土台を 1 回転以上回すと範囲の外に出る。土台を逆向きに 1 回転戻す（Mac で <code>curl -s http://127.0.0.1:8444/state</code> の shoulder_pan が動けばよい）。戻らなければ Ctrl+C で止めて AC アダプタを抜き差し</td></tr>

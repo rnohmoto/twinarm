@@ -16,15 +16,15 @@ example slice; it has no backend and runs against mocks.
 | Path | What it is |
 | ---- | ---------- |
 | [`twinarm/`](twinarm/README.md) | The installable Python library (src layout). |
-| [`discovery/`](discovery/README.md) | Hardware experiment sandbox: standalone Koch-arm scripts. `discovery/koch4/` is the Learning Fest setup (start at its HANDOFF.md). |
+| [`discovery/`](discovery/README.md) | Hardware experiment sandboxes. `discovery/koch/` is the Koch arms bench and the Learning Fest setup (start at its `docs/HANDOFF.md`); `discovery/dobot/` the Dobot bench. |
 | [`dobot/`](dobot/README.md) | Dobot Magician pick-and-place sandbox: overhead camera → homography → pydobot, plus the first-time setup manual. |
 | [`twinarm-web-ui/`](twinarm-web-ui/README.md) | The web teleoperation UI: React and Vite, mock-backed. |
 | `docs/` | Documentation. `fest_start_prompts.md`: the Learning Fest bench sessions, one Mac per role (handshake A, VR leader B, VR follower C, desktop robot D), with the prompt to paste into Claude Code on each Mac. |
 | `pyproject.toml` | Configuration-only root project. Holds the shared ruff configuration. |
 
-`twinarm/` and `discovery/` are independent uv projects, each with its own `pyproject.toml` and
-`uv.lock` — this is not a uv workspace, so sync and run commands are issued inside a subproject rather
-than at the root. `twinarm-web-ui/` is a separate npm project with its own `package-lock.json`, and
+`twinarm/`, `discovery/koch/` and `discovery/dobot/` are independent uv projects, each with its own
+`pyproject.toml` and `uv.lock` — this is not a uv workspace, so sync and run commands are issued inside
+a subproject rather than at the root (`discovery/` itself is configuration-only, like the root). `twinarm-web-ui/` is a separate npm project with its own `package-lock.json`, and
 follows the same rule. The root project declares `package = false` and no dependencies; it exists to
 hold shared tool configuration and the mise tasks that fan out across subprojects.
 

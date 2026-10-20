@@ -4,8 +4,9 @@
 built and tested with no arms attached. Treat every shape here as provisional.
 
 The contract is derived from the working prototype
-[`../../../../discovery/mock/v0/koch_web_panel.py`](../../../../discovery/mock/v0/koch_web_panel.py), a stdlib-only
-panel that the teleop loop launches:
+`discovery/mock/v0/koch_web_panel.py` (in git history; its multi-pair successor, which adds `labels`
+and per-pair arrays, is [`../../../../discovery/koch/src/koch/panel.py`](../../../../discovery/koch/src/koch/panel.py)),
+a stdlib-only panel that the teleop loop launches:
 
 |           |                                                                               |
 | --------- | ----------------------------------------------------------------------------- |

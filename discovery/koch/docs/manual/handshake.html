@@ -29,7 +29,7 @@
   <text x="36" y="44" font-weight="bold">操作する机（説明員）</text>
   <rect x="130" y="64" width="180" height="64" rx="8" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
   <text x="220" y="92" text-anchor="middle" font-weight="bold">Mac（操作者側）</text>
-  <text x="220" y="112" text-anchor="middle" font-size="12">./koch4/start.sh handshake</text>
+  <text x="220" y="112" text-anchor="middle" font-size="12">./start.sh handshake</text>
   <rect x="50" y="190" width="140" height="56" rx="8" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
   <text x="120" y="214" text-anchor="middle">リーダー A</text><text x="120" y="232" text-anchor="middle" font-size="12">5V</text>
   <rect x="250" y="190" width="140" height="56" rx="8" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
@@ -43,7 +43,7 @@
   <text x="536" y="44" font-weight="bold">握手の机（来場者）</text>
   <rect x="630" y="64" width="180" height="64" rx="8" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
   <text x="720" y="92" text-anchor="middle" font-weight="bold">Mac（握手用）</text>
-  <text x="720" y="112" text-anchor="middle" font-size="12">koch4_follower_host.py ×2</text>
+  <text x="720" y="112" text-anchor="middle" font-size="12">follower_host.py ×2</text>
   <rect x="550" y="190" width="140" height="56" rx="8" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
   <text x="620" y="214" text-anchor="middle">フォロワー A</text><text x="620" y="232" text-anchor="middle" font-size="12">12V</text>
   <rect x="750" y="190" width="140" height="56" rx="8" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
@@ -82,12 +82,12 @@
 <div class="step">
 <ol class="mb-0">
   <li><strong>握手用の Mac</strong>: フォロワー 2 本を USB で挿し、ポートを確かめる。
-<pre>uv run python koch4/koch4_dual_launch.py --list</pre></li>
+<pre>uv run koch-launch --list</pre></li>
   <li><strong>握手用の Mac</strong>: ルータに繋ぎ、IP アドレスを確かめる。
 <pre>ipconfig getifaddr en0</pre></li>
   <li><strong>操作者側の Mac</strong>: 設定ファイルを作り、リーダーのポートと、握手用の Mac の宛先を書く。
-<pre>uv run python koch4/koch4_dual_launch.py --init
-# koch4/config/koch4_config.json の例（ペア A）
+<pre>uv run koch-launch --init
+# config/config.json の例（ペア A）
 #   "leader_port":   "/dev/tty.usbmodem＜リーダー A＞",
 #   "follower_host": "udp://＜握手用 Mac の IP＞:9101",
 #   "follower_port": "/dev/tty.usbmodem＜有線に戻すときのフォロワー A＞"
@@ -102,14 +102,14 @@
 <ol class="mb-0">
   <li>4 本とも腕を机に寝かせ、AC アダプタを挿す（リーダー 5V・フォロワー 12V）。</li>
   <li><strong>握手用の Mac</strong> で受け側を 2 つ起動する（端末を 2 つ開く）。
-<pre>cd twinarm/discovery
-./koch4/start.sh host A ＜フォロワー A のポート＞
-./koch4/start.sh host B ＜フォロワー B のポート＞</pre>
-  起動すると、操作者側の設定ファイルに書く宛先（この Mac の IP と番号）が表示されます。ポートは <code>uv run python koch4/koch4_dual_launch.py --list</code> で確かめて渡します。</li>
+<pre>cd twinarm/discovery/koch
+./start.sh host A ＜フォロワー A のポート＞
+./start.sh host B ＜フォロワー B のポート＞</pre>
+  起動すると、操作者側の設定ファイルに書く宛先（この Mac の IP と番号）が表示されます。ポートは <code>uv run koch-launch --list</code> で確かめて渡します。</li>
   <li><strong>操作者側の Mac</strong> で起動する。
-<pre>cd twinarm/discovery
-./koch4/start.sh handshake</pre>
-  フォロワーが 1.5 秒かけてリーダーの姿勢に合流し、パネルがブラウザで開きます。ペア A だけで握手する日は <code>./koch4/start.sh handshake --pair A</code>（ペア B を VR に使っていても同時に動かせます）。</li>
+<pre>cd twinarm/discovery/koch
+./start.sh handshake</pre>
+  フォロワーが 1.5 秒かけてリーダーの姿勢に合流し、パネルがブラウザで開きます。ペア A だけで握手する日は <code>./start.sh handshake --pair A</code>（ペア B を VR に使っていても同時に動かせます）。</li>
   <li>リーダーを動かし、フォロワーが付いてくることを 2 組とも確かめる。</li>
 </ol>
 </div>
@@ -142,13 +142,13 @@
 </tbody>
 </table>
 <p>無線が安定しないときは、フォロワーを操作者側の Mac に USB で繋ぎ替えて、有線で起動します。設定ファイルは同じものを使えます。</p>
-<pre>./koch4/start.sh handshake --follower wired</pre>
+<pre>./start.sh handshake --follower wired</pre>
 
 <!-- ===================================================== -->
 <h2 id="s6">6. 握る物と握力</h2>
 <ul>
   <li>フォロワーの握る力には上限（<code>--grip-ma</code>・既定 500 mA）を掛けています。上限が無いと、物を握ったままサーボが力を出し続けて過負荷で止まり、物を落とします。</li>
-  <li>握力が足りないときは 600、700 と上げ、止まりやすいときは 400、350 と下げます。操作者側は <code>GRIP_MA=400 ./koch4/start.sh handshake</code>、握手用の Mac は <code>GRIP_MA=400 ./koch4/start.sh host A ＜ポート＞</code>。</li>
+  <li>握力が足りないときは 600、700 と上げ、止まりやすいときは 400、350 と下げます。操作者側は <code>GRIP_MA=400 ./start.sh handshake</code>、握手用の Mac は <code>GRIP_MA=400 ./start.sh host A ＜ポート＞</code>。</li>
   <li>物を持たせるなら、卓球ボール（直径 40 mm）が安全です。ゴルフボールは重さと滑りやすさで限界に近く、落としやすくなります。指先に滑り止めのテープを貼ると持ちやすくなります。</li>
   <li>動きを穏やかにするには <code>--extra "--max-rel 15"</code> を付けて起動します（1 回に動く量の上限。既定 20）。</li>
 </ul>
@@ -169,7 +169,7 @@
 <tr><td>「通信断 → 再接続中」</td><td>USB の接触。手を離して 2 秒待つ。続くならケーブルとハブの電源</td></tr>
 <tr><td>握っても押し返さない</td><td>起動時の表示に <code>Operating_Mode=5 / Position_P_Gain=800</code> が出ているか。パネルのモードが gripper か</td></tr>
 <tr><td>リーダーとフォロワーの姿勢が合わない</td><td>両方の腕を同じ姿勢に手で持ち、ずれを数値で見る。3% を超える関節は較正をやり直す
-<pre class="mb-0">uv run python koch4/koch4_calib_offset.py --leader-port ＜L＞ --follower-port ＜F＞ --leader-id koch_leader_A --follower-id koch_follower_A</pre></td></tr>
+<pre class="mb-0">uv run koch-calib --leader-port ＜L＞ --follower-port ＜F＞ --leader-id koch_leader_A --follower-id koch_follower_A</pre></td></tr>
 </tbody>
 </table>
 

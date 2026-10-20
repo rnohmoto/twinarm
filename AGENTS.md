@@ -9,13 +9,15 @@ development commands.
 
 ## Working in this repo
 
-- Run `uv` commands inside the subproject you are changing (`twinarm/` or `discovery/`), and `npm`
+- Run `uv` commands inside the subproject you are changing (`twinarm/`, `discovery/koch/` or
+  `discovery/dobot/`), and `npm`
   commands inside `twinarm-web-ui/`. The root project is configuration only — never run `uv sync` or
   `npm install` at the root.
 - After changing code, run the affected subproject's checks before you finish and make them pass:
-  `mise run check` in `twinarm/` and `twinarm-web-ui/`, or the ruff and ty commands directly in
-  `discovery/`, which has no tasks. If it reports formatting violations, run `mise run format` and
-  re-run it. From the root, `mise run check` runs both task-based subprojects at once.
+  `mise run check` in `twinarm/`, `twinarm-web-ui/` and `discovery/koch/`, or the ruff and ty
+  commands directly in `discovery/dobot/`, which has no tasks. If it reports formatting violations,
+  run `mise run format` and re-run it. From the root, `mise run check` runs the three task-based
+  subprojects at once.
 - Do not add dependencies, entry points, or top-level directories without an explicit request.
 
 ## Hardware safety
@@ -31,13 +33,14 @@ The scripts in `discovery/` drive real robot arms.
 
 ## Testing and CI
 
-Both task-based subprojects run their tests as part of `mise run check`. Inside either one,
+The task-based subprojects run their tests as part of `mise run check`. Inside any of them,
 `mise run test --coverage` reports line coverage. Playwright is deliberately **not** part of
-`check`; run `mise run e2e` in `twinarm-web-ui/` when it matters. `discovery/` has no tests and no
-tasks: its scripts need arms attached.
+`check`; run `mise run e2e` in `twinarm-web-ui/` when it matters. `discovery/koch/` runs its
+offline tests in `check`; its simbus rehearsal is `mise run rehearse` (about three minutes, run it
+alone, not part of `check`). `discovery/dobot/` has no tasks: its scripts need hardware.
 
 CI is GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), running the same mise
-tasks a developer runs locally. `discovery/` is excluded because it needs real hardware.
+tasks a developer runs locally. `discovery/dobot/` is excluded because it needs real hardware.
 
 Report what actually ran. Never claim tests passed on output you did not see.
 
@@ -63,5 +66,6 @@ When working inside a subdirectory, read its AGENTS.md first:
 
 - The root `pyproject.toml` has a `[tool.lint.isort]` table that has no effect; ruff would need
   `[tool.ruff.lint.isort]`. Known — leave it unless the user asks.
-- All three `pyproject.toml` files still carry the placeholder `description = "Add your description
-  here"`, and `discovery/` reuses the `twinarm` package name. Known — leave them unless the user asks.
+- The root, `twinarm/` and `discovery/` `pyproject.toml` files still carry the placeholder
+  `description = "Add your description here"`, and `discovery/` (now configuration-only) reuses the
+  `twinarm` package name. Known — leave them unless the user asks.

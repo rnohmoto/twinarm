@@ -1,24 +1,18 @@
 # Discovery (sandbox)
 
-Hardware experiment sandbox for the Koch v1.1 arms. The scripts live in [`mock/v0/`](mock/v0/) and are flat and standalone — no package
-structure, no shared modules, and some deliberate duplication between them. Run them from this
-directory so `uv run` picks up the environment here.
+Hardware experiment sandboxes for the robot arms. Each one is its own uv project; this directory
+only holds the ruff configuration they share (`pyproject.toml`, no dependencies — never `uv sync`
+here). Part of the TwinArm monorepo; see [`../README.md`](../README.md) for requirements and setup.
 
-Part of the TwinArm monorepo; see [`../README.md`](../README.md) for requirements and setup.
+| Folder | What it is |
+| ------ | ---------- |
+| [`koch/`](koch/README.md) | The Koch v1.1 arms bench: the `koch` package and console scripts (teleop with force feedback, two-pair launcher, VR bridge, panel, wireless follower host, bus tools), the Learning Fest runbooks under `koch/docs/`, and a rehearsal harness that needs no arms. A new session starts at [`koch/docs/HANDOFF.md`](koch/docs/HANDOFF.md). Successor of the `mock/v0/` scripts and of `koch4/` (both in git history). |
+| [`dobot/`](dobot/README.md) | Dobot Magician pick-and-place sandbox: overhead camera → homography → pydobot. |
+| [`mock/v1/ui/`](mock/v1/ui/README.md) | A static HTML mock of a next-generation dual-arm teleoperation cockpit — the design successor to the panel in `koch/`. Simulated data only (open `index.html` in a browser; no hardware, no risk). |
 
-## Quick start
+## Risk classes
 
-```bash
-uv sync
-uv run python mock/v0/koch_scan.py /dev/tty.usbmodem<XXXX>
-```
-
-`koch_scan.py` is the safe place to start: it only broadcast-pings the bus and prints the motors it
-finds. Everything else needs more care — check the risk column below first.
-
-## Script inventory
-
-All scripts below live in [`mock/v0/`](mock/v0/). Risk classes:
+Every script inventory in these folders uses the same classes:
 
 - **read-only** — reads registers only.
 - **torque off** — releases the motors; an arm held up by torque will drop when it runs.
@@ -27,41 +21,10 @@ All scripts below live in [`mock/v0/`](mock/v0/). Risk classes:
 - **writes motor config** — writes EEPROM (motor IDs and similar); undoing it is a manual job.
 - **network only** — no serial access of its own.
 
-| Script | Purpose | Hardware risk | Extra I/O |
-| ------ | ------- | ------------- | --------- |
-| `koch_scan.py` | Broadcast-ping an assembled arm at 1 Mbps and 57600 bps; prints ID, model and firmware for every motor found. | read-only | — |
-| `koch_read_loop.py` | Read the positions of IDs 1–6 for 30 s and report success/failure counts — a comms stability test. | read-only | — |
-| `koch_calib_offset.py` | Compare leader and follower calibration: raw ticks and normalized position per joint, to quantify a zero-point or range mismatch. Both arms must be held in the same pose by hand. | torque off (both arms) | reads calibration JSON |
-| `koch_current_monitor.py` | Real-time current/load plots for one or two arms, with per-axis statistics on exit. Cannot share a port with a running teleop session. | read-only by default; `--torque on` energizes | CSV out (`--csv`) |
-| `koch_set_id.py` | Change one motor's Dynamixel ID. Refuses to run unless exactly one motor is on the bus. | writes motor config | — |
-| `setup_follower_id.py` | Run lerobot's `KochFollower.setup_motors()` for the follower arm. The port is hard-coded — edit it before use. | writes motor config | — |
-| `koch_teleop_robust.py` | Wrapper around `lerobot-teleoperate` that retries `sync_read` 10× and reconnects up to 20 times after a comms loss. Takes the same arguments as `lerobot-teleoperate`. | moves motors | — |
-| `koch_teleop_plus.py` | Successor to the above: a custom teleop loop built on lerobot classes, with optional force feedback (`--ff gripper`, `--ff arm`), telemetry, and auto-reconnect. Can launch the two viewers below via `--plot` and `--panel`. | moves motors; force feedback puts leader joints into current control | UDP telemetry out :8765, control in :8766, CSV out (`--csv`) |
-| `koch_live_plot.py` | matplotlib viewer for teleop telemetry: leader command, follower position, the L−F error, and currents. | network only | UDP in :8765 |
-| `koch_web_panel.py` | Stdlib-only browser control panel with Canvas graphs. Switches force-feedback mode, resyncs, or stops a running teleop session. | network only, but it commands a live teleop session | HTTP :8780 (SSE), UDP in :8765, control out :8766 |
+The safe place to start on an unknown arm is `koch-scan` (read-only: it pings the bus at both bauds
+and prints the motors it finds):
 
-## koch4 — two pairs, dedicated config/work folders, VR virtual wall
-
-[`koch4/`](koch4/README.md) is the next generation of the v0 scripts for the four-arm
-(two-pair) setup: one merged teleop (`koch4_teleop.py`, the v0 script plus the
-2026-09-04 gripper fixes and the error-reflection style), a two-pair launcher, the web
-panel, and a VR bridge that lets the leader gripper "grasp" a virtual object rendered by
-the servo's own position loop. Calibration JSON, config and logs live under
-`koch4/config/` and `koch4/work/` instead of `~/.cache`. Its README lists every script
-with the same risk classes as the table above; the same hardware rules apply. A new
-session should start at [`koch4/HANDOFF.md`](koch4/HANDOFF.md).
-
-## UI mocks
-
-[`mock/v1/ui/`](mock/v1/ui/README.md) is a static HTML mock of a next-generation dual-arm
-teleoperation cockpit — the design successor to `koch_web_panel.py`. It runs on simulated data only
-(open `index.html` in a browser; no hardware, no risk) and its README documents the scenarios it can
-play back.
-
-## Notes
-
-- Some docstrings still say `conda activate twinarm`. That is stale — this project uses uv.
-- `pyproject.toml` and `uv.lock` here are a copy of the ones in `twinarm/`, package name included. They
-  exist only to pin dependencies for `uv run`; nothing is built or published from this directory.
-- The force-feedback design in `koch_teleop_plus.py` — gain caps, current limits, and the thermal
-  cut-off — is documented in that script's module docstring. Read it before changing feedback gains.
+```bash
+cd koch && uv sync
+uv run koch-scan /dev/tty.usbmodem<XXXX>
+```

@@ -20,8 +20,8 @@
 
 | 役 | 機材 | 起動 | ページ |
 | --- | --- | --- | --- |
-| MacBook Pro 1 | リーダー B（5 V）＋ Quest Pro #1（データ対応 USB-C） | `koch4/mac/3_VR1人目_リーダーB.command`（＝`koch.sh vr-leader`） | ゴーグル `http://localhost:8444/`、Mac の操作ページ `…?spectator=1&info=1` |
-| MacBook Pro 2 | フォロワー B（12 V）＋ Quest Pro #2 | `koch4/mac/4_VR2人目_フォロワーB.command`（＝`koch.sh vr-follower`） | ゴーグル `http://localhost:8443/`、Mac の操作ページ同様 |
+| MacBook Pro 1 | リーダー B（5 V）＋ Quest Pro #1（データ対応 USB-C） | `mac/3_VR1人目_リーダーB.command`（＝`koch.sh vr-leader`） | ゴーグル `http://localhost:8444/`、Mac の操作ページ `…?spectator=1&info=1` |
+| MacBook Pro 2 | フォロワー B（12 V）＋ Quest Pro #2 | `mac/4_VR2人目_フォロワーB.command`（＝`koch.sh vr-follower`） | ゴーグル `http://localhost:8443/`、Mac の操作ページ同様 |
 | 予備 | Quest Pro #3・ペア A（同じ .command の A 版） | `PAIR=A` | 8445 / 8446 |
 
 ポート: ブリッジ HTTP 8444（B リーダー）/ 8443（B フォロワー）/ 8445（A リーダー）/ 8446（A フォロワー）。
@@ -36,7 +36,7 @@ teleop のテレメトリ・制御は 8770/8768（B リーダー）・8773/8772�
 | FR-3 | **ゴーグルの中で合わせる**: 分身の近くでつまむ／グリップを握ったまま動かすと台が手に貼り付いて動く。離して 1.5 秒で保存＝アンカー登録。音で合図 | 確認済み 10/19（「だいたい合った」＝ユーザー） |
 | FR-4 | **AR 中は UI 無しで完結**: Quest Browser は DOM overlay を描かないので、ゴーグルの中はつかむ・握る・音だけ。細かい操作は Mac の操作ページから遠隔で（位置合わせ C の開始／確定／取消／中止・アンカー解除・再読込・配置リセット・高さ ±1 cm・置き場所 近く／遠く） | 実装 10/19（判断）。ゴーグルの状態（点数・残差・アンカー）は Mac の操作ページに 1 秒ごとに表示 |
 | FR-5 | **設定の即時反映**: Mac で保存した設定（高さ・置き場所・物の硬さ）は、ゴーグルのページが 1 秒以内に読み直す（再読込なし・AR 継続） | 実装 10/19（判断） |
-| FR-6 | **Quest の接続維持**: USB が再列挙されて reverse が消えても、2 秒以内に張り直し、ページは開いたまま復帰する。許可（USB デバッグ）が未だなら待つ | 確認済み 10/19（見張りスクリプトで 2 回自動復帰）→ `koch4_quest_usb.py --watch` に実装 |
+| FR-6 | **Quest の接続維持**: USB が再列挙されて reverse が消えても、2 秒以内に張り直し、ページは開いたまま復帰する。許可（USB デバッグ）が未だなら待つ | 確認済み 10/19（見張りスクリプトで 2 回自動復帰）→ `quest_usb.py --watch` に実装 |
 | FR-7 | **物の配置**: 台から 12〜15 cm、物が乗る面は台の底から +4 cm（`desk.y`）。的は置き場所の平均距離 × 0.65 の弧。すべて編集モードと操作ページから変えられる | 実装 10/19。数値の最終判断はユーザー（距離・高さ） |
 | FR-8 | **2 人目（フォロワー機を手で）**: 接続直後にトルクを抜き、gripper だけ壁、肘は電流・肩は PWM で重さ、摩擦アシスト。Mac 2 で `vr-follower` | 実装済み（10/5）。Mac 2 ＋ Quest #2 の実機は未 |
 | FR-9 | **観客ページ**: `?spectator=1`（接触を送らない）に `&view=top` などの視点。操作ページは `&info=1` を足したもの | 実装済み |
@@ -48,7 +48,7 @@ teleop のテレメトリ・制御は 8770/8768（B リーダー）・8773/8772�
 - 復帰: USB 切断から 4 秒以内に reverse 復帰、AR は途切れない。ゴーグルを外して戻っても、アンカーで位置は保たれる。
 - 会場: ネット不要（Quest は USB、Mac 間通信なし）。初回のみ uv sync と three.js 取得にネットが要る。
 - 電池: Quest Pro は USB（Mac 給電）で約 1 時間 98→99〜100%（減らないが安定して充電もしない・10/19）。
-- 記録: 各プロセスの標準出力は `koch4/work/logs/`（`solo_<腕>_vr.log`・`quest_<腕>.log`・teleop は窓に出る）。
+- 記録: 各プロセスの標準出力は `work/logs/`（`solo_<腕>_vr.log`・`quest_<腕>.log`・teleop は窓に出る）。
 
 ## 5. 制約・前提（実機で判明したこと）
 
@@ -65,12 +65,12 @@ teleop のテレメトリ・制御は 8770/8768（B リーダー）・8773/8772�
 
 ## 6. 設計判断（判断）
 
-- **起動の正本は `koch4/mac/koch.sh`**（`.command` はその呼び出し）。`start.sh vr` も残すが、Quest の見張りと操作ページは `koch.sh` 側だけ。
+- **起動の正本は `mac/koch.sh`**（`.command` はその呼び出し）。`start.sh vr` も残すが、Quest の見張りと操作ページは `koch.sh` 側だけ。
 - **ブリッジに操作キュー `/op` と状態報告 `/status`** を足し、`/state` に `op`・`page`・`cfg_version` を載せる。ページはこれだけ見て動く（adb や DevTools に依存しない）。開いた時点より前の操作は実行しない。
 - **操作ページ＝同じ VR ページの観客モード＋文字**（`?spectator=1&info=1`）。接触を送らず、ゴーグルのページに操作を送る。
-- **fest 設定 `config/koch4_config.fest.json`** を git に入れ、Mac ごとの `koch4_config.json` が無ければ写す。ポートはシリアル番号で解決する（`koch.sh` が pyserial で現在の名前を探す）。
+- **fest 設定 `config/config.fest.json`** を git に入れ、Mac ごとの `config.json` が無ければ写す。ポートはシリアル番号で解決する（`koch.sh` が pyserial で現在の名前を探す）。
 - **物が乗る面の高さ `scene.desk.y`** を設定に追加（既定 0、フェスの設定ファイルは 0.04）。物理の床・的・置き場所がその面に乗る。
-- Mac からの遠隔操作の予備経路として Chrome DevTools（`koch4_quest_usb.py --devtools` で 9222 を forward、`koch4.startCalib()` など）も残す。
+- Mac からの遠隔操作の予備経路として Chrome DevTools（`quest_usb.py --devtools` で 9222 を forward、`koch4.startCalib()` など）も残す。
 
 ## 7. 受け入れ基準（CHECKLIST との対応）
 

@@ -1,9 +1,10 @@
 """Force-feedback laws for the leader gripper.
 
-Pure functions over frozen dataclasses: no I/O, no lerobot, no serial. The
-hardware scripts in ``discovery/koch4/`` mirror these functions verbatim
-because that sandbox cannot import this package (separate uv projects); keep
-the two copies in sync by hand and let the tests here pin the semantics.
+Pure functions over frozen dataclasses: no I/O, no lerobot, no serial.
+``discovery/koch/src/koch/feedback.py`` mirrors this module verbatim because
+that sandbox cannot import this package (separate uv projects); its
+``test_mirror`` compares the two by syntax tree, and the tests here pin the
+semantics.
 
 Ubiquitous language (see ``README.md``): currents in milliamps; the gripper
 opening in lerobot's normalized 0-100 range (0 = calibrated closed end,
@@ -151,7 +152,8 @@ class VirtualWall:
     ``width`` is the normalized opening at which the fingers first touch the
     object; ``p_gain`` is the servo position-loop gain (perceived stiffness);
     ``cap_ma`` the Goal_Current that bounds the rendered force; ``release`` the
-    hysteresis above ``width`` before the wall lets go.
+    hysteresis above ``width`` before the wall lets go; ``mass_g`` the mass the
+    weight law renders on the arm while the object is held (0 = weightless).
     """
 
     name: str
@@ -159,6 +161,7 @@ class VirtualWall:
     p_gain: int = 800
     cap_ma: int = 300
     release: float = 1.0
+    mass_g: float = 0.0
 
 
 @dataclass(frozen=True)

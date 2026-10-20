@@ -66,6 +66,30 @@ from datetime import datetime
 from pathlib import Path
 from typing import TypedDict
 
+from koch.feedback import (
+    JOINT_SPAN_DEG,
+    LINK_M,
+    ErrorReflectionLaw,
+    ErrorReflectionState,
+    HandAssistLaw,
+    HandAssistState,
+    JointMap,
+    SpringLaw,
+    SpringState,
+    ThermalGuard,
+    VirtualWall,
+    VirtualWeightLaw,
+    VirtualWeightState,
+    error_reflection_step,
+    hand_assist_step,
+    norm_to_rad,
+    spring_step,
+    thermal_derate,
+    tip_levers,
+    virtual_wall_step,
+    virtual_weight_step,
+    wall_tick,
+)
 from koch.paths import CONFIG_DIR, WORK_DIR
 
 _reconfigure = getattr(sys.stdout, "reconfigure", None)
@@ -128,16 +152,6 @@ DEVICE_MODELS: dict[str, DeviceModel] = {
         ],
     },
 }
-JOINT_SPAN_DEG = {
-    "shoulder_pan": 180.0,
-    "shoulder_lift": 100.0,
-    "elbow_flex": 100.0,
-    "wrist_flex": 100.0,
-    "wrist_roll": 180.0,
-}
-LINK_M = (0.11, 0.108, 0.115)  # 上腕・前腕・手首＋グリッパ先端まで(分身モデルと同じ)
-G_MPS2 = 9.81
-KT_NM_PER_A = 0.146  # XL330-M077 5V ストール値(0.215 N*m / 1.47 A)
 # 位置ループ剛性。既定のままでは偏差 158 ticks で ~124mA しか要求せず、Goal_Current を
 # 450 まで上げても実電流が頭打ち（9/4 実測）。Operating_Mode を書くと既定へ戻るので
 # 必ずモード設定の後に書く。
@@ -157,8 +171,6 @@ PWM_CAP_MAX = 400  # 肩 PWM の上限(885 = 100 %)。400 ≈ 45 % ≈ 0.68 N*m
 PWM_LIMIT_DEFAULT = 885
 MODE_PWM = 16
 MODE_EXTENDED_POSITION = 4
-FREE_SPACE_P_GAIN = 800
-STALL_FRAMES_MAX = 10
 MAX_RECONNECTS = 20
 TEMP_CHECK_EVERY = 60  # frames (2 s at 30 fps)
 WALL_TTL_SEC = (
@@ -184,284 +196,6 @@ class _DropClampWarning(logging.Filter):
 
 
 logging.getLogger().addFilter(_DropClampWarning())
-
-
-# ==================================================================== laws
-# twinarm/src/twinarm/domain/gripper_feedback.py の写し（同期を保つこと）
-
-
-@dataclass(frozen=True)
-class SpringLaw:
-    """Follower current -> leader return-spring current (Operating_Mode 5)."""
-
-    gain: float = 1.5
-    floor_ma: int = 60
-    cap_ma: int = 450
-    deadband_ma: int = 25
-    alpha: float = 0.2
-
-
-@dataclass(frozen=True)
-class SpringState:
-    """Smoothed follower current and the last commanded current."""
-
-    ema: float = 0.0
-    command_ma: int = 0
-
-
-def spring_step(law, state, follower_current_ma):
-    """Advance the spring law by one frame."""
-    magnitude = max(abs(follower_current_ma) - law.deadband_ma, 0.0)
-    ema = (1.0 - law.alpha) * state.ema + law.alpha * magnitude
-    command = int(min(law.floor_ma + law.gain * ema, law.cap_ma))
-    return SpringState(ema=ema, command_ma=command)
-
-
-@dataclass(frozen=True)
-class ErrorReflectionLaw:
-    """Leader-minus-follower position error -> signed leader current (mode 0)."""
-
-    ke: float = 9.0
-    deadband: float = 6.0
-    sign: int = 1
-    cap_ma: int = 450
-    slew_ma: int = 90
-    move_eps: float = 0.4
-    stall_frames: int = 3
-    alpha: float = 0.3
-    release: float = 0.5
-
-
-@dataclass(frozen=True)
-class ErrorReflectionState:
-    """Stall detector state, smoothed target and the last commanded current."""
-
-    prev_follower_pos: float | None = None
-    stall_frames: int = 0
-    ema: float = 0.0
-    command_ma: int = 0
-
-
-def error_reflection_step(law, state, leader_cmd, follower_pos):
-    """Advance the error-reflection law by one frame."""
-    moving = (
-        state.prev_follower_pos is not None
-        and abs(follower_pos - state.prev_follower_pos) > law.move_eps
-    )
-    stall = 0 if moving else min(state.stall_frames + 1, STALL_FRAMES_MAX)
-    error = leader_cmd - follower_pos
-    if abs(error) < law.deadband or stall < law.stall_frames:
-        target = 0.0
-    else:
-        over = error - (law.deadband if error > 0 else -law.deadband)
-        target = -law.ke * over * law.sign
-    ema = (1.0 - law.alpha) * state.ema + law.alpha * target
-    if target == 0.0:
-        ema *= law.release
-    raw = max(min(ema, law.cap_ma), -law.cap_ma)
-    command = int(
-        max(
-            min(raw, state.command_ma + law.slew_ma),
-            state.command_ma - law.slew_ma,
-        )
-    )
-    return ErrorReflectionState(
-        prev_follower_pos=follower_pos, stall_frames=stall, ema=ema, command_ma=command
-    )
-
-
-@dataclass(frozen=True)
-class VirtualWall:
-    """A virtual object the leader gripper can close on (normalized width)."""
-
-    name: str
-    width: float
-    p_gain: int = 800
-    cap_ma: int = 300
-    release: float = 1.0
-    mass_g: float = 0.0
-
-
-@dataclass(frozen=True)
-class WallCommand:
-    """Registers to write on the leader gripper for one frame."""
-
-    goal_position_tick: int
-    goal_current_ma: int
-    p_gain: int
-    engaged: bool
-
-
-def wall_tick(width, closed_tick, open_tick):
-    """Map a normalized opening (0-100) to a raw tick between the two ends."""
-    fraction = min(max(width, 0.0), 100.0) / 100.0
-    return round(closed_tick + fraction * (open_tick - closed_tick))
-
-
-def virtual_wall_step(wall, opening, closed_tick, open_tick, engaged):
-    """Decide whether the wall is engaged and what to write to the servo."""
-    if wall is None:
-        return WallCommand(open_tick, 0, FREE_SPACE_P_GAIN, False)
-    limit = wall.width + (wall.release if engaged else 0.0)
-    now_engaged = opening <= limit
-    return WallCommand(
-        goal_position_tick=wall_tick(wall.width, closed_tick, open_tick),
-        goal_current_ma=wall.cap_ma if now_engaged else 0,
-        p_gain=wall.p_gain,
-        engaged=now_engaged,
-    )
-
-
-@dataclass(frozen=True)
-class ThermalGuard:
-    """Servo temperature policy: derate at one threshold, stop at another."""
-
-    derate_c: int = 60
-    stop_c: int = 65
-    min_gain: float = 0.1
-
-
-def thermal_derate(guard, temp_c, gain):
-    """Return the gain to use and whether feedback must stop."""
-    if temp_c >= guard.stop_c:
-        return gain, True
-    if temp_c >= guard.derate_c:
-        return max(gain * 0.5, guard.min_gain), False
-    return gain, False
-
-
-@dataclass(frozen=True)
-class JointMap:
-    """How a normalized joint value (+-100) becomes a display/model angle."""
-
-    span_deg: float
-    offset_deg: float = 0.0
-    sign: int = 1
-
-
-def norm_to_rad(value, joint_map):
-    """Map a normalized joint value to radians with the joint's span, offset and sign."""
-    degrees = value / 100.0 * joint_map.span_deg / 2.0 + joint_map.offset_deg
-    return joint_map.sign * math.radians(degrees)
-
-
-def tip_levers(lift_rad, elbow_rad, wrist_rad, links=LINK_M):
-    """Horizontal lever arms [m] of the tip about shoulder_lift and elbow (0 rad = up)."""
-    a1 = lift_rad
-    a2 = a1 + elbow_rad
-    a3 = a2 + wrist_rad
-    x1 = links[0] * math.sin(a1)
-    x2 = x1 + links[1] * math.sin(a2)
-    x3 = x2 + links[2] * math.sin(a3)
-    return x3, x3 - x1
-
-
-@dataclass(frozen=True)
-class VirtualWeightLaw:
-    """Render a grasped object's weight as current on the leader's lift and elbow."""
-
-    scale: float = 0.12
-    cap_ma: int = 120
-    alpha: float = 0.2
-    release: float = 0.5
-    invert_shoulder: bool = False
-    invert_elbow: bool = False
-    kt_nm_per_a: float = KT_NM_PER_A
-    shoulder_gain_per_nm: float | None = None
-    shoulder_cap: float | None = None
-
-
-@dataclass(frozen=True)
-class VirtualWeightState:
-    """Smoothed outputs for shoulder_lift and elbow_flex (mA, or PWM counts for a PWM shoulder)."""
-
-    shoulder_ma: float = 0.0
-    elbow_ma: float = 0.0
-
-
-def _weight_target_ma(law, torque_nm, invert):
-    physical_ma = torque_nm / law.kt_nm_per_a * 1000.0
-    target = max(min(physical_ma * law.scale, law.cap_ma), -law.cap_ma)
-    return -target if invert else target
-
-
-def _shoulder_target(law, torque_nm):
-    if law.shoulder_gain_per_nm is None:
-        return _weight_target_ma(law, torque_nm, law.invert_shoulder)
-    cap = law.cap_ma if law.shoulder_cap is None else law.shoulder_cap
-    target = max(min(torque_nm * law.shoulder_gain_per_nm, cap), -cap)
-    return -target if law.invert_shoulder else target
-
-
-def virtual_weight_step(law, state, engaged, mass_g, levers_m):
-    """Advance the weight law by one frame; releases decay faster than they rise."""
-    if engaged and mass_g > 0.0:
-        force_n = mass_g / 1000.0 * G_MPS2
-        target_s = _shoulder_target(law, force_n * levers_m[0])
-        target_e = _weight_target_ma(law, force_n * levers_m[1], law.invert_elbow)
-        alpha = law.alpha
-    else:
-        target_s = target_e = 0.0
-        alpha = law.release
-    return VirtualWeightState(
-        shoulder_ma=(1.0 - alpha) * state.shoulder_ma + alpha * target_s,
-        elbow_ma=(1.0 - alpha) * state.elbow_ma + alpha * target_e,
-    )
-
-
-@dataclass(frozen=True)
-class HandAssistLaw:
-    """Cancel part of the gear friction of a joint that a person moves by hand.
-
-    A Koch follower used as a hand-moved input device has 288:1 gears (XL330-M288),
-    so it feels heavy even with no force commanded. The law adds a small current
-    along the measured motion: ``gain_ma_s`` mA per normalized unit/s above
-    ``deadband``, capped at ``cap_ma``. The cap must stay below the joint's own
-    friction, otherwise the joint keeps moving after the hand lets go; above
-    ``max_speed`` (nobody moves it that fast on purpose) the assist cuts out.
-    ``invert`` flips the current for a joint whose positive current lowers the
-    normalized position.
-    """
-
-    gain_ma_s: float = 1.5
-    cap_ma: int = 25
-    deadband: float = 5.0
-    max_speed: float = 300.0
-    alpha: float = 0.4
-    slew_ma: int = 8
-    invert: bool = False
-
-
-@dataclass(frozen=True)
-class HandAssistState:
-    """Last position, smoothed speed [normalized unit/s] and commanded current [mA]."""
-
-    position: float | None = None
-    speed: float = 0.0
-    command_ma: int = 0
-
-
-def hand_assist_step(law, state, position, dt):
-    """Advance the assist by one frame from the joint's normalized position."""
-    if state.position is None or dt <= 0.0:
-        return HandAssistState(position=position)
-    speed = (1.0 - law.alpha) * state.speed + law.alpha * (
-        position - state.position
-    ) / dt
-    magnitude = abs(speed)
-    if magnitude <= law.deadband or magnitude > law.max_speed:
-        target = 0.0
-    else:
-        target = min(law.gain_ma_s * (magnitude - law.deadband), law.cap_ma)
-        if (speed < 0.0) != law.invert:
-            target = -target
-    command = max(
-        min(target, state.command_ma + law.slew_ma), state.command_ma - law.slew_ma
-    )
-    return HandAssistState(position=position, speed=speed, command_ma=round(command))
-
-
-# ================================================================ helpers
 
 
 def parse_wall(spec):
@@ -2083,11 +1817,11 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
 
     def weight_feedback(action, engaged):
         """One frame of virtual weight: grasped mass × tip lever → lift/elbow current."""
-        angles = [
+        lift, elbow, wrist = (
             norm_to_rad(float(action.get(f"{j}.pos", 0.0)), twin_map[j])
             for j in ("shoulder_lift", "elbow_flex", "wrist_flex")
-        ]
-        levers = tip_levers(*angles)
+        )
+        levers = tip_levers(lift, elbow, wrist)
         mass = wall[0].mass_g if wall[0] else 0.0
         vw_state[0] = virtual_weight_step(vw_law(), vw_state[0], engaged, mass, levers)
         outs = {

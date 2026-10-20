@@ -58,11 +58,16 @@ import socket
 import subprocess
 import sys
 import time
-from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
 from koch.console import install_clamp_filter, reconfigure_stdout
+from koch.control import (
+    parse_wall,
+    scale_wall,
+    twin_map_from_message,
+    wall_from_message,
+)
 from koch.feedback import (
     JOINT_SPAN_DEG,
     LINK_M,
@@ -121,47 +126,6 @@ WALL_TTL_SEC = (
 )
 TELEMETRY_HOST = "127.0.0.1"
 ALERT_TTL_SEC = 4.0
-
-
-def parse_wall(spec):
-    """Parse ``name:width[:p_gain[:cap_ma[:release[:mass_g]]]]`` into a VirtualWall."""
-    parts = spec.split(":")
-    if len(parts) < 2:
-        raise argparse.ArgumentTypeError(
-            "--wall は name:width[:p_gain[:cap_ma[:release[:mass_g]]]]"
-        )
-    name, width = parts[0], float(parts[1])
-    p_gain = int(parts[2]) if len(parts) > 2 else 800
-    cap = int(parts[3]) if len(parts) > 3 else 300
-    release = float(parts[4]) if len(parts) > 4 else 1.0
-    mass_g = float(parts[5]) if len(parts) > 5 else 0.0
-    return wall_from_fields(name, width, p_gain, cap, release, mass_g)
-
-
-def wall_from_fields(name, width, p_gain, cap_ma, release, mass_g=0.0):
-    """Build a VirtualWall with every field clamped to a safe range."""
-    return VirtualWall(
-        name=str(name)[:32],
-        width=min(max(float(width), 0.0), 100.0),
-        p_gain=int(min(max(int(p_gain), 0), 16383)),
-        cap_ma=int(min(max(int(cap_ma), 0), FF_CAP_MAX_MA)),
-        release=min(max(float(release), 0.0), 20.0),
-        mass_g=min(max(float(mass_g), 0.0), 2000.0),
-    )
-
-
-def wall_from_message(payload):
-    """Turn the ``vwall`` field of a control message into a VirtualWall or None."""
-    if not payload:
-        return None
-    return wall_from_fields(
-        payload.get("name", "obj"),
-        payload.get("width", 50.0),
-        payload.get("p_gain", 800),
-        payload.get("cap_ma", 300),
-        payload.get("release", 1.0),
-        payload.get("mass_g", 0.0),
-    )
 
 
 def selftest():
@@ -913,14 +877,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         print(f"[vw] 重さ cap は安全のため最大{ARM_CAP_MAX_MA}mAに制限しました")
     guard = ThermalGuard()
     viz_ports = parse_ports(args.viz_port)
-    if args.wall is not None and wall_scale != 1.0:
-        args.wall = replace(
-            args.wall, cap_ma=round(args.wall.cap_ma * wall_scale)
-        )  # 機種差の換算(M288 は同じ電流で約 2.4 倍の力)
-    if args.wall is not None and args.wall.cap_ma > args.ff_cap:
-        args.wall = replace(
-            args.wall, cap_ma=int(args.ff_cap)
-        )  # 固定壁も --ff-cap を超えない
+    # 機種差の換算(M288 は同じ電流で約 2.4 倍の力)と --ff-cap の頭打ち
+    args.wall = scale_wall(args.wall, wall_scale, args.ff_cap)
 
     KochFollower, KochFollowerConfig, KochLeader, KochLeaderConfig, retry_errors = (
         load_lerobot()
@@ -1215,14 +1173,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
 
     def update_twin_map(payload):
         """Take the joint spans/offsets/signs the bridge uses for the twin (weight FK)."""
-        joints = (payload or {}).get("joints", {})
-        for j, m in joints.items():
-            if j in twin_map and isinstance(m, dict):
-                twin_map[j] = JointMap(
-                    float(m.get("span_deg", twin_map[j].span_deg)),
-                    float(m.get("offset_deg", twin_map[j].offset_deg)),
-                    1 if int(m.get("sign", twin_map[j].sign)) >= 0 else -1,
-                )
+        twin_map.update(twin_map_from_message(twin_map, payload))
 
     def set_ff_mode(new):
         """Switch FF mode from the panel / bridge (off/gripper/arm/vwall) with cleanup."""
@@ -1298,15 +1249,10 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             if "mode" in cmd:
                 set_ff_mode(cmd["mode"])
             if "vwall" in cmd:
-                wall[0] = wall_from_message(cmd["vwall"])
-                if wall[0] is not None and wall_scale != 1.0:
-                    wall[0] = replace(
-                        wall[0], cap_ma=round(wall[0].cap_ma * wall_scale)
-                    )  # 機種差の換算
-                if wall[0] is not None and wall[0].cap_ma > args.ff_cap:
-                    wall[0] = replace(
-                        wall[0], cap_ma=int(args.ff_cap)
-                    )  # ページ側の値も --ff-cap で頭打ち
+                # 機種差の換算と、ページ側の値も --ff-cap で頭打ち
+                wall[0] = scale_wall(
+                    wall_from_message(cmd["vwall"]), wall_scale, args.ff_cap
+                )
                 wall_expire[0] = time.monotonic() + WALL_TTL_SEC
             if cmd.get("resync"):
                 print("\n[ctl] 合流リセット")

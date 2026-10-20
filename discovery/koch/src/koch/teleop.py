@@ -114,6 +114,7 @@ from koch.motors import (
 )
 from koch.paths import CONFIG_DIR, WORK_DIR, calibration_dir
 from koch.remote_follower import RemoteFollower
+from koch.telemetry import TELEMETRY_HOST, parse_ports, telemetry_frame, viewer_commands
 
 DEFAULT_CONFIG_DIR = CONFIG_DIR
 DEFAULT_WORK_DIR = WORK_DIR
@@ -124,7 +125,6 @@ TEMP_CHECK_EVERY = 60  # frames (2 s at 30 fps)
 WALL_TTL_SEC = (
     3.0  # VR ブリッジからの壁更新が途絶えたら壁を解除する秒数(固定壁は無期限)
 )
-TELEMETRY_HOST = "127.0.0.1"
 ALERT_TTL_SEC = 4.0
 
 
@@ -775,36 +775,19 @@ def build_parser():
     return ap
 
 
-def parse_ports(spec):
-    """Turn '8765,8769' into [8765, 8769]; zero and blanks are dropped."""
-    ports = []
-    for part in str(spec).split(","):
-        part = part.strip()
-        if part and int(part) > 0:
-            ports.append(int(part))
-    return ports
-
-
 def spawn_viewers(args, viz_ports):
     """Start the plot / panel helper processes if asked; returns the Popen list."""
-    children = []
+    commands = viewer_commands(
+        plot=args.plot,
+        panel=args.panel,
+        cams=args.cams,
+        ctl_port=args.ctl_port,
+        viz_ports=viz_ports,
+    )
+    children = [subprocess.Popen(cmd) for cmd in commands]
     if args.plot and viz_ports:
-        cmd = [sys.executable, "-m", "koch.live_plot", "--port", str(viz_ports[0])]
-        children.append(subprocess.Popen(cmd))
         print("[plot] グラフビューアを自動起動しました")
     if args.panel and viz_ports:
-        cmd = [
-            sys.executable,
-            "-m",
-            "koch.panel",
-            "--telemetry",
-            str(viz_ports[0]),
-            "--ctl-port",
-            str(args.ctl_port),
-        ]
-        if args.cams:
-            cmd += ["--cams", args.cams]
-        children.append(subprocess.Popen(cmd))
         print("[panel] ブラウザ操作パネル自動起動 → http://127.0.0.1:8780")
     return children
 
@@ -1458,60 +1441,43 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         """Send one telemetry frame over UDP and append the CSV row."""
         engaged = bool(wall_cmd[0].engaged) if wall_cmd[0] else False
         if sock:
-            payload = json.dumps(
-                {
-                    "t": round(t, 3),
-                    "cur": {m: round(v, 1) for m, v in cur.items()},
-                    "pos": {
-                        k.replace(".pos", ""): round(float(v), 1)
-                        for k, v in action.items()
-                    },
-                    "fpos": {m: round(float(v), 1) for m, v in fpos.items()},
-                    "ff": ff_ma[0],
-                    "mode": args.ff,
-                    "temp": last_temp[0],
-                    "rec": reconnects[0],
-                    "n": n[0],
-                    "leader_only": leader_only,
-                    "arm": args.arm_label,
-                    "device": args.leader_type,
-                    "alerts": active_alerts(),
-                    "hw": dict(hw_bits),
-                    "link": (
-                        robot.link_stats()
-                        if isinstance(robot, RemoteFollower)
-                        else None
-                    ),
-                    "vw": {j: vw_out[j] for j in vw_joints} if vw_on else None,
-                    "vw_unit": (
-                        {j: ("PWM" if j in pwm_spec else "mA") for j in vw_joints}
-                        if vw_on
-                        else None
-                    ),
-                    "vwall": (
-                        {
-                            "name": wall[0].name,
-                            "width": wall[0].width,
-                            "engaged": engaged,
-                        }
-                        if (vwall_on and wall[0])
-                        else None
-                    ),
-                    "params": {
-                        "ff_gain": args.ff_gain,
-                        "ff_ke": args.ff_ke,
-                        "ff_cap": args.ff_cap,
-                        "ff_floor": args.ff_floor,
-                        "arm_gain": args.ff_arm_gain,
-                        "arm_cap": args.ff_arm_cap,
-                        "vw_scale": args.vw_scale,
-                        "vw_cap": args.vw_cap,
-                        "max_rel": (robot.config.max_relative_target or 0)
-                        if robot
-                        else 0,
-                    },
-                }
-            ).encode()
+            params = {
+                "ff_gain": args.ff_gain,
+                "ff_ke": args.ff_ke,
+                "ff_cap": args.ff_cap,
+                "ff_floor": args.ff_floor,
+                "arm_gain": args.ff_arm_gain,
+                "arm_cap": args.ff_arm_cap,
+                "vw_scale": args.vw_scale,
+                "vw_cap": args.vw_cap,
+                "max_rel": (robot.config.max_relative_target or 0) if robot else 0,
+            }
+            frame_dict = telemetry_frame(
+                t=t,
+                action=action,
+                cur=cur,
+                fpos=fpos,
+                ff_ma=ff_ma[0],
+                mode=args.ff,
+                temp=last_temp[0],
+                reconnects=reconnects[0],
+                n=n[0],
+                leader_only=leader_only,
+                arm_label=args.arm_label,
+                device=args.leader_type,
+                alerts=active_alerts(),
+                hw=hw_bits,
+                link=robot.link_stats() if isinstance(robot, RemoteFollower) else None,
+                vw_on=vw_on,
+                vw_joints=vw_joints,
+                pwm_joints=pwm_spec,
+                vw_out=vw_out,
+                vwall_on=vwall_on,
+                wall=wall[0],
+                wall_engaged=engaged,
+                params=params,
+            )
+            payload = json.dumps(frame_dict).encode()
             for port in viz_ports:
                 sock.sendto(payload, (TELEMETRY_HOST, port))
         if writer:

@@ -23,18 +23,11 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from dynamixel_sdk import PacketHandler, PortHandler
-
+from koch.dxl import open_port, s32
+from koch.motors import MOTORS
 from koch.paths import CONFIG_DIR, WORK_DIR
 
-JOINTS = [
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-    "gripper",
-]
+JOINTS = MOTORS  # bus order, IDs 1-6
 RANGED = ["shoulder_lift", "elbow_flex", "wrist_flex"]
 HOMED = ["shoulder_pan", "wrist_roll"]
 POSES = [
@@ -49,17 +42,9 @@ POSES = [
 ]
 
 
-def s32(v):
-    return v - (1 << 32) if v >= (1 << 31) else v
-
-
 class Arm:
     def __init__(self, port_name):
-        self.port = PortHandler(port_name)
-        self.packet = PacketHandler(2.0)
-        if not self.port.openPort():
-            sys.exit(f"ポートが開けません: {port_name}")
-        self.port.setBaudRate(1_000_000)
+        self.port, self.packet = open_port(port_name)
 
     def read1(self, dxl_id, addr, size):
         fn = {1: self.packet.read1ByteTxRx, 4: self.packet.read4ByteTxRx}[size]

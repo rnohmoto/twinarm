@@ -1,8 +1,11 @@
-"""Read-only register dump of several Koch buses and a side-by-side diff (NO writes)."""
+"""Read-only register dump of several Koch buses and a side-by-side diff (NO writes).
 
-import sys
+python -m koch.tools.reg_diff <label> <port> [<label> <port> ...]
+"""
 
-from dynamixel_sdk import PacketHandler, PortHandler
+import argparse
+
+from koch.dxl import open_port
 
 REGS = [  # (addr, size, name, area)
     (6, 1, "FW", "E"),
@@ -42,10 +45,7 @@ MODEL = {1060: "XL430", 1200: "M288", 1190: "M077"}
 
 
 def dump(port_name):
-    port = PortHandler(port_name)
-    packet = PacketHandler(2.0)
-    assert port.openPort(), port_name
-    port.setBaudRate(1_000_000)
+    port, packet = open_port(port_name)
     out = {}
     try:
         for i in range(1, 7):
@@ -67,16 +67,34 @@ def dump(port_name):
     return out
 
 
-labels = sys.argv[1::2]
-ports = sys.argv[2::2]
-dumps = {lab: dump(p) for lab, p in zip(labels, ports)}
-names = [r[2] for r in REGS]
-print(f"比較: {labels}")
-for i in range(1, 7):
-    diffs = []
-    for name in names:
-        vals = [dumps[lab].get(i, {}).get(name) for lab in labels]
-        if len(set(vals)) > 1:
-            diffs.append(f"{name}={'/'.join(str(v) for v in vals)}")
-    models = "/".join(str(dumps[lab].get(i, {}).get("model")) for lab in labels)
-    print(f"ID {i} [{models}]: " + ("差なし" if not diffs else "  ".join(diffs)))
+def build_parser():
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "pairs", nargs="+", metavar="LABEL PORT", help="label and port, repeated"
+    )
+    return ap
+
+
+def main():
+    ap = build_parser()
+    args = ap.parse_args()
+    if len(args.pairs) % 2:
+        ap.error("<label> <port> の組で渡してください")
+    labels, ports = args.pairs[0::2], args.pairs[1::2]
+    dumps = {lab: dump(p) for lab, p in zip(labels, ports)}
+    names = [r[2] for r in REGS]
+    print(f"比較: {labels}")
+    for i in range(1, 7):
+        diffs = []
+        for name in names:
+            vals = [dumps[lab].get(i, {}).get(name) for lab in labels]
+            if len(set(vals)) > 1:
+                diffs.append(f"{name}={'/'.join(str(v) for v in vals)}")
+        models = "/".join(str(dumps[lab].get(i, {}).get("model")) for lab in labels)
+        print(f"ID {i} [{models}]: " + ("差なし" if not diffs else "  ".join(diffs)))
+
+
+if __name__ == "__main__":
+    main()

@@ -25,38 +25,16 @@ import argparse
 import glob
 import json
 import os
-import sys
 import time
 from pathlib import Path
 
+from koch.console import reconfigure_stdout
+from koch.dxl import ADDR_PRESENT_POSITION, ADDR_TORQUE_ENABLE, open_port
+from koch.motors import MOTORS
 from koch.paths import CONFIG_DIR
 
-_reconfigure = getattr(sys.stdout, "reconfigure", None)
-if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
-    _reconfigure(errors="replace")
-
 DEFAULT_CONFIG_DIR = CONFIG_DIR
-ADDR_TORQUE_ENABLE = 64
-ADDR_PRESENT_POSITION = 132
-JOINTS = [
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-    "gripper",
-]
-
-
-def open_port(path):
-    """Open a Dynamixel port at 1 Mbps."""
-    from dynamixel_sdk import PacketHandler, PortHandler
-
-    port = PortHandler(path)
-    packet = PacketHandler(2.0)
-    if not port.openPort() or not port.setBaudRate(1000000):
-        raise SystemExit(f"ポートを開けません: {path}")
-    return port, packet
+JOINTS = MOTORS  # bus order, IDs 1-6
 
 
 def read_positions(port, packet, ids):
@@ -160,6 +138,7 @@ def report(ids, acc_l, acc_f, lcal, fcal):
 
 def main():
     """Entry point."""
+    reconfigure_stdout()
     args = build_parser().parse_args()
     ids = [int(x) for x in args.ids.split(",")]
     lport, lpkt = open_port(args.leader_port)

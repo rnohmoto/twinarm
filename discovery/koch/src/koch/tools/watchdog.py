@@ -22,14 +22,9 @@ import subprocess
 import time
 from pathlib import Path
 
-JOINTS = [
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-    "gripper",
-]
+from koch.motors import MOTORS
+
+JOINTS = MOTORS  # bus order, IDs 1-6
 
 
 def main():

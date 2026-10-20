@@ -1,61 +1,56 @@
-"""koch_current_monitor.py — 電流/負荷のリアルタイムグラフ + CSV 記録（単独実行用）v2.
+"""koch-current — 電流/負荷のリアルタイムグラフ + CSV 記録（単独実行用）.
 
-v2の変更: (1) --port2 で2台目(リーダー等)を同じウィンドウに重ね描き(1窓で両アーム)
-          (2) 軸ラベルをASCII化(Macのmatplotlib標準フォントに日本語がなく警告が出るため)
-          (3) 凡例の空警告を抑止
+テレオペを動かさずに、バスから直接 Present_Current（XL330: mA）/ Present_Load（XL430: %）を
+読んで描き、CSV に残す。--port2 で 2 台目（リーダー等）を同じ窓に重ね描き。
 
 注意: シリアルポートは排他なので、テレオペと同時には使えない。
-      テレオペ中のライブ表示は koch_teleop_plus.py + koch_live_plot.py を使う。
-      トルクOFFのモーターは駆動電流が流れないため電流はほぼ0が正常
-      (電流/負荷が意味を持つのはトルクON時か駆動中)。
+      テレオペ中のライブ表示は koch-teleop --plot（koch-plot）を使う。
+      トルク OFF のモーターは駆動電流が流れないため電流はほぼ 0 が正常
+      (電流/負荷が意味を持つのはトルク ON 時か駆動中)。
 
 使い方:
-  conda activate twinarm
-  # フォロワーのみ(従来どおり)
-  python mock/v0/koch_current_monitor.py <フォロワーのポート>
-  # 1窓で両アーム(フォロワー実線・リーダー破線。リーダーは全軸XL330なので--xl430-2は既定の空でよい)
-  python mock/v0/koch_current_monitor.py <フォロワーのポート> --port2 <リーダーのポート>
-  # トルクON(保持電流を観察=実験1-1)
-  python mock/v0/koch_current_monitor.py <ポート> --torque on --duration 60 --csv noise_on.csv
+  koch-current <フォロワーのポート>                       # フォロワーのみ
+  koch-current <フォロワーのポート> --port2 <リーダーのポート> # 1 窓で両アーム(実線/破線)
+  koch-current <ポート> --torque on --duration 60 --csv noise_on.csv   # トルク ON の保持電流
 終了: Ctrl+C または --duration 秒経過。終了時に軸ごとの統計(平均/標準偏差/p-p)を表示。
+CSV の既定は work/csv/currents_<日時>.csv。
+Risk class: energizes (--torque on は Torque_Enable を書く); 終了時に全モーターをトルク OFF にする。
 """
 
 import argparse
 import csv
-import os
-import sys
 import time
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 
-from dynamixel_sdk import GroupSyncRead, PacketHandler, PortHandler
-
-ADDR_TORQUE_ENABLE = 64
-ADDR_PRESENT_CURRENT = (
-    126  # XL330: Present_Current(1unit=1mA) / XL430: Present_Load(1unit=0.1%)
+from koch.dxl import (
+    ADDR_PRESENT_CURRENT,
+    ADDR_TORQUE_ENABLE,
+    JOINTS,
+    open_port,
+    to_signed16,
 )
-
-JOINT_NAMES = {
-    1: "shoulder_pan",
-    2: "shoulder_lift",
-    3: "elbow_flex",
-    4: "wrist_flex",
-    5: "wrist_roll",
-    6: "gripper",
-}
+from koch.paths import WORK_DIR
 
 
-def to_signed16(v):
-    """Two's complement of a 16-bit register value."""
-    return v - 65536 if v > 32767 else v
+def default_csv_path(now: datetime) -> Path:
+    """``work/csv/currents_<timestamp>.csv`` next to the teleop recordings."""
+    return WORK_DIR / "csv" / f"currents_{now:%Y%m%d_%H%M%S}.csv"
+
+
+def col_name(arm, i):
+    """CSV column of one motor: ``<tag>_id<n>_<joint>[unit]``."""
+    tag = f"{arm['tag']}_" if arm["tag"] else ""
+    unit = "%" if i in arm["xl430"] else "mA"
+    return f"{tag}id{i}_{JOINTS.get(i, '')}[{unit}]"
 
 
 def open_arm(tag, port_path, ids, xl430_ids, torque_on):
     """Open one bus, set torque on the listed motors and prepare a bulk reader."""
-    port = PortHandler(port_path)
-    packet = PacketHandler(2.0)
-    if not port.openPort() or not port.setBaudRate(1000000):
-        sys.exit(f"ポートを開けません: {port_path}")
+    from dynamixel_sdk import GroupSyncRead
+
+    port, packet = open_port(port_path)
     for i in ids:
         packet.write1ByteTxRx(port, i, ADDR_TORQUE_ENABLE, 1 if torque_on else 0)
     reader = GroupSyncRead(port, packet, ADDR_PRESENT_CURRENT, 2)
@@ -74,9 +69,11 @@ def open_arm(tag, port_path, ids, xl430_ids, torque_on):
     }
 
 
-def main():
-    """Sample currents from one or two arms, plot them live and write a CSV."""
-    ap = argparse.ArgumentParser()
+def build_parser():
+    """CLI of ``koch-current`` (the same flags as the v0 tool)."""
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument(
         "port", help="1台目(通常フォロワー)。例: /dev/tty.usbmodem5B141156401"
     )
@@ -102,8 +99,15 @@ def main():
     ap.add_argument("--hz", type=float, default=50, help="サンプリング周波数")
     ap.add_argument("--window", type=float, default=15, help="グラフの表示幅[秒]")
     ap.add_argument("--no-plot", action="store_true", help="グラフなし(CSVのみ)")
-    ap.add_argument("--csv", default=None, help="CSV出力先(省略時 logs/currents_*.csv)")
-    args = ap.parse_args()
+    ap.add_argument(
+        "--csv", default=None, help="CSV出力先(省略時 work/csv/currents_*.csv)"
+    )
+    return ap
+
+
+def main():
+    """Sample currents from one or two arms, plot them live and write a CSV."""
+    args = build_parser().parse_args()
 
     ids = [int(x) for x in args.ids.split(",")]
     torque_on = args.torque == "on"
@@ -127,23 +131,10 @@ def main():
             )
         )
 
-    csv_path = args.csv or os.path.join(
-        os.path.dirname(__file__) or ".",
-        "..",
-        "..",
-        "..",
-        "..",
-        "TacitCapture",
-        "logs",
-        f"currents_{datetime.now():%Y%m%d_%H%M%S}.csv",
+    csv_path = (
+        Path(args.csv).resolve() if args.csv else default_csv_path(datetime.now())
     )
-    csv_path = os.path.abspath(csv_path)
-    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
-
-    def col_name(arm, i):
-        tag = f"{arm['tag']}_" if arm["tag"] else ""
-        unit = "%" if i in arm["xl430"] else "mA"
-        return f"{tag}id{i}_{JOINT_NAMES.get(i, '')}[{unit}]"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     plot = not args.no_plot
     if plot:
@@ -163,7 +154,7 @@ def main():
                 ax = ax_pct if i in arm["xl430"] else ax_ma
                 label = (
                     f"{arm['tag']}:" if arm["tag"] else ""
-                ) + f"{i}:{JOINT_NAMES.get(i, '?')}"
+                ) + f"{i}:{JOINTS.get(i, '?')}"
                 (lines[(arm["tag"], i)],) = ax.plot(
                     [], [], style, label=label, linewidth=1.2
                 )
@@ -249,7 +240,7 @@ def main():
             sd = (sum((x - m) ** 2 for x in s) / len(s)) ** 0.5
             unit = "%" if i in arm["xl430"] else "mA"
             print(
-                f"  id{i} {JOINT_NAMES.get(i, ''):13s}: 平均 {m:7.1f} / SD {sd:6.1f} / "
+                f"  id{i} {JOINTS.get(i, ''):13s}: 平均 {m:7.1f} / SD {sd:6.1f} / "
                 f"p-p {max(s) - min(s):7.1f} [{unit}] (n={len(s)})"
             )
     print(f"CSV: {csv_path}")

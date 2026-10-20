@@ -8,26 +8,11 @@ import argparse
 import json
 from pathlib import Path
 
-from dynamixel_sdk import PacketHandler, PortHandler
+from koch.dxl import model_name, open_port, s32, to_signed16
+from koch.motors import MOTORS
 
-MODEL = {1060: "XL430-W250", 1200: "XL330-M288", 1190: "XL330-M077"}
-JOINTS = [
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-    "gripper",
-]
+JOINTS = MOTORS  # bus order, IDs 1-6
 HW_BITS = {0: "入力電圧", 2: "過熱", 3: "エンコーダ", 4: "電気ショック", 5: "過負荷"}
-
-
-def s32(v):
-    return v - (1 << 32) if v >= (1 << 31) else v
-
-
-def s16(v):
-    return v - (1 << 16) if v >= (1 << 15) else v
 
 
 def rd(packet, port, dxl_id, addr, size):
@@ -51,11 +36,7 @@ def main():
     )
     args = ap.parse_args()
 
-    port = PortHandler(args.port)
-    packet = PacketHandler(2.0)
-    if not port.openPort():
-        raise SystemExit(f"ポートが開けません: {args.port}")
-    port.setBaudRate(1_000_000)
+    port, packet = open_port(args.port)
     rows = {}
     try:
         for i in range(1, 7):
@@ -64,7 +45,7 @@ def main():
                 rows[i] = None
                 continue
             r = {
-                "model": MODEL.get(model, str(model)),
+                "model": model_name(model),
                 "drive_mode": rd(packet, port, i, 10, 1),
                 "op_mode": rd(packet, port, i, 11, 1),
                 "homing": s32(rd(packet, port, i, 20, 4)),
@@ -79,8 +60,8 @@ def main():
             }
             if model in (1190, 1200):  # XL330 only: current registers
                 r["cur_limit"] = rd(packet, port, i, 38, 2)
-                r["goal_cur"] = s16(rd(packet, port, i, 102, 2))
-                r["cur"] = s16(rd(packet, port, i, 126, 2))
+                r["goal_cur"] = to_signed16(rd(packet, port, i, 102, 2))
+                r["cur"] = to_signed16(rd(packet, port, i, 126, 2))
             rows[i] = r
     finally:
         port.closePort()

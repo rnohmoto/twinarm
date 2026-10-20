@@ -10,25 +10,14 @@ import sys
 import time
 from pathlib import Path
 
-from dynamixel_sdk import PacketHandler, PortHandler
+from koch.dxl import model_name, open_port, s32
+from koch.motors import MOTORS
 
-MODEL = {1060: "XL430-W250", 1200: "XL330-M288", 1190: "XL330-M077"}
-JOINTS = [
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-    "gripper",
-]
+JOINTS = MOTORS  # bus order, IDs 1-6
 EXPECT = {
     "leader": ["XL330-M077"] * 6,
     "follower": ["XL430-W250", "XL430-W250"] + ["XL330-M288"] * 4,
 }
-
-
-def s32(v):
-    return v - (1 << 32) if v >= (1 << 31) else v
 
 
 def rd(packet, port, dxl_id, addr, size):
@@ -43,11 +32,10 @@ def rd(packet, port, dxl_id, addr, size):
 
 
 def read_bus(port_name, trace_sec):
-    port = PortHandler(port_name)
-    packet = PacketHandler(2.0)
-    if not port.openPort():
+    try:
+        port, packet = open_port(port_name)
+    except SystemExit:
         return None, None
-    port.setBaudRate(1_000_000)
     rows, trace = {}, []
     try:
         for i in range(1, 7):
@@ -56,7 +44,7 @@ def read_bus(port_name, trace_sec):
                 rows[i] = None
                 continue
             rows[i] = {
-                "model": MODEL.get(model, str(model)),
+                "model": model_name(model),
                 "drive_mode": rd(packet, port, i, 10, 1),
                 "homing_offset": s32(rd(packet, port, i, 20, 4)),
                 "range_max": rd(packet, port, i, 48, 4),

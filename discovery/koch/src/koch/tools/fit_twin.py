@@ -27,16 +27,11 @@ import time
 import urllib.request
 from pathlib import Path
 
+from koch.dxl import open_port
+from koch.motors import MOTORS
 from koch.paths import CONFIG_DIR, TWIN_CONFIG_NAME
 
-JOINTS = [
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow_flex",
-    "wrist_flex",
-    "wrist_roll",
-    "gripper",
-]
+JOINTS = MOTORS  # bus order, IDs 1-6
 TWIN_JOINTS = [
     "shoulder_pan",
     "shoulder_lift",
@@ -85,12 +80,7 @@ def read_state(bridge, seconds):
 
 def read_bus(port_name, cal, seconds):
     """Average raw ticks on the bus and normalize like lerobot (read-only)."""
-    from dynamixel_sdk import PacketHandler, PortHandler
-
-    port, packet = PortHandler(port_name), PacketHandler(2.0)
-    if not port.openPort():
-        sys.exit(f"ポートが開けません: {port_name}")
-    port.setBaudRate(1_000_000)
+    port, packet = open_port(port_name)
     acc = {i: [] for i in range(1, 7)}
     try:
         t0 = time.time()

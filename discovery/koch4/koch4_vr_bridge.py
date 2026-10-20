@@ -6,7 +6,13 @@ telemetry of one or two teleop processes as ``/state`` (one arm each), keeps the
 twin/object configuration (``config/koch4_twin.json``: per-arm joint spans/offsets/
 signs and base placement, objects with stiffness/cap/mass/bounce and their spots,
 the desk) behind ``/config``, and relays the page's contact decisions to the right
-``koch4_teleop.py`` as ``{"vwall": ...}`` control messages::
+``koch4_teleop.py`` as ``{"vwall": ...}`` control messages. Two more routes let the
+Mac operate the headset page without any UI in AR (Quest Browser draws no DOM overlay):
+``POST /op`` queues one operation (calib_start/calib_save/calib_undo/calib_cancel/reset/
+anchor_clear/ghost/reload/select_arm) that the page picks up from ``/state``, and
+``POST /status`` lets the headset page report calibration points, residual and anchor
+state back, mirrored in ``/state`` as ``page``. ``/state`` also carries ``cfg_version``
+so every page reloads ``/config`` when another page saved it::
 
   koch4_teleop.py --ff vwall --vw --viz-port 8767,8770 --ctl-port 8768 --arm-label B
   koch4_teleop.py --leader-type koch_follower --ff vwall --vw --viz-port 8771,8773 \\
@@ -60,6 +66,19 @@ DEFAULT_WORK_DIR = HERE / "work"
 TWIN_CONFIG_NAME = "koch4_twin.json"
 TELEMETRY_HOST = "127.0.0.1"
 STALE_AFTER_SEC = 2.0
+PAGE_STALE_SEC = 5.0  # ヘッドセットのページからの /status が途絶えたと見なす秒数
+OPS_ALLOWED = (
+    "calib_start",
+    "calib_save",
+    "calib_undo",
+    "calib_cancel",
+    "reset",
+    "anchor_clear",
+    "ghost",
+    "reload",
+    "select_arm",
+)
+PAGE_STATUS_MAX_KEYS = 24
 KEEPALIVE_SEC = 1.0
 TWIN_RESEND_SEC = 10.0
 CONFIG_VERSION = 2
@@ -93,7 +112,7 @@ DEFAULT_OBJECTS: dict[str, dict[str, Any]] = {
         "bounce": 0.15,
         "color": "#facc15",
         "kind": "box",
-        "spot": [-0.155, 0.0, 0.221],
+        "spot": [-0.10, 0.0, 0.12],
     },
     "ball": {
         "label": "ボール",
@@ -105,7 +124,7 @@ DEFAULT_OBJECTS: dict[str, dict[str, Any]] = {
         "bounce": 0.65,
         "color": "#ef4444",
         "kind": "sphere",
-        "spot": [0.0, 0.0, 0.27],
+        "spot": [0.0, 0.0, 0.15],
     },
     "block": {
         "label": "鉄ブロック",
@@ -117,12 +136,18 @@ DEFAULT_OBJECTS: dict[str, dict[str, Any]] = {
         "bounce": 0.05,
         "color": "#94a3b8",
         "kind": "box",
-        "spot": [0.155, 0.0, 0.221],
+        "spot": [0.10, 0.0, 0.12],
     },
 }
 DEFAULT_SCENE: dict[str, Any] = {
     # 机(最初の腕のローカル座標・m)。2 本目の腕が置かれたら幅はページ側で広げる
-    "desk": {"x": 0.05, "z": 0.05, "w": 0.5, "d": 0.4},
+    "desk": {
+        "x": 0.05,
+        "y": 0.0,
+        "z": 0.05,
+        "w": 0.5,
+        "d": 0.4,
+    },  # y = 物が乗る面の高さ(台の底から・m)
     "sound": True,
     "ghost": "half",  # AR 中の分身の見せ方: solid / half / tips
 }
@@ -145,6 +170,15 @@ TWIN: dict[str, Any] = {}
 ARMS: list[str] = []  # order = --arms (the first one is the frame of desk/objects)
 CTL_PORTS: dict[str, int] = {}
 LOCK = threading.Lock()
+
+
+# Mac の操作ページ → ヘッドセットのページ: 最新の 1 件だけ持つ(人の操作なので順番待ちは要らない)
+OPS: dict[str, Any] = {"id": 0, "op": None}
+# ヘッドセットのページ → Mac: 位置合わせの点数・残差・アンカーの状態(1 秒ごとに届く)
+PAGE: dict[str, Any] = {"_rx": 0.0}
+META: dict[str, Any] = {
+    "cfg_version": 1
+}  # /config を保存するたびに +1。ページは変化を見て読み直す
 
 
 def clamp(value, lo, hi):
@@ -280,6 +314,9 @@ def _merge_scene(payload):
             scene["desk"][k] = clamp(float(desk.get(k, scene["desk"][k])), -2.0, 2.0)
         for k in ("w", "d"):
             scene["desk"][k] = clamp(float(desk.get(k, scene["desk"][k])), 0.2, 3.0)
+        scene["desk"]["y"] = clamp(
+            float(desk.get("y", scene["desk"].get("y", 0.0))), -1.0, 1.0
+        )
     if "sound" in payload:
         scene["sound"] = bool(payload["sound"])
     if payload.get("ghost") in ("solid", "half", "tips"):
@@ -452,21 +489,73 @@ def public_state():
     out: dict[str, Any] = {"t": round(now, 3), "arms": arms}
     if ARMS:
         out.update(arms[ARMS[0]])  # 旧ページ互換(1 本目を最上位にも)
+    with LOCK:
+        out["cfg_version"] = META["cfg_version"]
+        out["op"] = copy.deepcopy(OPS["op"])
+        fresh = now - PAGE.get("_rx", 0.0) <= PAGE_STALE_SEC
+        out["page"] = (
+            {k: v for k, v in PAGE.items() if not k.startswith("_")} if fresh else None
+        )
     return out
+
+
+def queue_op(msg):
+    """Validate and store one operation for the headset page; return its id or None."""
+    kind = msg.get("op")
+    if kind not in OPS_ALLOWED:
+        return None
+    arm = msg.get("arm")
+    if arm is not None and arm not in ARMS:
+        return None
+    value = msg.get("value")
+    if value is not None and not isinstance(value, (int, float)):
+        return None
+    with LOCK:
+        OPS["id"] += 1
+        OPS["op"] = {
+            "id": OPS["id"],
+            "op": kind,
+            "arm": arm,
+            "value": value,
+            "t": round(time.monotonic(), 3),
+        }
+        return OPS["id"]
+
+
+def store_page_status(msg):
+    """Keep the headset page's self-report (flat scalars only, bounded)."""
+    body = {}
+    for key, value in list(msg.items())[:PAGE_STATUS_MAX_KEYS]:
+        if (
+            isinstance(key, str)
+            and isinstance(value, (str, int, float, bool))
+            or value is None
+        ):
+            body[str(key)[:40]] = value if not isinstance(value, str) else value[:120]
+        elif isinstance(value, dict) and key == "base":
+            body["base"] = {
+                k: float(v) for k, v in value.items() if isinstance(v, (int, float))
+            }
+    with LOCK:
+        PAGE.clear()
+        PAGE.update(body)
+        PAGE["_rx"] = time.monotonic()
 
 
 def make_handler(ctl_sock, config_path):
     """Build the HTTP handler class bound to the control socket."""
 
     class Handler(SimpleHTTPRequestHandler):
-        """Static files + /state + /config + /contact."""
+        """Static files + /state + /config + /contact + /op + /status."""
 
-        def send_json(self, body, status=200):
+        def send_json(self, body, status=200, headers=None):
             """Write a JSON response."""
             payload = json.dumps(body).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Cache-Control", "no-store")
+            for name, value in (headers or {}).items():
+                self.send_header(name, str(value))
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
@@ -487,7 +576,8 @@ def make_handler(ctl_sock, config_path):
             elif route == "/config":
                 with LOCK:
                     body = copy.deepcopy(TWIN)
-                self.send_json(body)
+                    version = META["cfg_version"]
+                self.send_json(body, headers={"X-Config-Version": version})
             else:
                 super().do_GET()
 
@@ -519,6 +609,19 @@ def make_handler(ctl_sock, config_path):
                 send_ctl(ctl_sock, label, {"vwall": wall})
                 self.send_response(204)
                 self.end_headers()
+            elif route == "/op":
+                op_id = queue_op(msg)
+                if op_id is None:
+                    self.send_json({"ok": False, "allowed": OPS_ALLOWED}, status=400)
+                    return
+                print(
+                    f"[op] #{op_id} {msg.get('op')} arm={msg.get('arm')} value={msg.get('value')}"
+                )
+                self.send_json({"ok": True, "id": op_id})
+            elif route == "/status":
+                store_page_status(msg)
+                self.send_response(204)
+                self.end_headers()
             elif route == "/config":
                 with LOCK:
                     if msg.get("reset"):
@@ -528,6 +631,8 @@ def make_handler(ctl_sock, config_path):
                     else:
                         merge_twin_config(msg)
                     save_twin_config(config_path)
+                    META["cfg_version"] += 1
+                    version = META["cfg_version"]
                     body = copy.deepcopy(TWIN)
                 for label in ARMS:
                     send_ctl(
@@ -535,8 +640,8 @@ def make_handler(ctl_sock, config_path):
                         label,
                         {"twin": {"joints": body["arms"][label]["joints"]}},
                     )
-                print(f"[config] 保存 {config_path}")
-                self.send_json(body)
+                print(f"[config] 保存 {config_path} (v{version})")
+                self.send_json(body, headers={"X-Config-Version": version})
             else:
                 self.send_response(404)
                 self.end_headers()
@@ -544,7 +649,11 @@ def make_handler(ctl_sock, config_path):
         def log_message(self, format, *args):  # http.server's own parameter name
             """Silence the 30 Hz /state and /contact chatter."""
             first = str(args[0]) if args else ""
-            if "/state" not in first and "/contact" not in first:
+            if (
+                "/state" not in first
+                and "/contact" not in first
+                and "/status" not in first
+            ):
                 super().log_message(format, *args)
 
     return Handler

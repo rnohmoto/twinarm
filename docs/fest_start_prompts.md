@@ -13,8 +13,8 @@ Learning Fest（2026-10-26/27）の前に、Mac 4 台で実機を立ち上げる
 | Mac | 役割 | つなぐ物 | 起動（`discovery` で） | ページ | 段（`discovery/koch4/CHECKLIST.md`） |
 |---|---|---|---|---|---|
 | A | 握手（ペア A・差分反射式） | リーダー A（5 V）＋フォロワー A（12 V）＝USB シリアル 2 本・握手ハンド | `./koch4/mac/koch.sh handshake` | パネル http://127.0.0.1:8780 | S0 → TEST 2 → 2b → 5 → 6 |
-| B | VR 1 人目（リーダー B） | リーダー B（5 V）＝USB シリアル 1 本・Quest Pro #1（データ対応 USB-C ケーブル） | `./koch4/start.sh check` → `sim` → `vr --extra "--vw-cap 60"` | Quest Browser http://localhost:8444/ | S0 → U0 → V1 → V0 → V-w → V-c → V-e → V2 → V4 → V3 |
-| C | VR 2 人目（フォロワー B を手で） | フォロワー B（12 V）＝USB シリアル 1 本・Quest Pro #2 | `./koch4/mac/koch.sh vr-follower` ＋ 別の窓で `uv run python koch4/koch4_quest_usb.py --port 8443` | Quest Browser http://localhost:8443/ | S0 → U0 → V5 |
+| B | VR 1 人目（リーダー B） | リーダー B（5 V）＝USB シリアル 1 本・Quest Pro #1（データ対応 USB-C ケーブル） | `koch4/mac/3_VR1人目_リーダーB.command`（＝`PAIR=B ./koch4/mac/koch.sh vr-leader`。uv sync・設定・Quest の許可待ち・reverse・見張りまで自動） | ゴーグル http://localhost:8444/ ・Mac の操作ページ …`?spectator=1&info=1` | S0 → U0 → V1 → V0 → V-w → V-c → V-e → V2 → V4 → V3 |
+| C | VR 2 人目（フォロワー B を手で） | フォロワー B（12 V）＝USB シリアル 1 本・Quest Pro #2 | `koch4/mac/4_VR2人目_フォロワーB.command`（＝`PAIR=B ./koch4/mac/koch.sh vr-follower`。Quest も自動で開く） | ゴーグル http://localhost:8443/ ・Mac の操作ページ | S0 → U0 → V5 |
 | D | 卓上（Magician の P&P・声・俯瞰カメラ） | Magician（USB シリアル）・C922n（三脚・俯瞰）・マイク | `cd dobot && ./start.sh`（初回は wizard） | パネル http://127.0.0.1:8790 | §4 D の M0 → M1・M2 → M3 → 声 |
 
 - Quest Pro #3 は予備。3 台とも同じアカウントで初期設定し、USB デバッグの許可は Mac B と Mac C の両方で済ませる（許可は Mac とヘッドセットの組ごと）。
@@ -56,9 +56,9 @@ twinarm の discovery/koch4 で握手（ペア A だけ）を実機で立ち上�
 やりたいこと: フェスの握手体験（来場者がフォロワー A に手を出し、操作者がリーダー A で握り返す。ミラー制御なし）を、実機で 30 分通し、握手ハンドを付けた形まで確かめる。
 - 最初に git pull → cd discovery → ./koch4/start.sh check を実行し、「起動できるもの」の表とポート一覧を私に見せる（腕は動かない）
 - config/koch4_config.json のペア A のポートは私が渡す（--list の結果から私が選ぶ。推測しない。リーダーとフォロワーは入替不可）
-- 腕が動くコマンド（./koch4/mac/koch.sh handshake。中身は koch4_dual_launch.py --pair A --ff gripper --grip-ma 500 --extra "--ff-style error --max-rel 10"）は、私がこの会話で明示的に頼んだときだけ実行する。実機の挙動は私の報告だけを事実にする
+- 腕が動くコマンド（./koch4/mac/koch.sh handshake。中身は koch4_dual_launch.py --pair A --ff gripper --grip-ma 500 --extra "--ff-style error --max-rel 20 --ff-ke 15 --ff-cap 500"。ゲインと上限は 10/19 の仮設定）は、私がこの会話で明示的に頼んだときだけ実行する。実機の挙動は私の報告だけを事実にする
 - 進め方: S0 → TEST 2（ペア A 単独の回帰）→ 2b（フォロワー握力の上限 500 mA で過負荷停止と滑りの境）→ 5（30 分の連続稼働）→ 6（握手ハンド装着後の体験リハ）を 1 つずつ。各テストの記録欄を埋める
-- 握りの硬さや上限を変えるときは、koch.sh ではなく launcher を直接: uv run python koch4/koch4_dual_launch.py --pair A --ff gripper --grip-ma 500 --extra "--ff-style error --max-rel 10 --ff-pgain <P> --ff-cap <mA>"（--extra は 1 つの文字列で、後から足すと上書きされる）。既定は P 800・上限 450 mA・床 60 mA。連続は 300 mA 前後を基本に、温度（60／65 ℃ガード）を見る
+- 握りの硬さや上限を変えるときは環境変数で: FF_KE=20 FF_CAP=600 ./koch4/mac/koch.sh handshake（ke＝差分ゲイン mA/unit＝硬さ、cap＝握っている間の最大電流）。10/19 の仮設定は ke 15・cap 500（launcher の素の既定は ke 9・cap 450）。パネルのスライダ「(error)差分ゲイン」「握り上限mA」で動かしながらも変えられる。cap を上げるほど握っている間の発熱が速い（450→900 で 4 倍）。60 ℃で ke 半減・65 ℃で握り返し停止（停止後は冷えてから再起動）。cap を上げる前に TEST 5（30 分）で温度の曲線を取る
 - 終わったら実機ログ md を書く（docs/fest_start_prompts.md §5）
 ```
 
@@ -68,8 +68,9 @@ twinarm の discovery/koch4 で VR（1 人目・リーダー B）を実機と Qu
 読む順: AGENTS.md → discovery/koch4/HANDOFF.md → discovery/koch4/manual/vr.html → discovery/koch4/CHECKLIST.md の S0・U0・V 系 → docs/fest_start_prompts.md §2。Quest の準備（開発者モード・USB の許可）がまだなら discovery/koch4/manual/quest_setup.html の ②〜⑦ から。
 やりたいこと: ゴーグルの中の仮想の物（スポンジ・ボール・鉄ブロック）をリーダー B で握ったときに、硬さと重さが手に返る状態にし、10/19 の体験に出せるかを判断する。
 - 最初に git pull → cd discovery → ./koch4/start.sh check を実行し、「起動できるもの」と Quest の接続・電池残量を私に見せる（腕は動かない）
-- 腕が動くコマンド（./koch4/start.sh vr）は、私が明示的に頼んだときだけ。ポートは私が渡す。実機の挙動は私の報告だけを事実にする
-- 進め方: S0 → U0 → V1（./koch4/start.sh sim と Quest で表示）→ V0（壁だけ・ゴーグルなし）→ V-w（./koch4/start.sh vr --extra "--vw-cap 60" から。重さの上限は低くから）→ V-c（位置合わせ）→ V-e（編集モード）→ V2（実機リーダー × VR）→ V4（投げる・落とす）→ V3（フェス形態の判断）を 1 つずつ
+- 腕が動くコマンド（koch4/mac/3_VR1人目_リーダーB.command＝PAIR=B ./koch4/mac/koch.sh vr-leader。重さ 60 mA・肘反転・Quest の許可待ちと reverse・USB の見張り・Mac の操作ページまで自動）は、私が明示的に頼んだときだけ。ポートは fest 設定のシリアル番号で解決される（違う腕なら --list で直す）。実機の挙動は私の報告だけを事実にする
+- AR 中はゴーグルにボタンも文字も出ない（Quest Browser は DOM overlay を描かない）。位置合わせはゴーグルの中で分身をつまんで動かす（離して 1.5 秒で保存＝アンカー登録）。細かい操作と状態の確認は Mac の操作ページ（http://localhost:8444/?spectator=1&info=1）から
+- 進め方: S0 → U0 → V1（./koch4/start.sh sim と Quest で表示）→ V0（壁だけ・ゴーグルなし）→ V-w（重さの上限は低くから）→ V-c（つかんで合わせ・アンカー復元）→ V-e（編集モード・高さと置き場所）→ V2（実機リーダー × VR）→ V4（投げる・落とす）→ V3（フェス形態の判断）を 1 つずつ。10/19 の記録は discovery/koch4/LOG_261019_VR.md、要件は REQUIREMENTS_VR.md
 - V-e で、物体ごとの硬さ p_gain（50 刻み）と上限 cap_ma（10 刻み）をゴーグル内のスライダで掃引し、体感と CSV（--extra "--csv"）を記録する。既定はスポンジ P250／120 mA・ボール P900／350・鉄ブロック P2000／450。保存先は config/koch4_twin.json（Mac C に写すなら枝に載せる）
 - 給電: 電池残量を 30 分の体験の前後で記録する（USB のまま／充電口つきケーブル／Wi-Fi 切替 ./koch4/start.sh wifi）
 - 終わったら実機ログ md を書く（docs/fest_start_prompts.md §5）
@@ -81,8 +82,8 @@ twinarm の discovery/koch4 で VR の 2 人目（フォロワー B を手で動
 読む順: AGENTS.md → discovery/koch4/HANDOFF.md → discovery/koch4/manual/vr.html → discovery/koch4/CHECKLIST.md の S0・U0・V5 → docs/fest_start_prompts.md §2。
 やりたいこと: 2 人目がフォロワー B を手で動かして、同じ仮想の物を握れる状態にする（1 人目と同じ体験を 2 台目のゴーグルで）。
 - 最初に git pull → cd discovery → ./koch4/start.sh check。Quest の接続は uv run python koch4/koch4_quest_usb.py --check
-- config/koch4_config.json の pairs.B.follower_port にフォロワー B のポートを書く（私が渡す。推測しない）
-- 起動は ./koch4/mac/koch.sh vr-follower（ページは http://localhost:8443/）。この窓は adb reverse を張らないので、別の窓で uv run python koch4/koch4_quest_usb.py --port 8443 を実行してから Quest のブラウザで開く
+- config/koch4_config.json は無ければ fest 設定（4 本のシリアル入り）から自動で作られ、ポートはシリアル番号で解決される。違う腕を挿すときだけ --list を見て私が直す（推測しない）
+- 起動は koch4/mac/4_VR2人目_フォロワーB.command（＝PAIR=B ./koch4/mac/koch.sh vr-follower。ページは http://localhost:8443/）。Quest Pro #2 の許可（この Mac で「常に許可」）が済んでいれば、ゴーグルのページは自動で開き、USB が切れても見張りが張り直す。Mac の操作ページは http://localhost:8443/?spectator=1&info=1
 - 接続直後と終了時にフォロワー B のトルクが抜ける。私が腕を支えてから Enter を押す。腕が動くコマンドは私が明示的に頼んだときだけ。実機の挙動は私の報告だけを事実にする
 - 進め方: S0 → U0 → V5（CHECKLIST）。重さは --vw-cap 60 --vw-pwm-cap 80（既定）から上げる。摩擦アシストは環境変数 ASSIST（既定 elbow_flex,wrist_flex・上限 25 mA）
 - 終わったら実機ログ md を書く（docs/fest_start_prompts.md §5）

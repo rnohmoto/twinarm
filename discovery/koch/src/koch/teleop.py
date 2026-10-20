@@ -52,7 +52,6 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
 
 import argparse
 import csv
-import inspect
 import json
 import math
 import socket
@@ -88,6 +87,7 @@ from koch.feedback import (
     virtual_weight_step,
     wall_tick,
 )
+from koch.lerobot_compat import load_lerobot
 from koch.motors import (
     ARM_CAP_MAX_MA,
     ARM_FF_JOINTS,
@@ -266,36 +266,6 @@ def selftest_pwm_joints():
         ("Goal_PWM", 885),
     ], log
     assert pwm.write("shoulder_lift", 50) == 0  # release 後は書かない
-
-
-def load_lerobot():
-    """Import lerobot lazily, injecting bus retries (lerobot 0.5+: retry=0 default)."""
-    from lerobot.motors.motors_bus import MotorsBus
-
-    def inject_retry(name, n):
-        orig = getattr(MotorsBus, name)
-        if "num_retry" not in inspect.signature(orig).parameters:
-            return
-
-        def patched(self, *args, **kwargs):
-            kwargs["num_retry"] = max(int(kwargs.get("num_retry", 0) or 0), n)
-            return orig(self, *args, **kwargs)
-
-        setattr(MotorsBus, name, patched)
-
-    for nm, n in (("sync_read", 10), ("read", 5), ("write", 5), ("sync_write", 5)):
-        inject_retry(nm, n)
-
-    from lerobot.robots.koch_follower import KochFollower, KochFollowerConfig
-    from lerobot.teleoperators.koch_leader import KochLeader, KochLeaderConfig
-
-    try:
-        from lerobot.errors import DeviceNotConnectedError  # ty: ignore[unresolved-import]
-
-        retry_errors = (ConnectionError, DeviceNotConnectedError)
-    except Exception:  # noqa: BLE001 - older lerobot without the error module
-        retry_errors = (ConnectionError,)
-    return KochFollower, KochFollowerConfig, KochLeader, KochLeaderConfig, retry_errors
 
 
 def setup_gripper_ff(

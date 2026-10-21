@@ -17,6 +17,10 @@ Read @README.md for what lives here and the risk classes every inventory uses.
 - Koch work goes into the `koch` package (`koch/src/koch/`, a console script only when an operator
   needs one), with its offline tests; see [`koch/AGENTS.md`](koch/AGENTS.md). Pure control laws
   belong to `twinarm/domain` and are mirrored, not forked.
+- Dobot work goes into the `dobot` package (`dobot/src/dobot/`, flat modules plus a console script
+  per operator entry point), with its offline tests in `dobot/src/dobot/tests/`; see
+  [`dobot/AGENTS.md`](dobot/AGENTS.md). Its `config.json` lives in `dobot/src/`, its `assets/`
+  and `logs/` in `dobot/`; all three are reached through `dobot.paths`.
 - `koch/` can be rehearsed with no arms attached: `cd koch && ./start.sh rehearse` (or
   `mise run rehearse`) runs its launch paths against simulated servos and checks them (see
   `koch/simbus/README.md`). Run it, alone, after changing anything under `koch/src/koch/`. A pass

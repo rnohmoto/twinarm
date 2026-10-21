@@ -15,7 +15,7 @@ Learning Fest（2026-10-26/27）の前に、Mac 4 台で実機を立ち上げる
 | A | 握手（ペア A・差分反射式） | リーダー A（5 V）＋フォロワー A（12 V）＝USB シリアル 2 本・握手ハンド | `./mac/koch.sh handshake` | パネル http://127.0.0.1:8780 | S0 → TEST 2 → 2b → 5 → 6 |
 | B | VR 1 人目（リーダー B） | リーダー B（5 V）＝USB シリアル 1 本・Quest Pro #1（データ対応 USB-C ケーブル） | `mac/3_VR1人目_リーダーB.command`（＝`PAIR=B ./mac/koch.sh vr-leader`。uv sync・設定・Quest の許可待ち・reverse・見張りまで自動） | ゴーグル http://localhost:8444/ ・Mac の操作ページ …`?spectator=1&info=1` | S0 → U0 → V1 → V0 → V-w → V-c → V-e → V2 → V4 → V3 |
 | C | VR 2 人目（フォロワー B を手で） | フォロワー B（12 V）＝USB シリアル 1 本・Quest Pro #2 | `mac/4_VR2人目_フォロワーB.command`（＝`PAIR=B ./mac/koch.sh vr-follower`。Quest も自動で開く） | ゴーグル http://localhost:8443/ ・Mac の操作ページ | S0 → U0 → V5 |
-| D | 卓上（Magician の P&P・声・俯瞰カメラ） | Magician（USB シリアル）・C922n（三脚・俯瞰）・マイク | `cd dobot && ./start.sh`（初回は wizard） | パネル http://127.0.0.1:8790 | §4 D の M0 → M1・M2 → M3 → 声 |
+| D | 卓上（Magician の P&P・声・俯瞰カメラ） | Magician（USB シリアル）・C922n（三脚・俯瞰）・マイク | `cd dobot && ./scripts/start.sh`（初回は wizard） | パネル http://127.0.0.1:8790 | §4 D の M0 → M1・M2 → M3 → 声 |
 
 - Quest Pro #3 は予備。3 台とも同じアカウントで初期設定し、USB デバッグの許可は Mac B と Mac C の両方で済ませる（許可は Mac とヘッドセットの組ごと）。
 - 設定ファイル `discovery/koch/config/config.json` は Mac ごと（git 管理外）。較正 JSON（A・B 両ペア）と物体プリセット `twin.json` は main に入っている。Mac C の 2 人目は `config/solo_F/twin.json` が別ファイル。
@@ -42,7 +42,7 @@ uv run koch-quest --check     # 「✓ <番号>: 接続済み（adb 可・USB）
 ```bash
 cd twinarm/dobot && uv sync --extra voice --extra llm   # 約 150 MB
 export ANTHROPIC_API_KEY=...               # 無ければルール解析だけで動く
-./start.sh check                           # カメラ一覧・ポート候補・オフラインのテスト
+./scripts/start.sh check                   # カメラ一覧・ポート候補・オフラインのテスト
 # 声の初回は faster-whisper の small モデル（約 0.5 GB）を自動取得する。ネットのある所で一度 demo を動かしておく。macOS はターミナルにマイクの許可が要る
 ```
 会場でネットが要るのは LLM だけ。Quest のページは Mac から USB 越しに配る。聞き取りはローカル。
@@ -94,13 +94,13 @@ twinarm の discovery/koch で VR の 2 人目（フォロワー B を手で動�
 twinarm の dobot で卓上ロボット（Dobot Magician）のピック＆プレース・声の UI・俯瞰カメラを実機で立ち上げます。いま動いている PC は「卓上の Mac D」です。
 読む順: dobot/AGENTS.md → dobot/README.md → dobot/manual/index.html の §2（接続）・§3（カメラの固定。Mac は Logi Options+／Logi Tune／uvc-util・設定は起動のたびに書き直す）・§4 → docs/fest_start_prompts.md §2。
 やりたいこと: 木片・ゴルフボール・消しゴムを俯瞰カメラで見つけ、画面のボタンと声（「赤いブロックを右に置いて」）で拾って置く体験を、20 回連続で通せる状態にする。
-- 最初に git pull → cd dobot → uv sync --extra voice --extra llm → ./start.sh check を実行し、カメラ一覧・ポート候補・テストの結果を私に見せる（腕は動かない）
-- 腕が動くコマンド（./start.sh、demo.py、jog.py、suction.py）は、私が明示的に頼んだときだけ。ポートは私が渡す（/dev/cu.usbserial-… を --list で選ぶ。推測しない）。実機の挙動は私の報告だけを事実にする
+- 最初に git pull → cd dobot → uv sync --extra voice --extra llm → ./scripts/start.sh check を実行し、カメラ一覧・ポート候補・テストの結果を私に見せる（腕は動かない）
+- 腕が動くコマンド（./scripts/start.sh、dobot-demo、dobot-jog、dobot-suction）は、私が明示的に頼んだときだけ。ポートは私が渡す（/dev/cu.usbserial-… を --list で選ぶ。推測しない）。実機の挙動は私の報告だけを事実にする
 - 進め方（1 つずつ）:
-  M0 疎通と停止: 電源 ON → 本体キー 2 秒長押しでホーミング（LED 青点滅 → 緑）→ USB。uv run python jog.py --port <ポート> --speed 30 で 20 mm 動かし「停止」。次に uv run python demo.py --config config.json --robot magician --port <ポート> --camera-index <N> --no-llm → パネル「ホーム」→ 動作中に「非常停止」→ 止まるまでの秒数 →「再開」→「ホーム」。logs/*.jsonl の halt(estop)。吸着を 1 回（吸って置く・排気で離れるか）
-  M1・M2 カメラと較正: Logi Options+ でオートフォーカス・露出・ホワイトバランスを切って値を決める → uv run python check_camera.py --index <N> で読み戻し（「OFF が効いています」）→ ./start.sh wizard（カメラ → ロボット → マーカー → 較正 → 置き場 → 高さ → 検出 → 試運転。wizard は pydobot で動く）
+  M0 疎通と停止: 電源 ON → 本体キー 2 秒長押しでホーミング（LED 青点滅 → 緑）→ USB。uv run dobot-jog --port <ポート> --speed 30 で 20 mm 動かし「停止」。次に uv run dobot-demo --config src/config.json --robot magician --port <ポート> --camera-index <N> --no-llm → パネル「ホーム」→ 動作中に「非常停止」→ 止まるまでの秒数 →「再開」→「ホーム」。logs/*.jsonl の halt(estop)。吸着を 1 回（吸って置く・排気で離れるか）
+  M1・M2 カメラと較正: Logi Options+ でオートフォーカス・露出・ホワイトバランスを切って値を決める → uv run dobot-check-camera --index <N> で読み戻し（「OFF が効いています」）→ ./scripts/start.sh wizard（カメラ → ロボット → マーカー → 較正 → 置き場 → 高さ → 検出 → 試運転。wizard は pydobot で動く）
   M3 20 回: demo（--robot magician・--no-llm）でパネルのボタンと文字入力で 20 回連続。成功率・1 サイクルの秒数・アラーム・熱を JSONL から集計し、speed_pct を決める（基準: 20 回中 吸着ミス 1 回以下）
-  声: uv run python demo.py --dry-run --no-llm でマイクボタン長押し →「赤いブロックを右のトレイに置いて」が聞き取れるか・語頭が欠けないか・logs の asr（seconds・avg_logprob・no_speech_prob）。「赤じゃなくて青を右に」で「これですか？」が出て Enter で動き Esc で動かないこと。「止まって」で非常停止が掛かるまでの秒数。最後に実機で声で 1 回
+  声: uv run dobot-demo --dry-run --no-llm でマイクボタン長押し →「赤いブロックを右のトレイに置いて」が聞き取れるか・語頭が欠けないか・logs の asr（seconds・avg_logprob・no_speech_prob）。「赤じゃなくて青を右に」で「これですか？」が出て Enter で動き Esc で動かないこと。「止まって」で非常停止が掛かるまでの秒数。最後に実機で声で 1 回
   LLM: ANTHROPIC_API_KEY を入れて --no-llm を外し、同じ 3 文で返答と動作を見る（ネット断なら rule_parser に落ちる）
 - 終わったら実機ログ md を書く（docs/fest_start_prompts.md §5）
 ```

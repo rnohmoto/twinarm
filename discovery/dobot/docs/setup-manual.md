@@ -17,7 +17,7 @@ git clone <リポジトリ>            # 既にあるなら git pull
 cd twinarm/dobot                  # または twinarm-main/dobot
 ```
 
-Finder で `dobot` を開き、**`setup.command` をダブルクリック**（または `./setup.sh`）。次が自動で進みます。
+Finder で `dobot/scripts` を開き、**`setup.command` をダブルクリック**（または `./scripts/setup.sh`）。次が自動で進みます。
 
 1. uv（Python の管理ツール）の導入。Python 3.13 も uv が取得する
 2. 依存ライブラリ（OpenCV、pydobot、faster-whisper、sounddevice、anthropic）
@@ -29,27 +29,27 @@ Finder で `dobot` を開き、**`setup.command` をダブルクリック**（�
 
 - **マイク**: 初めてマイクを使うとき、macOS が Terminal への許可を聞く → 許可。出なければ システム設定 → プライバシーとセキュリティ → マイク
 - **カメラ**: 同様に Terminal へ許可
-- `start.command` をダブルクリックして「開発元を確認できない」と出たら、右クリック → 開く（git clone したファイルでは通常出ない）
+- `scripts/start.command` をダブルクリックして「開発元を確認できない」と出たら、右クリック → 開く（git clone したファイルでは通常出ない）
 
 Logi Options+（任意だが推奨）: C922 のフォーカスを「自動 OFF・机にピント」、露出を「自動 OFF」に固定する。WB は自動のまま（手動だと青被り）。固定しないと、腕が映り込むたびに明るさが変わって色の判定が揺れる。
 
 ## 3. 機材の接続
 
 1. Magician の電源を入れ、本体のキーを 2 秒長押し（LED 緑＝ホーミング済み）。**毎回**
-2. Magician の USB を Mac へ。`ls /dev/cu.usbserial-*` にポートが出る（CH9102、macOS 12 以降は追加ドライバ不要）。`config.json` の `robot.port` と違えば書き換える（ポート名の末尾はアダプタ固有なので、同じ機材なら Mac を替えても同じ）
-3. カメラを机の真上に固定し、作業域（ロボットの前 15〜30 cm、左右 ±15 cm）が画面の中央に入るように向ける。C922 は OpenCV の index 0 のはず（Mac 内蔵が 1）。違えば `config.json` の `camera.index`
+2. Magician の USB を Mac へ。`ls /dev/cu.usbserial-*` にポートが出る（CH9102、macOS 12 以降は追加ドライバ不要）。`src/config.json` の `robot.port` と違えば書き換える（ポート名の末尾はアダプタ固有なので、同じ機材なら Mac を替えても同じ）
+3. カメラを机の真上に固定し、作業域（ロボットの前 15〜30 cm、左右 ±15 cm）が画面の中央に入るように向ける。C922 は OpenCV の index 0 のはず（Mac 内蔵が 1）。違えば `src/config.json` の `camera.index`
 4. 腕の周りを空ける。机に黒や白のマットがあると検出が安定する
 
 ## 4. 初回だけ（同じ机・同じ配置なら不要）
 
-`config.json` と `assets/homography.json` はベンチの実機値でコミットしてあります。**同じ机・同じカメラ位置なら、このまま起動できます。** カメラかロボットを動かしたら 4.1、トレイを置き直したら 4.2、机や台を変えたら 4.3。
+`src/config.json` と `assets/homography.json` はベンチの実機値でコミットしてあります。**同じ机・同じカメラ位置なら、このまま起動できます。** カメラかロボットを動かしたら 4.1、トレイを置き直したら 4.2、机や台を変えたら 4.3。
 
 ### 4.1 較正（5 分、腕が動く）
 
 ランチャーの「較正をやり直す」、または:
 
 ```bash
-uv run python calibrate.py --config config.json --object blue_cube --drive
+uv run dobot-calibrate --config src/config.json --object blue_cube --drive
 ```
 
 腕が 3×3 の 9 点を回り、各点でブロック上面の 8 mm 上に止まる。吸盤の真下に青ブロックを置いて Enter。
@@ -58,14 +58,14 @@ uv run python calibrate.py --config config.json --object blue_cube --drive
 
 ### 4.2 置き場（1 分、腕は動かない）
 
-ランチャーの「置き場を調整」、または `uv run python zones_view.py`。数字で選んで実物のトレイの真ん中をクリック、s で保存。
+ランチャーの「置き場を調整」、または `uv run dobot-zones`。数字で選んで実物のトレイの真ん中をクリック、s で保存。
 
 ### 4.3 高さ（2 分、腕は手で動かす）
 
 腕のロック解除ボタンを押しながら吸盤を当て、座標を読む:
 
 ```bash
-uv run python check_robot.py --config config.json      # pose x= y= z=
+uv run dobot-check-robot --config src/config.json      # pose x= y= z=
 ```
 
 | 当てる場所 | 書く場所 | 値 |
@@ -74,19 +74,19 @@ uv run python check_robot.py --config config.json      # pose x= y= z=
 | 置く面に、ブロックを吸盤に付けたまま底を当てる | `robot.z_place` | 読んだ z ＋ 2 |
 | — | `robot.z_min` | どちらより下（例 −80） |
 
-ウィザードでも可: `uv run python setup_wizard.py --from 5`（5 置き場・6 高さ）。
+ウィザードでも可: `uv run dobot-setup --from 5`（5 置き場・6 高さ）。
 
 ### 4.4 検出の確認（照明が変わったとき）
 
 ```bash
-uv run python setup_wizard.py --only 7
+uv run dobot-setup --only 7
 ```
 
-全部のブロックに枠が付き、余計な枠が無ければ OK。外れる色は `config.json` の `objects[].ranges`（HSV の下限・上限）を広げる。2026-10-19 の値: 緑の彩度下限 50、黄の色相下限 16、木片の縦横比上限 4.0。
+全部のブロックに枠が付き、余計な枠が無ければ OK。外れる色は `src/config.json` の `objects[].ranges`（HSV の下限・上限）を広げる。2026-10-19 の値: 緑の彩度下限 50、黄の色相下限 16、木片の縦横比上限 4.0。
 
 ## 5. 起動と確認
 
-`start.command` → ランチャー → 「実演を起動」。初回は実演画面で **往復（試運転）** → 文字で 1 回ピック → **ループ ×3** の順に確認する（[操作マニュアル](operation-manual.md)）。
+`scripts/start.command` → ランチャー → 「実演を起動」。初回は実演画面で **往復（試運転）** → 文字で 1 回ピック → **ループ ×3** の順に確認する（[操作マニュアル](operation-manual.md)）。
 
 ## 6. 別の机・別の配置に移したとき
 
@@ -101,15 +101,15 @@ uv run python setup_wizard.py --only 7
 
 ## 7. Windows
 
-`start.bat`（ランチャー未対応: `wizard`・`demo`・`dry`・`check`）。ポートは `COMn`。未検証。
+`scripts\start.bat`（ランチャー未対応: `wizard`・`demo`・`dry`・`check`）。ポートは `COMn`。未検証。
 
 ## 8. ファイルの場所
 
 | ファイル | 内容 |
 | --- | --- |
-| `config.json` | 設定（ポート、高さ、置き場、色、速さ、画面）。ランチャーと道具が書く。保存前のコピーは `config.bak_*.json` |
+| `src/config.json` | 設定（ポート、高さ、置き場、色、速さ、画面）。ランチャーと道具が書く。保存前のコピーは `config.bak_*.json` |
 | `assets/homography.json` | 較正結果。`assets/homography.pairs.json` は較正の対応点（再開用） |
 | `logs/pnp_*.jsonl` | 実演の記録（検出・指示・動作・返事） |
 | `logs/bench_*.md` | ベンチ作業の記録 |
 | `logs/demo_launcher.log` | ランチャーから起動した実演の出力 |
-| `HANDOFF.md` | 短い再開手順（Claude 向けの起動プロンプトも） |
+| `docs/HANDOFF.md` | 短い再開手順（Claude 向けの起動プロンプトも） |

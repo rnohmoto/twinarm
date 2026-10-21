@@ -15,6 +15,19 @@ dependencies = [
 llm = ["anthropic>=1.0"]
 voice = ["faster-whisper>=1.0", "sounddevice>=0.4"]
 
+[project.scripts]
+dobot-launcher = "dobot.launcher:main"
+dobot-setup = "dobot.setup_wizard:main"
+dobot-demo = "dobot.demo:main"
+dobot-pnp = "dobot.main:main"
+dobot-calibrate = "dobot.calibrate:main"
+dobot-jog = "dobot.jog:main"
+dobot-suction = "dobot.suction:main"
+dobot-check-camera = "dobot.check_camera:main"
+dobot-check-robot = "dobot.check_robot:main"
+dobot-zones = "dobot.zones_view:main"
+dobot-config = "dobot.config:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.4",
@@ -22,12 +35,17 @@ dev = [
     "ty>=0.0.72",
 ]
 
-[tool.uv]
-package = false
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Co-located test packages stay out of the wheel; they import dev-only deps.
+wheel-exclude = ["tests"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
-testpaths = ["tests"]
+testpaths = ["src"]
 
 [tool.ruff]
 extend = "../pyproject.toml"

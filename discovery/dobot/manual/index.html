@@ -149,7 +149,7 @@
 <h3>3.1 なぜ「固定」が要るか</h3>
 <p>このシステムは色（HSV）で物を見つけ、画像の位置を mm に変換します。カメラが<strong>露出・ホワイトバランス・フォーカスを自動で変える</strong>と、色のしきい値が外れたり像の倍率が変わったりして、拾い損ねや数 mm のずれが出ます。純正ビジョンキットも固定焦点レンズを使い、国内の実務例でも「高さでピントが合わず認識率が落ちた」報告があります。対策は 2 つで、どちらも C920n で可能です。</p>
 <ul>
-  <li><strong>AF・露出・ホワイトバランスを止める</strong>: Windows と Linux は <code>check_camera.py</code> が OpenCV から書きます（Windows は DirectShow を明示。自動露出の読み戻しは DirectShow が対応しないので、効いたかは明るさの揺れで判断します）。Mac は OpenCV から触れないので、Logitech の <strong>Logi Options+</strong>（公式手順: Camera settings → Focus → Auto Focus を切ってスライダで合わせる。設定を効かせ続けるためアプリはバックグラウンドで起動したままにする）か Logi Tune、またはコマンドの <code>uvc-util</code> で固定します。C920／C922 は設定を本体に保存しない（新しいセッションで自動に戻る報告）ので、起動のたびに「固定 → <code>check_camera.py</code> で確認 → 起動」の順にします。</li>
+  <li><strong>AF・露出・ホワイトバランスを止める</strong>: Windows と Linux は <code>dobot-check-camera</code> が OpenCV から書きます（Windows は DirectShow を明示。自動露出の読み戻しは DirectShow が対応しないので、効いたかは明るさの揺れで判断します）。Mac は OpenCV から触れないので、Logitech の <strong>Logi Options+</strong>（公式手順: Camera settings → Focus → Auto Focus を切ってスライダで合わせる。設定を効かせ続けるためアプリはバックグラウンドで起動したままにする）か Logi Tune、またはコマンドの <code>uvc-util</code> で固定します。C920／C922 は設定を本体に保存しない（新しいセッションで自動に戻る報告）ので、起動のたびに「固定 → <code>dobot-check-camera</code> で確認 → 起動」の順にします。</li>
   <li><strong>固定焦点のカメラを選ぶ</strong>: Elgato Facecam MK.2（30〜120cm 固定焦点・設定を本体に保存）なら、PC を替えても同じ状態が再現します。C270n も固定焦点ですが画角 55° と狭く、合焦距離が高さに合わない例があります。</li>
 </ul>
 <h3>3.2 置き方</h3>
@@ -186,7 +186,7 @@
 </div>
 <div class="row g-3">
   <div class="col-md-6"><figure class="photo"><img src="img/04_camera_rig.jpg" alt="カメラの取り付け" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 04 未撮影: カメラの取り付けと高さ（メジャーを写す）</div><figcaption>写真 3-2: 取り付け。高さ 45cm が分かるように。</figcaption></figure></div>
-  <div class="col-md-6"><figure class="photo"><img src="img/05_camera_view.jpg" alt="カメラの視野" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 05 未撮影: check_camera.py のスナップショット（logs/camera_check_*.jpg）</div><figcaption>写真 3-3: カメラから見た作業域。</figcaption></figure></div>
+  <div class="col-md-6"><figure class="photo"><img src="img/05_camera_view.jpg" alt="カメラの視野" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 05 未撮影: dobot-check-camera のスナップショット（logs/camera_check_*.jpg）</div><figcaption>写真 3-3: カメラから見た作業域。</figcaption></figure></div>
 </div>
 <div class="gate"><strong>関門 3</strong>: 作業域全体が写り、カメラは手で押しても動かない。</div>
 
@@ -232,14 +232,14 @@
   <ol class="mb-0">
     <li><strong>置く</strong>。(a) iPhone は「連係カメラ」として Mac のカメラになります。USB ケーブルで Mac に繋ぎ（会場の Wi-Fi は要りません）、画面をロックした状態で、クランプ付きのアームでレンズを真下に向けて固定します。(b) MacBook は高い台に載せ、画面を手前に 30〜40° まで倒して作業域を見下ろします。</li>
     <li><strong>カメラ番号を確かめる</strong>。iPhone や iPad が近くにあると番号がずれます。
-<pre>uv run python check_camera.py --list
-uv run python check_camera.py --index 0        # 写った絵が logs/camera_check_*.jpg に保存される</pre></li>
+<pre>uv run dobot-check-camera --list
+uv run dobot-check-camera --index 0        # 写った絵が logs/camera_check_*.jpg に保存される</pre></li>
     <li><strong>グレーカードを貼る</strong>。作業域の端（物を置かない場所）に、灰色か白の紙を 5cm 角ほど貼ります。次のコマンドで窓が開くので、カードの上をマウスでドラッグして Enter を押すと、カードの位置（x,y,w,h。単位は画素）が表示されます。
-<pre>uv run python check_camera.py --index 0 --pick-ref</pre></li>
+<pre>uv run dobot-check-camera --index 0 --pick-ref</pre></li>
     <li><strong>補正の効きを確かめる</strong>。内蔵カメラと iPhone は明るさと色を自動で変えるので、カードが毎回同じ明るさ・色になるようにソフトが補正します。
-<pre>uv run python check_camera.py --index 0 --ref 1100,40,80,80     # 上で表示された x,y,w,h を入れる</pre>
+<pre>uv run dobot-check-camera --index 0 --ref 1100,40,80,80     # 上で表示された x,y,w,h を入れる</pre>
     「明るさは安定しています」と出れば使えます。</li>
-    <li><strong>設定に書く</strong>。<code>uv run python setup_wizard.py</code> の [1/8] で、カメラ番号・鏡を使うか・カードの位置を聞かれます（カードの位置は p と答えると、同じように窓でドラッグして選べます）。答えは <code>config.json</code> の <code>camera.index</code>・<code>camera.mirror</code>・<code>camera.reference_roi</code> に保存されます。</li>
+    <li><strong>設定に書く</strong>。<code>uv run dobot-setup</code> の [1/8] で、カメラ番号・鏡を使うか・カードの位置を聞かれます（カードの位置は p と答えると、同じように窓でドラッグして選べます）。答えは <code>config.json</code> の <code>camera.index</code>・<code>camera.mirror</code>・<code>camera.reference_roi</code> に保存されます。</li>
   </ol>
 </div>
 <ul>
@@ -248,38 +248,38 @@ uv run python check_camera.py --index 0        # 写った絵が logs/camera_che
   <li>ノート PC 用のミラークリップ（鏡で真下を映す）を使うときは、絵が左右反転するので <code>camera.mirror</code> を true にします。視野が狭く、作業域の全体が入らないことがあります。</li>
   <li>照明は一定に保ちます。カードに影が落ちたり、カードを物が隠したりすると補正が乱れます。</li>
 </ul>
-<div class="gate"><strong>関門 3.3</strong>: <code>check_camera.py --ref …</code> が「明るさは安定しています」を出し、作業域の全体とカードが写っている。</div>
+<div class="gate"><strong>関門 3.3</strong>: <code>dobot-check-camera --ref …</code> が「明るさは安定しています」を出し、作業域の全体とカードが写っている。</div>
 
 <!-- ===================================================== -->
 <h2 id="s4">4. ソフトの準備（uv・テスト・疎通チェック）</h2>
 <h3>4.0 いちばん早い道: 設定ウィザード</h3>
 <div class="step">
-  <p class="mb-1"><strong>Magician とカメラを繋いだら（接続マニュアル §2）、次の 1 本で §4.2〜§6 と初回のピックまでを順に通せます。</strong>設定が済んでいなければウィザード、済んでいれば実演画面が起動します。各ステップの結果は <code>config.json</code> に保存され、途中から再開できます。腕が動くのは <code>y</code> と答えたときだけです。</p>
+  <p class="mb-1"><strong>Magician とカメラを繋いだら（接続マニュアル §2）、次の 1 本で §4.2〜§6 と初回のピックまでを順に通せます。</strong>設定が済んでいなければウィザード、済んでいれば実演画面が起動します。各ステップの結果は <code>src/config.json</code> に保存され、途中から再開できます。腕が動くのは <code>y</code> と答えたときだけです。</p>
 <pre>cd twinarm/dobot
-./start.sh              # Mac / Linux（初回は uv が Python 環境を作る）
-.\start.bat             # Windows（PowerShell／コマンドプロンプト。エクスプローラーからのダブルクリックでも可）
-./start.sh wizard       # 設定をやり直す（1 カメラ → 2 ロボット → 3 マーカー → 4 較正 → 5 置き場 → 6 高さ → 7 検出 → 8 試運転）</pre>
-  <p class="mb-0">ウィザードが終わると、次回から <code>./start.sh</code> だけで実演画面（§7）が開きます。以下 4.1〜6 は、ウィザードが中で何をしているかの説明と、個別にやり直すときの手順です。</p>
+./scripts/start.sh      # Mac / Linux（初回は uv が Python 環境を作る）
+.\scripts\start.bat     # Windows（PowerShell／コマンドプロンプト。エクスプローラーからのダブルクリックでも可）
+./scripts/start.sh wizard  # 設定をやり直す（1 カメラ → 2 ロボット → 3 マーカー → 4 較正 → 5 置き場 → 6 高さ → 7 検出 → 8 試運転）</pre>
+  <p class="mb-0">ウィザードが終わると、次回から <code>./scripts/start.sh</code> だけで実演画面（§7）が開きます。以下 4.1〜6 は、ウィザードが中で何をしているかの説明と、個別にやり直すときの手順です。</p>
 </div>
 <h3>4.1 環境を作る（初回のみ・ハード不要）</h3>
 <pre>cd twinarm/dobot
 uv sync                 # .venv を作る（Python 3.13・OpenCV・pydobot）
 uv run pytest           # ハード無しテスト。全部 passed になること
-uv run python main.py --dry-run --no-llm --text "赤いブロックを右のトレイに置いて"   # 合成画像で一巡</pre>
+uv run dobot-pnp --dry-run --no-llm --text "赤いブロックを右のトレイに置いて"   # 合成画像で一巡</pre>
 <p><code>--dry-run</code> は合成画像とロボットの記録だけで動くので、機材が無くても流れを確認できます。</p>
 
 <h3>4.2 カメラの疎通と固定の確認（カメラだけ）</h3>
-<pre>uv run python check_camera.py --list        # 見えているカメラ番号
-uv run python check_camera.py --index 0     # 3 秒読んで、露出/WB が効いたか・明るさが揺れないかを報告</pre>
+<pre>uv run dobot-check-camera --list        # 見えているカメラ番号
+uv run dobot-check-camera --index 0     # 3 秒読んで、露出/WB が効いたか・明るさが揺れないかを報告</pre>
 <p>報告の見方: <code>手動露出の設定値 … が効いています</code> と <code>明るさは安定しています</code> の 2 行が出れば合格。<code>効いていません</code> のときは Mac ならメーカーツールで固定、Windows なら <code>--exposure -5</code> などを試す。スナップショットが <code>logs/</code> に保存されるので、写真 05 として使えます。</p>
 
 <h3>4.3 Magician の疎通（読むだけ → 動かす）</h3>
-<pre>uv run python check_robot.py --list                          # 候補ポートを表示（選ばない）
-uv run python check_robot.py --port /dev/tty.usbserial-XXXX  # 接続して現在位置を読む（動かない）
-uv run python check_robot.py --port /dev/tty.usbserial-XXXX --home        # ホーム姿勢へ動く
-uv run python check_robot.py --port /dev/tty.usbserial-XXXX --round-trip  # 作業域内を 1 往復</pre>
+<pre>uv run dobot-check-robot --list                          # 候補ポートを表示（選ばない）
+uv run dobot-check-robot --port /dev/tty.usbserial-XXXX  # 接続して現在位置を読む（動かない）
+uv run dobot-check-robot --port /dev/tty.usbserial-XXXX --home        # ホーム姿勢へ動く
+uv run dobot-check-robot --port /dev/tty.usbserial-XXXX --round-trip  # 作業域内を 1 往復</pre>
 <p>Windows は <code>--port COM5</code> のように書く。ポートは自動では選びません（間違った機器に指令を送らないため）。</p>
-<div class="step">設定ファイル <code>config.json</code> の <code>camera.index</code> と <code>robot.port</code> に、ここで分かった番号とポートを書いておくと、以後の引数が省けます。</div>
+<div class="step">設定ファイル <code>src/config.json</code> の <code>camera.index</code> と <code>robot.port</code> に、ここで分かった番号とポートを書いておくと、以後の引数が省けます。</div>
 <div class="gate"><strong>関門 4</strong>: テスト全 passed・カメラ報告 2 行が合格・<code>--home</code> でホーム姿勢に動いて止まる。</div>
 
 <!-- ===================================================== -->
@@ -299,8 +299,8 @@ uv run python check_robot.py --port /dev/tty.usbserial-XXXX --round-trip  # 作�
 </svg>
 <figcaption>図 5-1: マーカーの配置。対象物はマーカーの内側に置く（外側は補間が効かない）。</figcaption>
 </figure>
-<pre>uv run python calibrate.py --make-markers assets/markers   # 印刷用 PNG を出す → 4 枚印刷して厚紙に貼る
-uv run python calibrate.py --config config.json            # カメラで 4 枚を検出 → 各マーカー中心へ吸盤先端をジョグ → space で座標を記録</pre>
+<pre>uv run dobot-calibrate --make-markers assets/markers   # 印刷用 PNG を出す → 4 枚印刷して厚紙に貼る
+uv run dobot-calibrate --config src/config.json        # カメラで 4 枚を検出 → 各マーカー中心へ吸盤先端をジョグ → space で座標を記録</pre>
 <div class="step">
   <ol class="mb-0">
     <li>マーカーを四隅に貼る（図 5-1）。カメラ画面で 4 枚とも検出されることを確認。</li>
@@ -325,12 +325,12 @@ uv run python calibrate.py --config config.json            # カメラで 4 枚�
     <tr><td>台所スポンジ</td><td>×（多孔）</td><td>△（20〜25mm に切る）</td><td>黄／深緑</td><td>—</td></tr>
   </tbody>
 </table>
-<div class="step"><strong>吸着・把持テスト（M0.5）</strong>: 本番の物を決める前に、各物を <code>check_robot.py --round-trip</code> の要領で持ち上げて 10 回中何回成功するかを記録する（吸盤は <code>main.py</code> の <code>--text</code> で 1 発話ずつ試すのが早い）。ゴルフボールはこのテストで採否を決める。</div>
+<div class="step"><strong>吸着・把持テスト（M0.5）</strong>: 本番の物を決める前に、各物を <code>dobot-check-robot --round-trip</code> の要領で持ち上げて 10 回中何回成功するかを記録する（吸盤は <code>dobot-pnp</code> の <code>--text</code> で 1 発話ずつ試すのが早い）。ゴルフボールはこのテストで採否を決める。</div>
 <figure class="photo"><img src="img/07_objects_zones.jpg" alt="対象物と置き場" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 07 未撮影: 対象物と置き場を真上から</div><figcaption>写真 6-1: 配置。物同士は 1 個分以上離す。</figcaption></figure>
 
 <!-- ===================================================== -->
 <h2 id="s7">7. 初めてのピック＆プレースと実演画面</h2>
-<pre>uv run python demo.py --config config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
+<pre>uv run dobot-demo --config src/config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
 #   → ブラウザで http://127.0.0.1:8790 を開く（同じ PC。別 PC から見るなら --panel-port と PC の IP で）
 #   → 画面の入力欄に「赤いブロックを右のトレイに置いて」→ 送る
 #   → 20 回連続で成功（吸着ミス 1 回以内）が M3 の合格</pre>
@@ -363,7 +363,7 @@ uv run python calibrate.py --config config.json            # カメラで 4 枚�
   <text x="605" y="254" fill="#ccc">robot: pydobot /dev/tty.usbserial-…</text>
   <text x="605" y="280" fill="#9fb3c8" font-size="11">記録（直近のイベント）</text>
 </svg>
-<figcaption>図 7-1: 実演画面（demo.py）。左＝カメラ映像に検出枠、下＝話しかける欄とボタン、右＝状態・聞いた内容と判断・カメラとロボットの状態・記録。</figcaption>
+<figcaption>図 7-1: 実演画面（dobot-demo）。左＝カメラ映像に検出枠、下＝話しかける欄とボタン、右＝状態・聞いた内容と判断・カメラとロボットの状態・記録。</figcaption>
 </figure>
 <h3>7.1 実演の流れ（案）</h3>
 <table class="table table-bordered">
@@ -379,7 +379,7 @@ uv run python calibrate.py --config config.json            # カメラで 4 枚�
 <p>音声（faster-whisper）と LLM（Claude）は後から足せます: <code>uv sync --extra voice --extra llm</code> → <code>ANTHROPIC_API_KEY</code> を設定 → <code>--no-llm</code> を外す。ネットが切れてもルール解析に自動で戻ります。物理の非常停止は本体の電源スイッチ、画面の「非常停止」は以後の動作を拒否します。</p>
 <div class="row g-3">
   <div class="col-md-6"><figure class="photo"><img src="img/08_first_pick.jpg" alt="最初のピック" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 08 未撮影: 最初のピック成功の瞬間</div><figcaption>写真 7-1: 吸着中。</figcaption></figure></div>
-  <div class="col-md-6"><figure class="photo"><img src="img/09_pc_setup.jpg" alt="PC 画面" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 09 未撮影: main.py --tune の検出枠（スクリーンショット可）</div><figcaption>写真 7-2: 検出枠の画面。</figcaption></figure></div>
+  <div class="col-md-6"><figure class="photo"><img src="img/09_pc_setup.jpg" alt="PC 画面" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 09 未撮影: dobot-pnp --tune の検出枠（スクリーンショット可）</div><figcaption>写真 7-2: 検出枠の画面。</figcaption></figure></div>
 </div>
 <div class="gate"><strong>関門 7</strong>: 20 回連続成功。ここまで来たら音声入力、LLM の接続、連続稼働のリハーサルへ進む。</div>
 
@@ -390,7 +390,7 @@ uv run python calibrate.py --config config.json            # カメラで 4 枚�
   <tbody>
     <tr><td>ポートが見つからない</td><td>CP210x ドライバ／ケーブルが充電専用／電源が入っていない</td><td>§2.3。ケーブルをデータ対応品に替える</td></tr>
     <tr><td>接続できるが動かない・位置が変</td><td>ホーミングをしていない（電源投入ごとに必要）</td><td>本体キー 2 秒長押し → 緑になってから再実行</td></tr>
-    <tr><td>色を取り違える・拾い損ねる</td><td>自動露出／自動 WB が生きている・照明が変わった・背景に同色</td><td><code>check_camera.py</code> の 2 行を確認 → <code>--tune</code> でしきい値を追い込む → 黒マット</td></tr>
+    <tr><td>色を取り違える・拾い損ねる</td><td>自動露出／自動 WB が生きている・照明が変わった・背景に同色</td><td><code>dobot-check-camera</code> の 2 行を確認 → <code>--tune</code> でしきい値を追い込む → 黒マット</td></tr>
     <tr><td>数 mm ずれる</td><td>カメラか机が動いた・マーカーが浮いた・AF が動いた</td><td>キャリブをやり直す（§5）。AF を止める</td></tr>
     <tr><td>吸着しない</td><td>上面が多孔・小さい・凸凹／ポンプの配線／吸盤ゴムの劣化</td><td>§6 の表。<code>z_pick</code> を実機で較正（物ごとに高さが違う）</td></tr>
     <tr><td>カメラが 2 台目から読めない</td><td>同じ USB 系統で帯域切れ</td><td>別のポート・別ハブに分ける</td></tr>

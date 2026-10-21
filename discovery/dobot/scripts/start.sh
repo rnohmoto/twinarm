@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Dobot Magician ピック＆プレース 起動スクリプト（Mac / Linux）
+#   ./scripts/start.sh          設定が済んでいれば実演画面、まだならウィザード
+#   ./scripts/start.sh launcher 素人向けのランチャー画面（起動・停止・較正・置き場・設定。scripts/start.command と同じ）
+#   ./scripts/start.sh wizard   初期設定ウィザード（カメラ→ロボット→較正→置き場→高さ→検出→試運転）。--from N で途中から
+#   ./scripts/start.sh demo     実演画面（src/config.json のポートとカメラで。ブラウザが開く）
+#   ./scripts/start.sh dry      実機なしの実演（動作確認）
+#   ./scripts/start.sh check    読み取りだけ（カメラ一覧・ポート候補・テスト）
+#   ./scripts/start.sh suction --port /dev/cu.usbserial-XXXX   吸引 ON/OFF だけの画面（腕は動かさない）
+#   ./scripts/start.sh jog --port /dev/cu.usbserial-XXXX       前後・左右・上下のコントローラーと吸引の画面（腕が動く）
+set -e
+cd "$(dirname "$0")/.."
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "uv が見つかりません。https://docs.astral.sh/uv/ の手順でインストールしてから再実行してください。"
+  exit 1
+fi
+uv sync -q --inexact   # keep the voice/llm extras installed by "uv sync --extra voice --extra llm"
+
+open_url() {
+  local url="$1"
+  if command -v open >/dev/null 2>&1; then open "$url"
+  elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$url"
+  fi
+}
+
+configured() {
+  [ -f src/config.json ] && uv run python - <<'PY'
+import json, os, sys
+c = json.load(open("src/config.json", encoding="utf-8"))
+ok = bool(c.get("robot", {}).get("port")) and os.path.exists(c.get("homography_path", "assets/homography.json"))
+sys.exit(0 if ok else 1)
+PY
+}
+
+mode="${1:-auto}"
+if [ "$mode" = "auto" ]; then
+  if configured; then mode=demo; else mode=wizard; fi
+  echo "→ $mode を起動します（src/config.json のポートと較正の有無で判断）"
+fi
+
+case "$mode" in
+  wizard) shift; exec uv run dobot-setup "$@" ;;   # 例: ./scripts/start.sh wizard --from 5
+  launcher) shift; exec uv run dobot-launcher "$@" ;;     # ブラウザが開く。--dry で実機なしの練習
+  demo)
+    port=$(uv run python -c "import json;print(json.load(open('src/config.json',encoding='utf-8'))['demo']['panel_port'])")
+    ( sleep 4; open_url "http://127.0.0.1:${port}" ) &
+    exec uv run dobot-demo --config src/config.json ;;   # ロボットは src/config.json の backend(pydobot/magician)
+  dry)
+    ( sleep 4; open_url "http://127.0.0.1:8790" ) &
+    exec uv run dobot-demo --dry-run --no-llm ;;
+  check)
+    uv run dobot-check-camera --list || true
+    uv run dobot-check-robot --list
+    uv run pytest -q ;;
+  suction) shift; exec uv run dobot-suction "$@" panel ;;
+  jog) shift; exec uv run dobot-jog "$@" ;;
+  *) echo "使い方: ./scripts/start.sh [auto|launcher|wizard|demo|dry|check|suction|jog]"; exit 2 ;;
+esac

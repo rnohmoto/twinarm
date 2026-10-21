@@ -13,10 +13,11 @@ env:
   MISE_VERSION: 2026.8.9
 
 jobs:
-  # Runs exactly what `mise run check` runs locally. discovery/ is absent on
-  # purpose: its scripts need real arms attached.
+  # Runs exactly what `mise run check` runs locally: twinarm, twinarm-web-ui and
+  # discovery/koch's offline tests. The koch rehearsal (simulated servos, wall-clock
+  # checks) and discovery/dobot (needs hardware) stay out on purpose.
   check:
-    name: check (twinarm, twinarm-web-ui)
+    name: check (twinarm, twinarm-web-ui, koch)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -35,7 +36,7 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ~/.cache/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('twinarm/uv.lock') }}
+          key: uv-${{ runner.os }}-${{ hashFiles('twinarm/uv.lock', 'discovery/koch/uv.lock') }}
           restore-keys: uv-${{ runner.os }}-
 
       - uses: actions/cache@v6
@@ -47,6 +48,10 @@ jobs:
       - name: Install twinarm dependencies
         run: mise exec -- uv sync
         working-directory: twinarm
+
+      - name: Install koch dependencies
+        run: mise exec -- uv sync
+        working-directory: discovery/koch
 
       - name: Install web UI dependencies
         run: mise run install

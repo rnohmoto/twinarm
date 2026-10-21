@@ -1,0 +1,61 @@
+[project]
+name = "koch"
+version = "0.1.0"
+description = "Koch v1.1 arms bench: teleop with force feedback, dual-pair launcher, VR bridge, panel, wireless follower host and bus tools"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dynamixel-sdk>=3.8.4",
+    "lerobot[dynamixel]>=0.6.1",
+    "matplotlib>=3.10",
+    "pyserial>=3.5",
+]
+
+[project.scripts]
+koch-teleop = "koch.teleop:main"
+koch-launch = "koch.launch:main"
+koch-bridge = "koch.bridge:main"
+koch-panel = "koch.panel:main"
+koch-host = "koch.follower_host:main"
+koch-plot = "koch.live_plot:main"
+koch-calib = "koch.calib_offset:main"
+koch-quest = "koch.quest_usb:main"
+koch-scan = "koch.scan:main"
+koch-set-id = "koch.set_id:main"
+koch-current = "koch.current_monitor:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4",
+    "pytest-cov>=7.0",
+    "ruff>=0.16.3",
+    "ty>=0.0.72",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Co-located test packages stay out of the wheel; they import dev-only deps.
+wheel-exclude = ["tests"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["src"]
+markers = [
+    "unit: fast tests that need no hardware or I/O",
+    "integration: tests that open loopback sockets or spawn processes (still no hardware)",
+]
+
+[tool.coverage.run]
+# Tests live inside the package; they are not part of the measured surface.
+omit = ["*/tests/*"]
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+
+[tool.ruff.lint]
+# Bench scratch tools promoted from the git-ignored work/tools; docstrings are optional there.
+# (extend-, so the shared test-file ignores from the root config are kept.)
+extend-per-file-ignores = { "src/koch/tools/**" = ["D"] }

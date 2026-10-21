@@ -1,0 +1,4 @@
+# Machine-specific config, run artifacts, vendored three.js (fetch with webxr/setup_assets.py)
+/config/config.json
+/work/
+/webxr/three.module.js

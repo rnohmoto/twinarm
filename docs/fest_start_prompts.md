@@ -10,33 +10,33 @@ Learning Fest（2026-10-26/27）の前に、Mac 4 台で実機を立ち上げる
 5. 終わったら Claude に「実機ログを書いて」と頼む（§5）。
 
 ## 2. 役割表（Mac 4 台 × 腕 4 本 × ゴーグル 3 台）
-| Mac | 役割 | つなぐ物 | 起動（`discovery` で） | ページ | 段（`discovery/koch4/CHECKLIST.md`） |
+| Mac | 役割 | つなぐ物 | 起動（`discovery/koch` で） | ページ | 段（`discovery/koch/docs/CHECKLIST.md`） |
 |---|---|---|---|---|---|
-| A | 握手（ペア A・差分反射式） | リーダー A（5 V）＋フォロワー A（12 V）＝USB シリアル 2 本・握手ハンド | `./koch4/mac/koch.sh handshake` | パネル http://127.0.0.1:8780 | S0 → TEST 2 → 2b → 5 → 6 |
-| B | VR 1 人目（リーダー B） | リーダー B（5 V）＝USB シリアル 1 本・Quest Pro #1（データ対応 USB-C ケーブル） | `koch4/mac/3_VR1人目_リーダーB.command`（＝`PAIR=B ./koch4/mac/koch.sh vr-leader`。uv sync・設定・Quest の許可待ち・reverse・見張りまで自動） | ゴーグル http://localhost:8444/ ・Mac の操作ページ …`?spectator=1&info=1` | S0 → U0 → V1 → V0 → V-w → V-c → V-e → V2 → V4 → V3 |
-| C | VR 2 人目（フォロワー B を手で） | フォロワー B（12 V）＝USB シリアル 1 本・Quest Pro #2 | `koch4/mac/4_VR2人目_フォロワーB.command`（＝`PAIR=B ./koch4/mac/koch.sh vr-follower`。Quest も自動で開く） | ゴーグル http://localhost:8443/ ・Mac の操作ページ | S0 → U0 → V5 |
+| A | 握手（ペア A・差分反射式） | リーダー A（5 V）＋フォロワー A（12 V）＝USB シリアル 2 本・握手ハンド | `./mac/koch.sh handshake` | パネル http://127.0.0.1:8780 | S0 → TEST 2 → 2b → 5 → 6 |
+| B | VR 1 人目（リーダー B） | リーダー B（5 V）＝USB シリアル 1 本・Quest Pro #1（データ対応 USB-C ケーブル） | `mac/3_VR1人目_リーダーB.command`（＝`PAIR=B ./mac/koch.sh vr-leader`。uv sync・設定・Quest の許可待ち・reverse・見張りまで自動） | ゴーグル http://localhost:8444/ ・Mac の操作ページ …`?spectator=1&info=1` | S0 → U0 → V1 → V0 → V-w → V-c → V-e → V2 → V4 → V3 |
+| C | VR 2 人目（フォロワー B を手で） | フォロワー B（12 V）＝USB シリアル 1 本・Quest Pro #2 | `mac/4_VR2人目_フォロワーB.command`（＝`PAIR=B ./mac/koch.sh vr-follower`。Quest も自動で開く） | ゴーグル http://localhost:8443/ ・Mac の操作ページ | S0 → U0 → V5 |
 | D | 卓上（Magician の P&P・声・俯瞰カメラ） | Magician（USB シリアル）・C922n（三脚・俯瞰）・マイク | `cd dobot && ./start.sh`（初回は wizard） | パネル http://127.0.0.1:8790 | §4 D の M0 → M1・M2 → M3 → 声 |
 
 - Quest Pro #3 は予備。3 台とも同じアカウントで初期設定し、USB デバッグの許可は Mac B と Mac C の両方で済ませる（許可は Mac とヘッドセットの組ごと）。
-- 設定ファイル `discovery/koch4/config/koch4_config.json` は Mac ごと（git 管理外）。較正 JSON（A・B 両ペア）と物体プリセット `koch4_twin.json` は main に入っている。Mac C の 2 人目は `config/solo_F/koch4_twin.json` が別ファイル。
+- 設定ファイル `discovery/koch/config/config.json` は Mac ごと（git 管理外）。較正 JSON（A・B 両ペア）と物体プリセット `twin.json` は main に入っている。Mac C の 2 人目は `config/solo_F/twin.json` が別ファイル。
 - 元の設計は 1 台の Mac で 3 つを同時に動かす形（`koch.sh all`）。分けても各プロセスは独立で、別の Mac ならポートは競合しない。Mac 同士の通信は無い。
 
 ## 3. 新しい Mac の導入（コピペ・ネットのある所で・1 台 30〜45 分）
 ```bash
-uname -m                                   # arm64 であること（Intel は不可: discovery の uv.lock に torch の macOS x86_64 ホイールが無い）
+uname -m                                   # arm64 であること（Intel は不可: discovery/koch の uv.lock に torch の macOS x86_64 ホイールが無い）
 xcode-select --install                     # git。入っていれば「already installed」
 curl -LsSf https://astral.sh/uv/install.sh | sh    # uv。終わったらターミナルを開き直す
-git clone https://github.com/rnohmoto/twinarm.git && cd twinarm/discovery
-./koch4/start.sh check                     # uv sync（Python 3.13 と依存を自動取得・約 200 MB）→ selftest → three.js 取得 → ポート一覧 → adb の有無
-uv run python koch4/koch4_dual_launch.py --list    # ポート名と USB シリアル番号（読み取りのみ）
-uv run python koch4/koch4_dual_launch.py --init    # config/koch4_config.json の雛形 → この Mac に挿す腕の行だけ記入（推測しない）
-./koch4/start.sh rehearse                  # 仮想のサーボで通し稽古・約 3 分。「すべて通りました」で合格
+git clone https://github.com/rnohmoto/twinarm.git && cd twinarm/discovery/koch
+./start.sh check                     # uv sync（Python 3.13 と依存を自動取得・約 200 MB）→ selftest → three.js 取得 → ポート一覧 → adb の有無
+uv run koch-launch --list    # ポート名と USB シリアル番号（読み取りのみ）
+uv run koch-launch --init    # config/config.json の雛形 → この Mac に挿す腕の行だけ記入（推測しない）
+./start.sh rehearse                  # 仮想のサーボで通し稽古・約 3 分。「すべて通りました」で合格
 ```
 VR の Mac（B・C）はさらに:
 ```bash
-brew install --cask android-platform-tools # adb。Homebrew が無ければ Android の platform-tools zip を取り、koch4_quest_usb.py に --adb <path> で渡す
-# Quest 側: 開発者モード ON → USB で Mac へ → 設定 → 開発者 → MTP 通知 ON → 「USB デバッグを許可」→「常に許可」（discovery/koch4/manual/quest_setup.html §7）
-uv run python koch4/koch4_quest_usb.py --check     # 「✓ <番号>: 接続済み（adb 可・USB）」と電池残量
+brew install --cask android-platform-tools # adb。Homebrew が無ければ Android の platform-tools zip を取り、quest_usb.py に --adb <path> で渡す
+# Quest 側: 開発者モード ON → USB で Mac へ → 設定 → 開発者 → MTP 通知 ON → 「USB デバッグを許可」→「常に許可」（discovery/koch/docs/manual/quest_setup.html §7）
+uv run koch-quest --check     # 「✓ <番号>: 接続済み（adb 可・USB）」と電池残量
 ```
 卓上の Mac（D）は:
 ```bash
@@ -51,39 +51,39 @@ export ANTHROPIC_API_KEY=...               # 無ければルール解析だけ�
 
 ### A. 握手（ペア A）
 ```
-twinarm の discovery/koch4 で握手（ペア A だけ）を実機で立ち上げます。いま動いている PC は「握手の Mac A」です。
-読む順: AGENTS.md（実機安全）→ discovery/koch4/HANDOFF.md → discovery/koch4/manual/handshake.html → discovery/koch4/CHECKLIST.md の S0・TEST 2・2b・5・6 → docs/fest_start_prompts.md §2。
+twinarm の discovery/koch で握手（ペア A だけ）を実機で立ち上げます。いま動いている PC は「握手の Mac A」です。
+読む順: AGENTS.md（実機安全）→ discovery/koch/docs/HANDOFF.md → discovery/koch/docs/manual/handshake.html → discovery/koch/docs/CHECKLIST.md の S0・TEST 2・2b・5・6 → docs/fest_start_prompts.md §2。
 やりたいこと: フェスの握手体験（来場者がフォロワー A に手を出し、操作者がリーダー A で握り返す。ミラー制御なし）を、実機で 30 分通し、握手ハンドを付けた形まで確かめる。
-- 最初に git pull → cd discovery → ./koch4/start.sh check を実行し、「起動できるもの」の表とポート一覧を私に見せる（腕は動かない）
-- config/koch4_config.json のペア A のポートは私が渡す（--list の結果から私が選ぶ。推測しない。リーダーとフォロワーは入替不可）
-- 腕が動くコマンド（./koch4/mac/koch.sh handshake。中身は koch4_dual_launch.py --pair A --ff gripper --grip-ma 500 --extra "--ff-style error --max-rel 20 --ff-ke 15 --ff-cap 500"。ゲインと上限は 10/19 の仮設定）は、私がこの会話で明示的に頼んだときだけ実行する。実機の挙動は私の報告だけを事実にする
+- 最初に git pull → cd discovery/koch → ./start.sh check を実行し、「起動できるもの」の表とポート一覧を私に見せる（腕は動かない）
+- config/config.json のペア A のポートは私が渡す（--list の結果から私が選ぶ。推測しない。リーダーとフォロワーは入替不可）
+- 腕が動くコマンド（./mac/koch.sh handshake。中身は launch.py --pair A --ff gripper --grip-ma 500 --extra "--ff-style error --max-rel 20 --ff-ke 15 --ff-cap 500"。ゲインと上限は 10/19 の仮設定）は、私がこの会話で明示的に頼んだときだけ実行する。実機の挙動は私の報告だけを事実にする
 - 進め方: S0 → TEST 2（ペア A 単独の回帰）→ 2b（フォロワー握力の上限 500 mA で過負荷停止と滑りの境）→ 5（30 分の連続稼働）→ 6（握手ハンド装着後の体験リハ）を 1 つずつ。各テストの記録欄を埋める
-- 握りの硬さや上限を変えるときは環境変数で: FF_KE=20 FF_CAP=600 ./koch4/mac/koch.sh handshake（ke＝差分ゲイン mA/unit＝硬さ、cap＝握っている間の最大電流）。10/19 の仮設定は ke 15・cap 500（launcher の素の既定は ke 9・cap 450）。パネルのスライダ「(error)差分ゲイン」「握り上限mA」で動かしながらも変えられる。cap を上げるほど握っている間の発熱が速い（450→900 で 4 倍）。60 ℃で ke 半減・65 ℃で握り返し停止（停止後は冷えてから再起動）。cap を上げる前に TEST 5（30 分）で温度の曲線を取る
+- 握りの硬さや上限を変えるときは環境変数で: FF_KE=20 FF_CAP=600 ./mac/koch.sh handshake（ke＝差分ゲイン mA/unit＝硬さ、cap＝握っている間の最大電流）。10/19 の仮設定は ke 15・cap 500（launcher の素の既定は ke 9・cap 450）。パネルのスライダ「(error)差分ゲイン」「握り上限mA」で動かしながらも変えられる。cap を上げるほど握っている間の発熱が速い（450→900 で 4 倍）。60 ℃で ke 半減・65 ℃で握り返し停止（停止後は冷えてから再起動）。cap を上げる前に TEST 5（30 分）で温度の曲線を取る
 - 終わったら実機ログ md を書く（docs/fest_start_prompts.md §5）
 ```
 
 ### B. VR 1 人目（リーダー B × Quest Pro #1）
 ```
-twinarm の discovery/koch4 で VR（1 人目・リーダー B）を実機と Quest Pro で立ち上げます。いま動いている PC は「VR の Mac B」です。
-読む順: AGENTS.md → discovery/koch4/HANDOFF.md → discovery/koch4/manual/vr.html → discovery/koch4/CHECKLIST.md の S0・U0・V 系 → docs/fest_start_prompts.md §2。Quest の準備（開発者モード・USB の許可）がまだなら discovery/koch4/manual/quest_setup.html の ②〜⑦ から。
+twinarm の discovery/koch で VR（1 人目・リーダー B）を実機と Quest Pro で立ち上げます。いま動いている PC は「VR の Mac B」です。
+読む順: AGENTS.md → discovery/koch/docs/HANDOFF.md → discovery/koch/docs/manual/vr.html → discovery/koch/docs/CHECKLIST.md の S0・U0・V 系 → docs/fest_start_prompts.md §2。Quest の準備（開発者モード・USB の許可）がまだなら discovery/koch/docs/manual/quest_setup.html の ②〜⑦ から。
 やりたいこと: ゴーグルの中の仮想の物（スポンジ・ボール・鉄ブロック）をリーダー B で握ったときに、硬さと重さが手に返る状態にし、10/19 の体験に出せるかを判断する。
-- 最初に git pull → cd discovery → ./koch4/start.sh check を実行し、「起動できるもの」と Quest の接続・電池残量を私に見せる（腕は動かない）
-- 腕が動くコマンド（koch4/mac/3_VR1人目_リーダーB.command＝PAIR=B ./koch4/mac/koch.sh vr-leader。重さ 60 mA・肘反転・Quest の許可待ちと reverse・USB の見張り・Mac の操作ページまで自動）は、私が明示的に頼んだときだけ。ポートは fest 設定のシリアル番号で解決される（違う腕なら --list で直す）。実機の挙動は私の報告だけを事実にする
+- 最初に git pull → cd discovery/koch → ./start.sh check を実行し、「起動できるもの」と Quest の接続・電池残量を私に見せる（腕は動かない）
+- 腕が動くコマンド（mac/3_VR1人目_リーダーB.command＝PAIR=B ./mac/koch.sh vr-leader。重さ 60 mA・肘反転・Quest の許可待ちと reverse・USB の見張り・Mac の操作ページまで自動）は、私が明示的に頼んだときだけ。ポートは fest 設定のシリアル番号で解決される（違う腕なら --list で直す）。実機の挙動は私の報告だけを事実にする
 - AR 中はゴーグルにボタンも文字も出ない（Quest Browser は DOM overlay を描かない）。位置合わせはゴーグルの中で分身をつまんで動かす（離して 1.5 秒で保存＝アンカー登録）。細かい操作と状態の確認は Mac の操作ページ（http://localhost:8444/?spectator=1&info=1）から
-- 進め方: S0 → U0 → V1（./koch4/start.sh sim と Quest で表示）→ V0（壁だけ・ゴーグルなし）→ V-w（重さの上限は低くから）→ V-c（つかんで合わせ・アンカー復元）→ V-e（編集モード・高さと置き場所）→ V2（実機リーダー × VR）→ V4（投げる・落とす）→ V3（フェス形態の判断）を 1 つずつ。10/19 の記録は discovery/koch4/LOG_261019_VR.md、要件は REQUIREMENTS_VR.md
-- V-e で、物体ごとの硬さ p_gain（50 刻み）と上限 cap_ma（10 刻み）をゴーグル内のスライダで掃引し、体感と CSV（--extra "--csv"）を記録する。既定はスポンジ P250／120 mA・ボール P900／350・鉄ブロック P2000／450。保存先は config/koch4_twin.json（Mac C に写すなら枝に載せる）
-- 給電: 電池残量を 30 分の体験の前後で記録する（USB のまま／充電口つきケーブル／Wi-Fi 切替 ./koch4/start.sh wifi）
+- 進め方: S0 → U0 → V1（./start.sh sim と Quest で表示）→ V0（壁だけ・ゴーグルなし）→ V-w（重さの上限は低くから）→ V-c（つかんで合わせ・アンカー復元）→ V-e（編集モード・高さと置き場所）→ V2（実機リーダー × VR）→ V4（投げる・落とす）→ V3（フェス形態の判断）を 1 つずつ。10/19 の記録は discovery/koch/docs/LOG_261019_VR.md、要件は REQUIREMENTS_VR.md
+- V-e で、物体ごとの硬さ p_gain（50 刻み）と上限 cap_ma（10 刻み）をゴーグル内のスライダで掃引し、体感と CSV（--extra "--csv"）を記録する。既定はスポンジ P250／120 mA・ボール P900／350・鉄ブロック P2000／450。保存先は config/twin.json（Mac C に写すなら枝に載せる）
+- 給電: 電池残量を 30 分の体験の前後で記録する（USB のまま／充電口つきケーブル／Wi-Fi 切替 ./start.sh wifi）
 - 終わったら実機ログ md を書く（docs/fest_start_prompts.md §5）
 ```
 
 ### C. VR 2 人目（フォロワー B を手で × Quest Pro #2）
 ```
-twinarm の discovery/koch4 で VR の 2 人目（フォロワー B を手で動かす側・別の空間）を実機と Quest Pro で立ち上げます。いま動いている PC は「VR の Mac C」です。
-読む順: AGENTS.md → discovery/koch4/HANDOFF.md → discovery/koch4/manual/vr.html → discovery/koch4/CHECKLIST.md の S0・U0・V5 → docs/fest_start_prompts.md §2。
+twinarm の discovery/koch で VR の 2 人目（フォロワー B を手で動かす側・別の空間）を実機と Quest Pro で立ち上げます。いま動いている PC は「VR の Mac C」です。
+読む順: AGENTS.md → discovery/koch/docs/HANDOFF.md → discovery/koch/docs/manual/vr.html → discovery/koch/docs/CHECKLIST.md の S0・U0・V5 → docs/fest_start_prompts.md §2。
 やりたいこと: 2 人目がフォロワー B を手で動かして、同じ仮想の物を握れる状態にする（1 人目と同じ体験を 2 台目のゴーグルで）。
-- 最初に git pull → cd discovery → ./koch4/start.sh check。Quest の接続は uv run python koch4/koch4_quest_usb.py --check
-- config/koch4_config.json は無ければ fest 設定（4 本のシリアル入り）から自動で作られ、ポートはシリアル番号で解決される。違う腕を挿すときだけ --list を見て私が直す（推測しない）
-- 起動は koch4/mac/4_VR2人目_フォロワーB.command（＝PAIR=B ./koch4/mac/koch.sh vr-follower。ページは http://localhost:8443/）。Quest Pro #2 の許可（この Mac で「常に許可」）が済んでいれば、ゴーグルのページは自動で開き、USB が切れても見張りが張り直す。Mac の操作ページは http://localhost:8443/?spectator=1&info=1
+- 最初に git pull → cd discovery/koch → ./start.sh check。Quest の接続は uv run koch-quest --check
+- config/config.json は無ければ fest 設定（4 本のシリアル入り）から自動で作られ、ポートはシリアル番号で解決される。違う腕を挿すときだけ --list を見て私が直す（推測しない）
+- 起動は mac/4_VR2人目_フォロワーB.command（＝PAIR=B ./mac/koch.sh vr-follower。ページは http://localhost:8443/）。Quest Pro #2 の許可（この Mac で「常に許可」）が済んでいれば、ゴーグルのページは自動で開き、USB が切れても見張りが張り直す。Mac の操作ページは http://localhost:8443/?spectator=1&info=1
 - 接続直後と終了時にフォロワー B のトルクが抜ける。私が腕を支えてから Enter を押す。腕が動くコマンドは私が明示的に頼んだときだけ。実機の挙動は私の報告だけを事実にする
 - 進め方: S0 → U0 → V5（CHECKLIST）。重さは --vw-cap 60 --vw-pwm-cap 80（既定）から上げる。摩擦アシストは環境変数 ASSIST（既定 elbow_flex,wrist_flex・上限 25 mA）
 - 終わったら実機ログ md を書く（docs/fest_start_prompts.md §5）
@@ -107,5 +107,5 @@ twinarm の dobot で卓上ロボット（Dobot Magician）のピック＆プレ
 
 ## 5. 記録
 - robotics リポジトリ（user-m-s/robotics）がこの Mac にあるなら、`TacitCapture/` に実機ログ md（61_ の型・119_ 以降の番号）を書き、`.claude/cases/` の該当案件に 1 節足す。
-- 無ければ、Claude にこの会話の末尾へ「実機ログ」（日付・Mac・段ごとの結果・数値・直した設定・次）を書かせ、`discovery/koch4/CHECKLIST.md` の記録欄を埋める。後で robotics に写す。
-- twinarm のコードを直したときは枝 → `discovery/koch4/start.sh rehearse`（koch4）／`uv run pytest`（dobot）→ 実機。main へのマージは本人の指示があるときだけ。
+- 無ければ、Claude にこの会話の末尾へ「実機ログ」（日付・Mac・段ごとの結果・数値・直した設定・次）を書かせ、`discovery/koch/docs/CHECKLIST.md` の記録欄を埋める。後で robotics に写す。
+- twinarm のコードを直したときは枝 → `discovery/koch/start.sh rehearse`（koch）／`uv run pytest`（dobot）→ 実機。main へのマージは本人の指示があるときだけ。

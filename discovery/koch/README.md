@@ -15,12 +15,12 @@ here.
 
 ```
 koch/                      a uv project: `cd discovery/koch && uv sync`
-├── start.sh               one entry point: check / handshake / host / vr / vr2 / sim / rehearse / quest / wifi / manual
-├── mac/                   koch.sh (the launcher of record for VR) and the *.command files for Finder
+├── scripts/               start.sh, one entry point: check / handshake / host / vr / vr2 / sim / rehearse / quest / wifi / manual;
+│                          koch.sh (the launcher of record for VR) and the *.command files for Finder
 ├── src/koch/              the package behind the console scripts
 │   ├── teleop.py          one pair: teleop + telemetry + leader force feedback (3 styles + virtual wall/weight)
 │   ├── launch.py          both pairs by default (--pair A|B for staging), one panel, fixed ports, logs
-│   ├── bridge.py          serves webxr/ to the headset, /state /config /contact for one or two arms
+│   ├── bridge.py          serves src/webxr/ to the headset, /state /config /contact for one or two arms
 │   ├── panel.py (+ .html) one browser panel for every pair: shared sliders broadcast to all pairs
 │   ├── follower_host.py   wireless follower: the computer next to the follower, driven over UDP
 │   ├── live_plot.py       matplotlib telemetry viewer
@@ -31,9 +31,9 @@ koch/                      a uv project: `cd discovery/koch && uv sync`
 │   ├── motors.py, dxl.py, paths.py, control.py, telemetry.py, remote_follower.py, sim_follower.py,
 │   │   lerobot_compat.py, console.py, selfcheck.py   the shared pieces the entry points import
 │   ├── tools/             bench diagnostics, `python -m koch.tools.<name>` (preflight, snapshot, watchdog, ...)
-│   └── tests/             offline pytest suite (`mise run test`)
-├── simbus/                rehearsal with no arms: a virtual Dynamixel bus (dynamixel_sdk/) and rehearse.py
-├── webxr/index.html       three.js page: twins (1-2 arms), objects with physics, grab-to-move alignment, editor
+│   ├── tests/             offline pytest suite (`mise run test`)
+│   └── simbus/            rehearsal with no arms: a virtual Dynamixel bus (dynamixel_sdk/) and rehearse.py
+├── src/webxr/index.html   three.js page: twins (1-2 arms), objects with physics, grab-to-move alignment, editor
 ├── config/                config.json (git-ignored; see config.example.json / config.fest.json), twin.json, solo_*/twin.json
 │   └── calibration/koch_follower/<id>.json, koch_leader/<id>.json   ← lerobot calibration
 ├── docs/                  HANDOFF.md, CHECKLIST.md, REQUIREMENTS_VR.md, LOG_261019_VR.md, manual/*.html
@@ -50,9 +50,9 @@ is read and written under `config/calibration/` instead of `~/.cache/huggingface
 ```bash
 cd discovery/koch
 uv sync                 # one venv for everything here (lerobot, pyserial, matplotlib, dynamixel-sdk)
-./start.sh check        # no hardware: self-test, readiness report, port list, Quest check
+./scripts/start.sh check        # no hardware: self-test, readiness report, port list, Quest check
 mise run check          # ruff + ty + the offline tests
-./start.sh rehearse     # about 3 minutes against simulated servos; run it alone
+./scripts/start.sh rehearse     # about 3 minutes against simulated servos; run it alone
 ```
 
 | Console script | Module | What it is |
@@ -70,16 +70,16 @@ mise run check          # ruff + ty + the offline tests
 | `koch-current` | `koch.current_monitor` | standalone current recorder |
 
 Python-internal spawns use `python -m koch.<module>` (same venv, inherits the simbus `PYTHONPATH`);
-`mac/koch.sh` does the same so `status` / `stop` see one process per session.
+`scripts/koch.sh` does the same so `status` / `stop` see one process per session.
 
 ## Entry points for the fest
 
-`./start.sh <mode>` from this folder — `check` / `handshake [...]` / `host A|B <port>` / `vr [...]`
+`./scripts/start.sh <mode>` from this folder — `check` / `handshake [...]` / `host A|B <port>` / `vr [...]`
 / `vr2 [...]` / `sim` / `rehearse [name]` / `quest` / `wifi` / `manual`. Arguments after the mode go
-to the launcher (`./start.sh handshake --pair A`, `./start.sh vr --extra "--vw-cap 60"`).
+to the launcher (`./scripts/start.sh handshake --pair A`, `./scripts/start.sh vr --extra "--vw-cap 60"`).
 Environment: `VR_PAIR=A|B` (default B), `GRIP_MA` (default 500), `VR_MIRROR=1`.
 
-`./mac/koch.sh <mode>` is the launcher of record for VR and what the `mac/*.command` files run from
+`./scripts/koch.sh <mode>` is the launcher of record for VR and what the `scripts/*.command` files run from
 Finder: `handshake` / `vr-leader` / `vr-follower` / `quest` / `all` / `status` / `stop`, with
 `PAIR=A|B` (default B). It creates `config/config.json` from `config/config.fest.json` when missing,
 resolves ports by USB serial, opens the Mac operator page (`?spectator=1&info=1`), waits for the
@@ -94,19 +94,19 @@ Risk classes are the ones defined in [`../README.md`](../README.md).
 | ------ | ------- | ------------- | --------- |
 | `koch-teleop` | One pair. `--ff gripper --ff-style spring` (default; the 2026-09-04 fixes) / `--ff-style error` / `--ff arm` (untested on hardware) / `--ff vwall` (virtual wall, follower optional: `--follower-port none`) / `--vw` (virtual weight on `shoulder_lift` + `elbow_flex`, only while an object is grasped; `--vw-scale`, `--vw-cap` 120 mA, `--vw-invert`) / `--follower-grip-ma` (Goal_Current cap on the follower gripper against overload shutdowns). `--leader-type koch_follower` uses a Koch follower *moved by hand* as the input device (second player: arm joints torque-free, gripper wall only, weight on the elbow by current and on the XL430 shoulder by PWM mode with `--vw-pwm-scale` / `--vw-pwm-cap`, M288 current scaling, `--arm-label`). `--selftest` runs the laws with no hardware. | moves motors; force feedback and `--vw` put leader joints into current control; `vwall` holds the leader gripper in current-based position mode | UDP telemetry out (`--viz-port`, comma list), control in (`--ctl-port`), CSV in `work/csv/` |
 | `koch-launch` | `--list` ports+serials (read-only), `--init` config template, `--doctor` readiness report (config, port names present, calibration files, VR asset → what can start; opens nothing), `--follower wireless` / `wired` / `none` (`none` = leader only, the follower need not be plugged in: one-player VR), `--pair both` (default) / `A` / `B`, `--vr A|B` (+`--vw`) adds the bridge and forces that pair to `vwall`, `--vr2` also starts that pair's follower as a hand-moved second input (ports 8771/8772/8773) and gives the bridge both arms, `--grip-ma`, `--dry-run`. Ports: A 8765/8766 (+8769/8443), B 8767/8768 (+8770/8444), panel 8780. | launches `koch-teleop` → moves motors | logs in `work/logs/dual_*.log` |
-| `mac/koch.sh` and `mac/*.command` | Mac launchers and the launcher of record for VR (the `.command` files start from Finder with a double click): `handshake` (pair A, `--ff-style error`), `vr-leader` (leader by hand, page on 8444/8445), `vr-follower` (follower by hand in its own scene, page on 8443/8446, twin config in `config/solo_F/`), `quest` (re-add the reverse and reopen the page), `all`, `status`, `stop`. `PAIR=A|B`. Creates `config/config.json` from `config/config.fest.json` when missing, resolves ports by USB serial, opens the Mac operator page (`?spectator=1&info=1`), waits for the headset's USB-debugging allow, adds the reverse and reopens it whenever the USB link re-enumerates (10/19). | moves motors, torque off (`vr-follower` at start and stop, `stop`) | serial, UDP, HTTP |
+| `scripts/koch.sh` and `scripts/*.command` | Mac launchers and the launcher of record for VR (the `.command` files start from Finder with a double click): `handshake` (pair A, `--ff-style error`), `vr-leader` (leader by hand, page on 8444/8445), `vr-follower` (follower by hand in its own scene, page on 8443/8446, twin config in `config/solo_F/`), `quest` (re-add the reverse and reopen the page), `all`, `status`, `stop`. `PAIR=A|B`. Creates `config/config.json` from `config/config.fest.json` when missing, resolves ports by USB serial, opens the Mac operator page (`?spectator=1&info=1`), waits for the headset's USB-debugging allow, adds the reverse and reopens it whenever the USB link re-enumerates (10/19). | moves motors, torque off (`vr-follower` at start and stop, `stop`) | serial, UDP, HTTP |
 | `koch-panel` | One page for all launched pairs: status chips and 4 graphs per pair, one row of sliders and mode buttons (OFF / gripper / arm / vwall) that go to every pair. | network only, but it commands live teleop sessions | HTTP `--http`, UDP in `--telemetry` (list), out `--ctl-port` (list) |
 | `koch-plot` | matplotlib telemetry viewer. | network only | UDP in |
 | `koch-calib` | Torque off both arms, hold the same pose by hand, print raw ticks and normalized % per joint with the JSON fix to apply. Reads `config/calibration/`. | torque off (both arms) | reads calibration JSON |
 | `koch-host` | **Wireless follower.** Runs on the computer next to the follower (Raspberry Pi 4, or any Windows/Mac/Linux PC with lerobot): receives joint targets over UDP from the Mac's teleop (`--follower-port udp://<host>:9101`), drives lerobot's KochFollower, streams currents/positions/temperature/errors back. Holds the pose after 0.5 s without targets (torque kept), ramps back in after a gap; `--sim` needs no hardware. Same role as lerobot's LeKiwi host. | moves motors | UDP `--listen` (A 9101, B 9102) |
-| `koch-bridge` | Serves `webxr/`, republishes telemetry as `/state` (every arm; `--arms B,F` with one telemetry/control port per arm), keeps `config/twin.json` (v2: per-arm joints/base, objects with bounce, desk) behind `/config`, forwards `POST /contact {"arm","vwall"}` to that arm's teleop and the twin joint map to it (for the weight FK). `--sim` needs no teleop. | network only, but it commands the leader's virtual wall and weight (clamped by the teleop; dropped after 3 s without a refresh) | HTTP(S) `--port`, UDP in `--telemetry`, out `--ctl-port` |
+| `koch-bridge` | Serves `src/webxr/`, republishes telemetry as `/state` (every arm; `--arms B,F` with one telemetry/control port per arm), keeps `config/twin.json` (v2: per-arm joints/base, objects with bounce, desk) behind `/config`, forwards `POST /contact {"arm","vwall"}` to that arm's teleop and the twin joint map to it (for the weight FK). `--sim` needs no teleop. | network only, but it commands the leader's virtual wall and weight (clamped by the teleop; dropped after 3 s without a refresh) | HTTP(S) `--port`, UDP in `--telemetry`, out `--ctl-port` |
 | `koch-quest` | USB route for the headset: finds adb, `adb reverse tcp:<port> tcp:<port>`, opens `http://localhost:<port>/` in Quest Browser (`--spectator`, `--mirror` = scrcpy, `--wifi` = move adb to Wi-Fi so the headset's USB port can take a 45 W charger, `--check` = status and battery level only, `--wait N` = wait for the USB-debugging allow, `--watch` = keep running and re-add the reverse when the USB link re-enumerates, `--devtools` = also forward Chrome DevTools on 9222). Needs developer mode once (CHECKLIST U0). | none (network only) | adb over USB |
 | `koch-scan` | Broadcast-ping an assembled arm at 1 Mbps and 57600 bps (a motor fresh out of the box answers only there); prints ID, model and firmware. `--loop SECONDS` reads positions in a loop and counts failures (comms stability test). | read-only | — |
 | `koch-set-id` | `<port> <current-id> <new-id>`: change one motor's ID; refuses unless exactly that motor is on the bus. `--setup --port <port> [--id] [--type]`: lerobot's `setup_motors()` (IDs and baud, interactively). | writes motor config | — |
 | `koch-current` | Real-time current/load plots for one or two arms straight from the bus, with per-axis statistics on exit and a CSV under `work/csv/`. Cannot share a port with a running teleop. | **torque off** on every listed ID at start and at exit; `--torque on` energizes instead | CSV out |
 | `python -m koch.tools.<name>` | Bench diagnostics promoted from the old `work/tools/`: `preflight` (read-only go/no-go), `register_snapshot`, `reg_diff`, `pos_trace` (read-only), `match_leader` and `fit_twin` (rewrite calibration / twin JSON; no motor writes), `watchdog` (network only), `spawn_detached`, `torque_off` (**torque off**, cleanup after a crash). | read-only except `torque_off` | serial, files |
-| `webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. `start.sh check` runs it. | none | network (once) |
-| `simbus/rehearse.py` | Runs the launcher, teleop, bridge, panel and follower host against simulated servos (`simbus/dynamixel_sdk`, a stand-in for the SDK that lerobot loads from `PYTHONPATH`) and checks frame rate, feedback commands, register write order, refused EEPROM writes and torque at exit. Scenarios: `handshake` `vr` `vr2` `wireless` `mismatch` `dropout` `fest`. See [`simbus/README.md`](simbus/README.md). | none (no port is opened; fixed localhost ports, so not next to a live session) | logs in `work/rehearsal/` |
+| `src/webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. `scripts/start.sh check` runs it. | none | network (once) |
+| `src/koch/simbus/rehearse.py` | Runs the launcher, teleop, bridge, panel and follower host against simulated servos (`src/koch/simbus/dynamixel_sdk`, a stand-in for the SDK that lerobot loads from `PYTHONPATH`) and checks frame rate, feedback commands, register write order, refused EEPROM writes and torque at exit. Scenarios: `handshake` `vr` `vr2` `wireless` `mismatch` `dropout` `fest`. See [`src/koch/simbus/README.md`](src/koch/simbus/README.md). | none (no port is opened; fixed localhost ports, so not next to a live session) | logs in `work/rehearsal/` |
 
 ## Wireless follower (leader wired to the Mac, follower on its own computer)
 
@@ -136,7 +136,7 @@ uv run koch-launch --init                     # → config/config.json, fill it 
 uv run koch-launch --pair A --ff gripper      # TEST 2 (staging)
 uv run koch-launch --ff gripper --grip-ma 500 # TEST 4: both pairs (default)
 # VR is a separate track: one leader, wall + weight. USB route (no venue Wi-Fi): bridge over http + adb reverse
-uv run python webxr/setup_assets.py
+uv run python src/webxr/setup_assets.py
 uv run koch-launch --pair B --vr B --vw --vr-http      # page on http://localhost:8444/ in the headset
 uv run koch-quest --port 8444                           # other terminal: adb reverse + open Quest Browser
 uv run koch-launch --pair B --vr B --vw --vr-http --vr2 # two players: the pair's follower moved by hand
@@ -164,7 +164,7 @@ The laws are pure functions in `src/koch/feedback.py`, a verbatim mirror of
 projects), so `tests/test_mirror.py` compares the two by syntax tree and `koch-teleop --selftest`
 runs the mirrored copy on the same vectors.
 
-## VR page (`webxr/index.html`)
+## VR page (`src/webxr/index.html`)
 
 - One twin per arm from `config/twin.json` v2 (`arms: {B: {...}, F: {...}}`; a v1 file with
   top-level `joints`/`base` is migrated to the first arm). Objects (`objects`, in the first arm's
@@ -218,7 +218,7 @@ docs/CHECKLIST.md; write the test first (TDD rule in `../../.claude/rules/common
   editor's offsets are set against the real arm. Object widths are in lerobot's normalized
   0–100 gripper units; the weight lever arms use the twin's link lengths.
 - Checked in a desktop browser (inline mode, `--sim`), with the launcher's `--dry-run`, and end to
-  end against simulated servos on lerobot 0.6.1 (`simbus/`); the second player and the wireless
+  end against simulated servos on lerobot 0.6.1 (`src/koch/simbus/`); the second player and the wireless
   follower have not run on the arms, the VR alignment ran on a Quest Pro on 10/19.
 - When started by the launcher (output in a log file), a teleop whose calibration file differs
   from what the servos hold stops with the reason instead of waiting on lerobot's question; run
@@ -227,11 +227,11 @@ docs/CHECKLIST.md; write the test first (TDD rule in `../../.claude/rules/common
 ## Migrating a Mac from `discovery/koch4/` (temporary, until after the fest)
 
 `git pull` renames the tracked files but leaves the git-ignored ones behind in the old folder.
-Run `./start.sh check` (that is what `mac/0_最初の確認.command` runs) **before** any other
+Run `./scripts/start.sh check` (that is what `scripts/0_最初の確認.command` runs) **before** any other
 `.command`: those create a fresh `config/config.json` from the fest file, after which the old
 per-Mac config is only warned about.
-`./start.sh check` moves the files once: `koch4/config/koch4_config.json` → `config/config.json`,
-`koch4/webxr/three.module.js` → `webxr/`, `koch4/work/` → `work/`, then removes the empty
+`./scripts/start.sh check` moves the files once: `koch4/config/koch4_config.json` → `config/config.json`,
+`koch4/webxr/three.module.js` → `src/webxr/`, `koch4/work/` → `work/`, then removes the empty
 `koch4/`. The venv is new (`discovery/koch/.venv`); `uv sync` reuses the download cache, and
-`discovery/.venv` can be deleted. Remove `migrate_from_koch4` from `start.sh` and this section
+`discovery/.venv` can be deleted. Remove `migrate_from_koch4` from `scripts/start.sh` and this section
 after the fest.

@@ -460,7 +460,7 @@ def doctor(args, config_path):
     print(
         ""
         if asset.exists()
-        else "  → uv run python webxr/setup_assets.py（要ネット・1 回）"
+        else "  → uv run python src/webxr/setup_assets.py（要ネット・1 回）"
     )
     print(f"  {mark[twin.exists()]} 分身と物体の設定 {twin.name}")
     if not config_path.exists():
@@ -509,7 +509,7 @@ def doctor(args, config_path):
         row = "  ".join(f"{mark[ok]} {name}" for name, ok in modes.items())
         print(f"    ペア {pair}: {row}")
     print(
-        "  ※ 無線の握手は、握手用の PC でフォロワー側（start.sh host）が先に動いていること"
+        "  ※ 無線の握手は、握手用の PC でフォロワー側（scripts/start.sh host）が先に動いていること"
     )
 
 

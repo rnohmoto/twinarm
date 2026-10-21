@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Koch 4 本: 握手（ペア A）と VR（どちらのペアでも、2 本を別々の人が手で動かす）を Mac で起動する。これが起動の正本。
-#   ./mac/koch.sh              使い方を表示
-#   ./mac/koch.sh handshake    握手: ペア A・差分反射式（フリーなら戻らない）・握力上限 500 mA・追従リミッタ 20・握り返し 差分ゲイン 15／上限 500 mA（10/19 仮設定）
-#   ./mac/koch.sh vr-leader    VR 1 人目: リーダーを手で。ペア B=http://localhost:8444/  ペア A=http://localhost:8445/
-#   ./mac/koch.sh vr-follower  VR 2 人目: フォロワーを手で（別の空間）。ペア B=http://localhost:8443/  ペア A=http://localhost:8446/
-#   ./mac/koch.sh quest        Quest を繋ぎ直す: 動いているブリッジの口に adb reverse を張り、ゴーグルのブラウザでページを開く
-#   ./mac/koch.sh all          握手 A と VR（ペア B の 2 本）を、ターミナルの窓 3 枚で起動する（Mac 1 台で全部やるとき）
-#   ./mac/koch.sh status       動いているもの・Quest の接続・reverse を表示
-#   ./mac/koch.sh stop         全部止める（握手を止めるとフォロワー A の力が抜ける。先に支える）
+#   ./scripts/koch.sh              使い方を表示
+#   ./scripts/koch.sh handshake    握手: ペア A・差分反射式（フリーなら戻らない）・握力上限 500 mA・追従リミッタ 20・握り返し 差分ゲイン 15／上限 500 mA（10/19 仮設定）
+#   ./scripts/koch.sh vr-leader    VR 1 人目: リーダーを手で。ペア B=http://localhost:8444/  ペア A=http://localhost:8445/
+#   ./scripts/koch.sh vr-follower  VR 2 人目: フォロワーを手で（別の空間）。ペア B=http://localhost:8443/  ペア A=http://localhost:8446/
+#   ./scripts/koch.sh quest        Quest を繋ぎ直す: 動いているブリッジの口に adb reverse を張り、ゴーグルのブラウザでページを開く
+#   ./scripts/koch.sh all          握手 A と VR（ペア B の 2 本）を、ターミナルの窓 3 枚で起動する（Mac 1 台で全部やるとき）
+#   ./scripts/koch.sh status       動いているもの・Quest の接続・reverse を表示
+#   ./scripts/koch.sh stop         全部止める（握手を止めるとフォロワー A の力が抜ける。先に支える）
 # 同じフォルダの .command をダブルクリックしても同じ。止めるのは各窓で Ctrl+C。
-# VR のペアは PAIR=A|B（既定 B）。例: PAIR=A ./mac/koch.sh vr-leader。ペア A の握手と VR は同時には動かせない（同じ腕）。
+# VR のペアは PAIR=A|B（既定 B）。例: PAIR=A ./scripts/koch.sh vr-leader。ペア A の握手と VR は同時には動かせない（同じ腕）。
 # フェスの形: MacBook Pro 1 = vr-leader（リーダー B＋Quest Pro #1）、MacBook Pro 2 = vr-follower（フォロワー B＋Quest Pro #2）。Mac 同士の通信は無い。
 # vr-leader / vr-follower がやること: uv sync → 設定が無ければ fest 設定（4 本のシリアル入り）から作る → ポートをシリアルで解決 →
 #   ブリッジ＋teleop を起動 → Mac のブラウザに操作ページ（観客モード＋文字）→ Quest の許可を待って reverse を張りページを開く →
@@ -23,7 +23,7 @@
 #           VW_INVERT=重さの向きを反転する関節（既定は分身の設定から決める: 向きが「反転」の肩・肘）
 #           QUEST=0 で Quest の接続を扉せず Mac のブラウザだけ（ゴーグル無しの確認）  QUEST_WAIT=許可を待つ秒数（既定 900）
 set -e
-here="$(cd "$(dirname "$0")" && pwd)"        # mac/
+here="$(cd "$(dirname "$0")" && pwd)"        # scripts/
 root="$(cd "$here/.." && pwd)"               # discovery/koch（uv プロジェクトの場所）
 cd "$root"
 
@@ -51,13 +51,13 @@ VR_HTTP_PORTS="8444 8443 8445 8446"
 prepare() {  # prepare [vr]: uv・VR ページの部品・設定ファイル（無ければ fest 設定から）・adb（VR のとき）
   command -v uv >/dev/null 2>&1 || { echo "uv が見つかりません。https://docs.astral.sh/uv/ の手順で入れてください"; exit 1; }
   uv sync -q
-  [ -f webxr/three.module.js ] || uv run python webxr/setup_assets.py
+  [ -f src/webxr/three.module.js ] || uv run python src/webxr/setup_assets.py
   if [ ! -f config/config.json ]; then
     if [ -f "$FEST_CONFIG" ]; then
       cp "$FEST_CONFIG" config/config.json
       echo "config/config.json を fest 設定から作りました（4 本のシリアル番号で現在のポートに解決します）"
     else
-      echo "config/config.json がありません。./start.sh check の案内に従って作ってください"; exit 1
+      echo "config/config.json がありません。./scripts/start.sh check の案内に従って作ってください"; exit 1
     fi
   fi
   if [ "${1:-}" = "vr" ] && [ "$QUEST" = "1" ] && ! command -v adb >/dev/null 2>&1 && [ ! -x /opt/homebrew/bin/adb ]; then
@@ -68,7 +68,7 @@ prepare() {  # prepare [vr]: uv・VR ページの部品・設定ファイル（�
 
 ports_free() {  # ports_free <名前> <UDP 番号...> -- <TCP 番号...>: 使用中なら理由を出して止まる
   local what="$1"; shift
-  "$PY" - "$@" <<'PYEOF' || { echo "⛔ $what は起動しません。同じものが既に動いているか、通し稽古（start.sh rehearse）の最中です。"; echo "   ./mac/koch.sh status で確認し、止めてからもう一度起動してください。"; exit 1; }
+  "$PY" - "$@" <<'PYEOF' || { echo "⛔ $what は起動しません。同じものが既に動いているか、通し稽古（scripts/start.sh rehearse）の最中です。"; echo "   ./scripts/koch.sh status で確認し、止めてからもう一度起動してください。"; exit 1; }
 import socket, sys
 kind, busy = socket.SOCK_DGRAM, []
 for a in sys.argv[1:]:

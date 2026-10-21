@@ -5,7 +5,7 @@
 koch のコマンドに置き換えて 1 枚にしたもの。**合格は、ユーザーが実行して報告した結果だけを事実とする。**
 実機を動かす・トルクを抜くコマンドは、その会話でユーザーが明示的に頼んだときだけ実行する。
 
-入口: `./start.sh`（check／handshake／host／vr／vr2／sim／rehearse／quest／wifi／manual）。図解つきの手引きは `manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`・Quest の準備＝`quest_setup.html`）。
+入口: `./scripts/start.sh`（check／handshake／host／vr／vr2／sim／rehearse／quest／wifi／manual）。図解つきの手引きは `manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`・Quest の準備＝`quest_setup.html`）。
 
 方針（2026-09-20 裁定）: **2ペアが原則**（`--pair both` 既定・パネル 1 枚・ゲインは全ペア同じ値）。
 **VR は別枠**（リーダー 1 本で `--vr`。握手ペアと混ぜない）。
@@ -24,8 +24,8 @@ koch のコマンドに置き換えて 1 枚にしたもの。**合格は、ユ�
 ## S0 — 準備状況と通し稽古（腕に触れない・各 Mac で 1 回）
 
 ```bash
-./start.sh check       # 自己診断・準備状況（起動できるもの）・ポート一覧・Quest。VR ページの部品も取得する
-./start.sh rehearse    # 仮想のサーボで握手・VR・2 人・無線・較正不一致・通信断・同時起動を通す（約 3 分）
+./scripts/start.sh check       # 自己診断・準備状況（起動できるもの）・ポート一覧・Quest。VR ページの部品も取得する
+./scripts/start.sh rehearse    # 仮想のサーボで握手・VR・2 人・無線・較正不一致・通信断・同時起動を通す（約 3 分）
 ```
 - 合格: `check` に「selftest OK」。`rehearse` の最後に「すべて通りました」
 - 通し稽古が確かめるのはソフトの経路だけ（起動・モード切替・書込みの順序・終了時のトルク）。腕の挙動は以下の TEST で確かめる
@@ -183,7 +183,7 @@ uv run koch-teleop --leader-port <L> --follower-port udp://127.0.0.1:9101 --ff g
 ### W2 — 握手の場の PC で（5 GHz 自前ルータ越し）
 - その PC: `uv sync` 済み・フォロワーの USB・12 V 電源。`hostname -I`（Pi/Linux）や `ipconfig`（Windows）で IP を確認
 - **2 台目の MacBook Pro を使う場合（推奨）**: `git clone` → `cd twinarm/discovery/koch && uv sync` → フォロワーを USB で挿す →
-  `./start.sh host A /dev/tty.usbmodemXXXX`（2 本目は `host B <port>`。起動時に、操作者側の設定に書く宛先を表示する。
+  `./scripts/start.sh host A /dev/tty.usbmodemXXXX`（2 本目は `host B <port>`。起動時に、操作者側の設定に書く宛先を表示する。
   中身は `follower_host.py --port <port> --id koch_follower_A --listen 9101 --grip-ma 500`）。較正 JSON は `config/calibration/koch_follower/` に置く。Mac 本体はバッテリで動くので握手の場の電源はアームの 12 V だけ
 - Mac: config の `follower_host` に `udp://<IP>:9101` → `launch.py --pair A --ff gripper`
 ```
@@ -219,8 +219,8 @@ uv run koch-launch --follower wired --ff gripper    # USB の follower_port を�
 5. データ対応の USB-C ケーブルで Quest を Mac に挿し、ヘッドセットを被る → 設定 → 開発者 → **MTP 通知 ON**（Meta の手順 2026-08 版の段階）→「USB デバッグを許可」→「常に許可」（許可は Mac×ヘッドセットの組ごと。予備の Mac・2 台目以降のヘッドセットでも）
 6. `uv run koch-quest --check` → `✓ <serial>: 接続済み`
 7. 給電: Quest Pro のバッテリーは公称 1〜2 時間・付属の 45W ドックで満充電に約 2 時間 → **バッテリーだけでは 1 日もたない**。構成は 4 つ:
-   A. USB のまま（Mac から給電。Mac の USB は 45W 充電器より弱く、減りが遅くなるだけのことがある）→ まず 30 分測る（`./start.sh check` が残量 % を出す）
-   B. `./start.sh wifi`（adb を Wi-Fi に切替・Mac と Quest は同じ自前 5 GHz ルータ）→ `✓ adb reverse` が出たら USB を抜いて 45W 充電器かモバイルバッテリーに差し替える。`✗ adb reverse を張れません` なら、この機体では Wi-Fi 越しの reverse が通らない（古い Quest で報告あり。Meta の文書は USB の手順だけ）→ https の経路（`manual/vr.html` §9）で繋ぐ。ヘッドセットを再起動したらやり直す
+   A. USB のまま（Mac から給電。Mac の USB は 45W 充電器より弱く、減りが遅くなるだけのことがある）→ まず 30 分測る（`./scripts/start.sh check` が残量 % を出す）
+   B. `./scripts/start.sh wifi`（adb を Wi-Fi に切替・Mac と Quest は同じ自前 5 GHz ルータ）→ `✓ adb reverse` が出たら USB を抜いて 45W 充電器かモバイルバッテリーに差し替える。`✗ adb reverse を張れません` なら、この機体では Wi-Fi 越しの reverse が通らない（古い Quest で報告あり。Meta の文書は USB の手順だけ）→ https の経路（`manual/vr.html` §9）で繋ぐ。ヘッドセットを再起動したらやり直す
    A+. 充電ポート付きの Link 用ケーブル（データは Mac・電気は付属の 45W アダプター。Quest Pro 対応と書かれていない製品が多いので `check` で「接続済み」と「充電中」を確認）
    C. 休憩ごとにドックで充電（満充電まで約 2 時間）
    補足: Mac からゴーグルへ映像は送っていない（関節角度だけ・腕 2 本で毎秒約 40 kB）。2.4 GHz でも量は足りるが、会場の混雑を避けるため 5 GHz を使う
@@ -276,7 +276,7 @@ uv run koch-teleop --leader-port <L> --leader-id koch_leader_B \
 ### V1 — 分身の空間投影（Quest Pro・USB）
 
 ```bash
-uv run python webxr/setup_assets.py                              # 初回のみ(three.js 取得)
+uv run python src/webxr/setup_assets.py                              # 初回のみ(three.js 取得)
 uv run koch-bridge --sim --http --port 8444  # まずテレオペなし
 uv run koch-quest --port 8444               # 別ターミナル: reverse を張り Quest Browser で http://localhost:8444/ を開く
 ```

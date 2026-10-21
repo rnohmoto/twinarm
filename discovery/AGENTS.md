@@ -21,7 +21,7 @@ Read @README.md for what lives here and the risk classes every inventory uses.
   per operator entry point), with its offline tests in `dobot/src/dobot/tests/`; see
   [`dobot/AGENTS.md`](dobot/AGENTS.md). Its `config.json` lives in `dobot/src/`, its `assets/`
   and `logs/` in `dobot/`; all three are reached through `dobot.paths`.
-- `koch/` can be rehearsed with no arms attached: `cd koch && ./start.sh rehearse` (or
+- `koch/` can be rehearsed with no arms attached: `cd koch && ./scripts/start.sh rehearse` (or
   `mise run rehearse`) runs its launch paths against simulated servos and checks them (see
-  `koch/simbus/README.md`). Run it, alone, after changing anything under `koch/src/koch/`. A pass
+  `koch/src/koch/simbus/README.md`). Run it, alone, after changing anything under `koch/src/koch/`. A pass
   says the software path holds together, nothing about the arms.

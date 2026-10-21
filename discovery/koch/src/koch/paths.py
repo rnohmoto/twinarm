@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]  # discovery/koch, the uv project
 CONFIG_DIR = ROOT / "config"
 WORK_DIR = ROOT / "work"
-WEBXR_DIR = ROOT / "webxr"
+WEBXR_DIR = ROOT / "src" / "webxr"
 CONFIG_NAME = "config.json"
 TWIN_CONFIG_NAME = "twin.json"
 

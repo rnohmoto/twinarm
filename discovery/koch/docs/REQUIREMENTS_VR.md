@@ -20,8 +20,8 @@
 
 | 役 | 機材 | 起動 | ページ |
 | --- | --- | --- | --- |
-| MacBook Pro 1 | リーダー B（5 V）＋ Quest Pro #1（データ対応 USB-C） | `mac/3_VR1人目_リーダーB.command`（＝`koch.sh vr-leader`） | ゴーグル `http://localhost:8444/`、Mac の操作ページ `…?spectator=1&info=1` |
-| MacBook Pro 2 | フォロワー B（12 V）＋ Quest Pro #2 | `mac/4_VR2人目_フォロワーB.command`（＝`koch.sh vr-follower`） | ゴーグル `http://localhost:8443/`、Mac の操作ページ同様 |
+| MacBook Pro 1 | リーダー B（5 V）＋ Quest Pro #1（データ対応 USB-C） | `scripts/3_VR1人目_リーダーB.command`（＝`koch.sh vr-leader`） | ゴーグル `http://localhost:8444/`、Mac の操作ページ `…?spectator=1&info=1` |
+| MacBook Pro 2 | フォロワー B（12 V）＋ Quest Pro #2 | `scripts/4_VR2人目_フォロワーB.command`（＝`koch.sh vr-follower`） | ゴーグル `http://localhost:8443/`、Mac の操作ページ同様 |
 | 予備 | Quest Pro #3・ペア A（同じ .command の A 版） | `PAIR=A` | 8445 / 8446 |
 
 ポート: ブリッジ HTTP 8444（B リーダー）/ 8443（B フォロワー）/ 8445（A リーダー）/ 8446（A フォロワー）。
@@ -65,7 +65,7 @@ teleop のテレメトリ・制御は 8770/8768（B リーダー）・8773/8772�
 
 ## 6. 設計判断（判断）
 
-- **起動の正本は `mac/koch.sh`**（`.command` はその呼び出し）。`start.sh vr` も残すが、Quest の見張りと操作ページは `koch.sh` 側だけ。
+- **起動の正本は `scripts/koch.sh`**（`.command` はその呼び出し）。`scripts/start.sh vr` も残すが、Quest の見張りと操作ページは `koch.sh` 側だけ。
 - **ブリッジに操作キュー `/op` と状態報告 `/status`** を足し、`/state` に `op`・`page`・`cfg_version` を載せる。ページはこれだけ見て動く（adb や DevTools に依存しない）。開いた時点より前の操作は実行しない。
 - **操作ページ＝同じ VR ページの観客モード＋文字**（`?spectator=1&info=1`）。接触を送らず、ゴーグルのページに操作を送る。
 - **fest 設定 `config/config.fest.json`** を git に入れ、Mac ごとの `config.json` が無ければ写す。ポートはシリアル番号で解決する（`koch.sh` が pyserial で現在の名前を探す）。
@@ -76,7 +76,7 @@ teleop のテレメトリ・制御は 8770/8768（B リーダー）・8773/8772�
 
 | 段 | 合格の目安 | 10/19 の結果 |
 | --- | --- | --- |
-| S0 | `start.sh check` に selftest OK、`rehearse` が通る | check ✓、rehearse は 10/5（10/19 のコード変更後は未） |
+| S0 | `scripts/start.sh check` に selftest OK、`rehearse` が通る | check ✓、rehearse は 10/5（10/19 のコード変更後は未） |
 | U0 | `--check` に接続済みと電池 | ✓（230YC01D8L0376） |
 | V1 | 分身が実機に連動、AR 表示 | ✓ |
 | V-c | 位置合わせ・アンカー復元（再 AR・付け替え・境界引き直し） | つかんで合わせ ✓、再 AR の復元 ✓（USB 再接続後も）。付け替え・境界引き直しは未 |
@@ -87,6 +87,6 @@ teleop のテレメトリ・制御は 8770/8768（B リーダー）・8773/8772�
 
 1. Mac 2（フォロワー B ＋ Quest Pro #2）で `4_VR2人目_フォロワーB.command` を実機で通す（Quest #2 の許可・肩 PWM の向き・摩擦アシスト）。
 2. 高さ +4 cm・距離 12〜15 cm の最終値（操作ページの ±1 cm・近く／遠くで決めて保存）。
-3. 10/19 のコード変更後の `start.sh rehearse`（実機セッションを止めてから）。
-4. USB の切断の根本原因（ケーブル・口）。Wi-Fi 経路（`start.sh wifi`）は reverse が通らない機体がある。
+3. 10/19 のコード変更後の `scripts/start.sh rehearse`（実機セッションを止めてから）。
+4. USB の切断の根本原因（ケーブル・口）。Wi-Fi 経路（`scripts/start.sh wifi`）は reverse が通らない機体がある。
 5. 操作ページの見やすさ（ボタンが多い）。必要なら操作専用の見た目にする。

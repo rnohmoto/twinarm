@@ -29,7 +29,7 @@
   <text x="36" y="44" font-weight="bold">操作する机（説明員）</text>
   <rect x="130" y="64" width="180" height="64" rx="8" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
   <text x="220" y="92" text-anchor="middle" font-weight="bold">Mac（操作者側）</text>
-  <text x="220" y="112" text-anchor="middle" font-size="12">./start.sh handshake</text>
+  <text x="220" y="112" text-anchor="middle" font-size="12">./scripts/start.sh handshake</text>
   <rect x="50" y="190" width="140" height="56" rx="8" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
   <text x="120" y="214" text-anchor="middle">リーダー A</text><text x="120" y="232" text-anchor="middle" font-size="12">5V</text>
   <rect x="250" y="190" width="140" height="56" rx="8" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
@@ -103,13 +103,13 @@
   <li>4 本とも腕を机に寝かせ、AC アダプタを挿す（リーダー 5V・フォロワー 12V）。</li>
   <li><strong>握手用の Mac</strong> で受け側を 2 つ起動する（端末を 2 つ開く）。
 <pre>cd twinarm/discovery/koch
-./start.sh host A ＜フォロワー A のポート＞
-./start.sh host B ＜フォロワー B のポート＞</pre>
+./scripts/start.sh host A ＜フォロワー A のポート＞
+./scripts/start.sh host B ＜フォロワー B のポート＞</pre>
   起動すると、操作者側の設定ファイルに書く宛先（この Mac の IP と番号）が表示されます。ポートは <code>uv run koch-launch --list</code> で確かめて渡します。</li>
   <li><strong>操作者側の Mac</strong> で起動する。
 <pre>cd twinarm/discovery/koch
-./start.sh handshake</pre>
-  フォロワーが 1.5 秒かけてリーダーの姿勢に合流し、パネルがブラウザで開きます。ペア A だけで握手する日は <code>./start.sh handshake --pair A</code>（ペア B を VR に使っていても同時に動かせます）。</li>
+./scripts/start.sh handshake</pre>
+  フォロワーが 1.5 秒かけてリーダーの姿勢に合流し、パネルがブラウザで開きます。ペア A だけで握手する日は <code>./scripts/start.sh handshake --pair A</code>（ペア B を VR に使っていても同時に動かせます）。</li>
   <li>リーダーを動かし、フォロワーが付いてくることを 2 組とも確かめる。</li>
 </ol>
 </div>
@@ -142,13 +142,13 @@
 </tbody>
 </table>
 <p>無線が安定しないときは、フォロワーを操作者側の Mac に USB で繋ぎ替えて、有線で起動します。設定ファイルは同じものを使えます。</p>
-<pre>./start.sh handshake --follower wired</pre>
+<pre>./scripts/start.sh handshake --follower wired</pre>
 
 <!-- ===================================================== -->
 <h2 id="s6">6. 握る物と握力</h2>
 <ul>
   <li>フォロワーの握る力には上限（<code>--grip-ma</code>・既定 500 mA）を掛けています。上限が無いと、物を握ったままサーボが力を出し続けて過負荷で止まり、物を落とします。</li>
-  <li>握力が足りないときは 600、700 と上げ、止まりやすいときは 400、350 と下げます。操作者側は <code>GRIP_MA=400 ./start.sh handshake</code>、握手用の Mac は <code>GRIP_MA=400 ./start.sh host A ＜ポート＞</code>。</li>
+  <li>握力が足りないときは 600、700 と上げ、止まりやすいときは 400、350 と下げます。操作者側は <code>GRIP_MA=400 ./scripts/start.sh handshake</code>、握手用の Mac は <code>GRIP_MA=400 ./scripts/start.sh host A ＜ポート＞</code>。</li>
   <li>物を持たせるなら、卓球ボール（直径 40 mm）が安全です。ゴルフボールは重さと滑りやすさで限界に近く、落としやすくなります。指先に滑り止めのテープを貼ると持ちやすくなります。</li>
   <li>動きを穏やかにするには <code>--extra "--max-rel 15"</code> を付けて起動します（1 回に動く量の上限。既定 20）。</li>
 </ul>

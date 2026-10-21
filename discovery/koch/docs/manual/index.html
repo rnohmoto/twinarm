@@ -26,17 +26,17 @@
   <div class="col-md-4"><div class="card h-100"><div class="card-body">
     <h3 class="h5">握手（2 ペア）</h3>
     <p class="mb-2">説明員がリーダーを握ると、離れた机のフォロワーが同じ動きをします。来場者がフォロワーの手を握ると、その握る力がリーダーの指に返ります。</p>
-    <pre class="mb-0">./start.sh handshake</pre>
+    <pre class="mb-0">./scripts/start.sh handshake</pre>
   </div></div></div>
   <div class="col-md-4"><div class="card h-100"><div class="card-body">
     <h3 class="h5">VR（1 人）</h3>
     <p class="mb-2">ゴーグルを着けたままリーダーを握ると、目の前の同じ位置に仮想の物（スポンジ・ボール・鉄ブロック）が見えます。握ると硬さと重さが手に返り、投げられます。</p>
-    <pre class="mb-0">./start.sh vr</pre>
+    <pre class="mb-0">./scripts/start.sh vr</pre>
   </div></div></div>
   <div class="col-md-4"><div class="card h-100"><div class="card-body">
     <h3 class="h5">VR（2 人）</h3>
     <p class="mb-2">同じペアのフォロワー機も手で握る入力装置にします。2 本の腕が同じ仮想の机に並び、物を取り合ったり渡したりできます。</p>
-    <pre class="mb-0">./start.sh vr2</pre>
+    <pre class="mb-0">./scripts/start.sh vr2</pre>
   </div></div></div>
 </div>
 
@@ -98,16 +98,16 @@ cd twinarm/discovery/koch
 uv sync</pre>
   既に取得済みなら <code>git pull</code> の後に <code>uv sync</code>。</li>
   <li>腕に触れない確認をする。制御則の自己診断、準備状況（握手・VR・2 人のうち起動できるもの）、見えているポートの一覧、Quest の接続状態が出ます。VR のページに要る描画ライブラリもここで取得します（ネット接続が要るのはこの 1 回だけ）。
-<pre>./start.sh check</pre></li>
+<pre>./scripts/start.sh check</pre></li>
   <li>設定ファイルを作り、<code>check</code> で出たポートを書く。ポートは自動では選びません（取り違えると別の腕が動くため）。
 <pre>uv run koch-launch --init      # config/config.json ができる</pre></li>
   <li>較正ファイルを確かめる。<code>config/calibration/koch_leader/</code> と <code>koch_follower/</code> に、設定ファイルの id と同じ名前の JSON が要ります（ペア A・B の 4 つは同梱済み）。</li>
-  <li>もう一度 <code>./start.sh check</code> を実行し、「起動できるもの」に ✓ が付くことを確かめる。</li>
+  <li>もう一度 <code>./scripts/start.sh check</code> を実行し、「起動できるもの」に ✓ が付くことを確かめる。</li>
   <li>腕を繋ぐ前に、ソフトの通り道だけ先に確かめられます。仮想のサーボで握手・VR・2 人・無線を起動から終了まで通します（腕は動きません。約 3 分）。
-<pre>./start.sh rehearse</pre></li>
+<pre>./scripts/start.sh rehearse</pre></li>
 </ol>
 </div>
-<div class="gate"><strong>関門 2</strong>: <code>./start.sh check</code> が「selftest OK」を表示し、「起動できるもの」の握手と VR に ✓ が付く。</div>
+<div class="gate"><strong>関門 2</strong>: <code>./scripts/start.sh check</code> が「selftest OK」を表示し、「起動できるもの」の握手と VR に ✓ が付く。</div>
 
 <!-- ===================================================== -->
 <h2 id="s3">3. 起動早見表</h2>
@@ -115,23 +115,23 @@ uv sync</pre>
 <table class="table table-striped align-middle">
 <thead><tr><th style="width:22%">やりたいこと</th><th style="width:34%">コマンド</th><th>動くもの・開く画面</th></tr></thead>
 <tbody>
-<tr><td><strong>VR 1 人目（リーダー B＋Quest #1・Mac 1）</strong></td><td><code>mac/3_VR1人目_リーダーB.command</code>（＝<code>PAIR=B ./mac/koch.sh vr-leader</code>）</td><td>ブリッジ 8444・腕の制御・Mac の操作ページ・Quest の許可待ち→ページを開く→USB の見張り。10/19 から VR の正本</td></tr>
-<tr><td><strong>VR 2 人目（フォロワー B＋Quest #2・Mac 2）</strong></td><td><code>mac/4_VR2人目_フォロワーB.command</code>（＝<code>koch.sh vr-follower</code>）</td><td>同上をフォロワー機で（8443）。腕を支えてから Enter</td></tr>
-<tr><td>Quest を繋ぎ直す（koch.sh で起動したとき）</td><td><code>mac/7_Quest再接続.command</code>（＝<code>koch.sh quest</code>）</td><td>動いているブリッジの口に reverse を張り直し、ゴーグルでページを開く</td></tr>
-<tr><td>握手（2 ペア）</td><td><code>./start.sh handshake</code></td><td>リーダー 2・フォロワー 2。パネル <code>http://127.0.0.1:8780</code></td></tr>
-<tr><td>握手（ペア A だけ）</td><td><code>./start.sh handshake --pair A</code></td><td>リーダー A・フォロワー A。ペア B を VR に使う日の形</td></tr>
-<tr><td>握手の受け側（2 台目の Mac）</td><td><code>./start.sh host A ＜ポート＞</code></td><td>フォロワーを無線で受ける。操作者側に書く宛先も表示する</td></tr>
-<tr><td>VR（1 人）</td><td><code>./start.sh vr</code></td><td>リーダー B だけ（フォロワーは繋がなくてよい）。約 12 秒後に Quest のブラウザでページが開く</td></tr>
-<tr><td>VR（2 人）</td><td><code>./start.sh vr2</code></td><td>リーダー B とフォロワー B（手で握る）。分身が 2 体</td></tr>
-<tr><td>VR の画面だけ確認（実機なし）</td><td><code>./start.sh sim</code></td><td>Mac のブラウザに模擬の腕 2 本と物体</td></tr>
-<tr><td>Quest を繋ぎ直した</td><td><code>./start.sh quest</code></td><td>接続を張り直してページを開く</td></tr>
-<tr><td>Quest を充電しながら使う</td><td><code>./start.sh wifi</code></td><td>接続を Wi-Fi に切り替え、USB の口を充電器に空ける</td></tr>
-<tr><td>確認だけ（腕は動かない）</td><td><code>./start.sh check</code></td><td>自己診断・準備状況・ポート・Quest の接続と電池残量</td></tr>
-<tr><td>腕なしの通し稽古</td><td><code>./start.sh rehearse</code></td><td>仮想のサーボで握手・VR・2 人・無線を通す。腕は動かない</td></tr>
+<tr><td><strong>VR 1 人目（リーダー B＋Quest #1・Mac 1）</strong></td><td><code>scripts/3_VR1人目_リーダーB.command</code>（＝<code>PAIR=B ./scripts/koch.sh vr-leader</code>）</td><td>ブリッジ 8444・腕の制御・Mac の操作ページ・Quest の許可待ち→ページを開く→USB の見張り。10/19 から VR の正本</td></tr>
+<tr><td><strong>VR 2 人目（フォロワー B＋Quest #2・Mac 2）</strong></td><td><code>scripts/4_VR2人目_フォロワーB.command</code>（＝<code>koch.sh vr-follower</code>）</td><td>同上をフォロワー機で（8443）。腕を支えてから Enter</td></tr>
+<tr><td>Quest を繋ぎ直す（koch.sh で起動したとき）</td><td><code>scripts/7_Quest再接続.command</code>（＝<code>koch.sh quest</code>）</td><td>動いているブリッジの口に reverse を張り直し、ゴーグルでページを開く</td></tr>
+<tr><td>握手（2 ペア）</td><td><code>./scripts/start.sh handshake</code></td><td>リーダー 2・フォロワー 2。パネル <code>http://127.0.0.1:8780</code></td></tr>
+<tr><td>握手（ペア A だけ）</td><td><code>./scripts/start.sh handshake --pair A</code></td><td>リーダー A・フォロワー A。ペア B を VR に使う日の形</td></tr>
+<tr><td>握手の受け側（2 台目の Mac）</td><td><code>./scripts/start.sh host A ＜ポート＞</code></td><td>フォロワーを無線で受ける。操作者側に書く宛先も表示する</td></tr>
+<tr><td>VR（1 人）</td><td><code>./scripts/start.sh vr</code></td><td>リーダー B だけ（フォロワーは繋がなくてよい）。約 12 秒後に Quest のブラウザでページが開く</td></tr>
+<tr><td>VR（2 人）</td><td><code>./scripts/start.sh vr2</code></td><td>リーダー B とフォロワー B（手で握る）。分身が 2 体</td></tr>
+<tr><td>VR の画面だけ確認（実機なし）</td><td><code>./scripts/start.sh sim</code></td><td>Mac のブラウザに模擬の腕 2 本と物体</td></tr>
+<tr><td>Quest を繋ぎ直した</td><td><code>./scripts/start.sh quest</code></td><td>接続を張り直してページを開く</td></tr>
+<tr><td>Quest を充電しながら使う</td><td><code>./scripts/start.sh wifi</code></td><td>接続を Wi-Fi に切り替え、USB の口を充電器に空ける</td></tr>
+<tr><td>確認だけ（腕は動かない）</td><td><code>./scripts/start.sh check</code></td><td>自己診断・準備状況・ポート・Quest の接続と電池残量</td></tr>
+<tr><td>腕なしの通し稽古</td><td><code>./scripts/start.sh rehearse</code></td><td>仮想のサーボで握手・VR・2 人・無線を通す。腕は動かない</td></tr>
 </tbody>
 </table>
-<p>握手（ペア A）と VR（ペア B）を同時に動かすときは、端末を 2 つ開いて <code>./start.sh handshake --pair A</code> と <code>./start.sh vr</code> をそれぞれ実行します。片方を止めても、もう片方は続きます。</p>
-<p>VR に使うペアは既定で B です。A にするときは <code>VR_PAIR=A ./start.sh vr</code>。握手でフォロワーの握力の上限を変えるときは <code>GRIP_MA=400 ./start.sh handshake</code>。コマンドの後ろに書いた指定はそのまま起動の本体に渡ります（例: <code>./start.sh handshake --follower wired</code>）。</p>
+<p>握手（ペア A）と VR（ペア B）を同時に動かすときは、端末を 2 つ開いて <code>./scripts/start.sh handshake --pair A</code> と <code>./scripts/start.sh vr</code> をそれぞれ実行します。片方を止めても、もう片方は続きます。</p>
+<p>VR に使うペアは既定で B です。A にするときは <code>VR_PAIR=A ./scripts/start.sh vr</code>。握手でフォロワーの握力の上限を変えるときは <code>GRIP_MA=400 ./scripts/start.sh handshake</code>。コマンドの後ろに書いた指定はそのまま起動の本体に渡ります（例: <code>./scripts/start.sh handshake --follower wired</code>）。</p>
 <p>起動してすぐ止まったときは、端末に <code>|</code> で始まる行（記録の末尾）が出ます。そこに理由が書かれています。</p>
 
 <!-- ===================================================== -->
@@ -149,7 +149,7 @@ uv sync</pre>
 <table class="table table-striped">
 <thead><tr><th style="width:34%">ファイル</th><th>役割</th></tr></thead>
 <tbody>
-<tr><td><code>start.sh</code></td><td>起動の入口（上の早見表）</td></tr>
+<tr><td><code>scripts/start.sh</code></td><td>起動の入口（上の早見表）</td></tr>
 <tr><td><code>config/config.json</code></td><td>ペアごとのポート・id・無線フォロワーの宛先（各 Mac で作る。共有しない）</td></tr>
 <tr><td><code>config/twin.json</code></td><td>VR の分身の位置・関節の対応・物体の硬さと重さ（VR の画面から保存される）</td></tr>
 <tr><td><code>config/calibration/</code></td><td>腕ごとの較正（関節の原点と可動範囲）</td></tr>
@@ -157,9 +157,9 @@ uv sync</pre>
 <tr><td><code>src/koch/launch.py</code>（<code>koch-launch</code>）</td><td>2 ペアと VR をまとめて起動・停止する本体</td></tr>
 <tr><td><code>src/koch/teleop.py</code>（<code>koch-teleop</code>）</td><td>1 ペアの制御（追従・握り返し・仮想の壁と重さ）</td></tr>
 <tr><td><code>src/koch/follower_host.py</code>（<code>koch-host</code>）</td><td>握手の机の Mac で動かす受け側（無線フォロワー）</td></tr>
-<tr><td><code>src/koch/bridge.py</code>（<code>koch-bridge</code>）・<code>webxr/index.html</code></td><td>VR の画面を配信する側と、ゴーグルで開くページ</td></tr>
+<tr><td><code>src/koch/bridge.py</code>（<code>koch-bridge</code>）・<code>src/webxr/index.html</code></td><td>VR の画面を配信する側と、ゴーグルで開くページ</td></tr>
 <tr><td><code>src/koch/quest_usb.py</code>（<code>koch-quest</code>）</td><td>Quest を USB（または Wi-Fi）で繋いでページを開く</td></tr>
-<tr><td><code>simbus/</code></td><td>腕なしの通し稽古（仮想のサーボと、その検査）</td></tr>
+<tr><td><code>src/koch/simbus/</code></td><td>腕なしの通し稽古（仮想のサーボと、その検査）</td></tr>
 <tr><td><code>docs/CHECKLIST.md</code></td><td>実機で順に確かめる手順と記録欄</td></tr>
 </tbody>
 </table>

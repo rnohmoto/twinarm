@@ -1,0 +1,25 @@
+{
+  "pairs": {
+    "A": {
+      "leader_port": "/dev/tty.usbmodem5B141156061",
+      "follower_port": "/dev/tty.usbmodem5B141156401",
+      "leader_serial": "5B14115606",
+      "follower_serial": "5B14115640",
+      "leader_id": "koch_leader_A",
+      "follower_id": "koch_follower_A",
+      "follower_host": null,
+      "cams": ""
+    },
+    "B": {
+      "leader_port": "/dev/tty.usbmodem5B8E1148181",
+      "follower_port": "/dev/tty.usbmodem5B790162281",
+      "leader_serial": "5B8E114818",
+      "follower_serial": "5B79016228",
+      "leader_id": "koch_leader_B",
+      "follower_id": "koch_follower_B",
+      "follower_host": null,
+      "cams": ""
+    }
+  },
+  "_memo": "フェスの 4 本（2026-09-30 記入・10/19 確認）。koch4/mac/koch.sh は koch4_config.json が無いとこれを写して使い、ポート名は USB シリアル番号（leader_serial/follower_serial）で現在の /dev/cu.usbmodem* に解決する。別の腕を挿すときは --list のシリアルに書き換える。リーダーとフォロワーは入替不可。"
+}

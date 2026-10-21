@@ -17,6 +17,12 @@ USB ケーブル 1 本で済ませる手順を 1 コマンドにしたもの。R
   uv run python koch4/koch4_quest_usb.py --port 8444 --spectator # 観客用 URL（?spectator=1）を開く
   uv run python koch4/koch4_quest_usb.py --port 8444 --mirror    # 加えて scrcpy でヘッドセットの画面を Mac に出す
   uv run python koch4/koch4_quest_usb.py --port 8444 --wifi      # adb を Wi-Fi に切替え、USB の口を充電に空ける
+  uv run python koch4/koch4_quest_usb.py --port 8444 --wait 600 --watch   # 許可を待ってから開き、以後は切れるたびに張り直す
+
+--wait N: ヘッドセットが「許可済み(device)」になるまで最長 N 秒待つ(未許可なら被って「常に許可」)。
+--watch: 開いた後も終わらず、2 秒ごとに adb を見て、USB が再列挙されて reverse が消えたら張り直す
+(10/19 実機: Quest Pro の USB は数十分に 1 回切れて reverse が消える。ページは開いたまま復帰する)。
+--devtools: Chrome DevTools の口(localhost:9222)も forward する(Mac から koch4.* を呼ぶ遠隔操作用)。
 
 Quest 側で開く URL は http://localhost:<port>/ 。localhost は WebXR の安全なコンテキストなので
 証明書は要らない（https + 自己署名の警告も出ない）。
@@ -49,6 +55,9 @@ ADB_CANDIDATES = [
 ]
 QUEST_BROWSER = "com.oculus.browser"
 ADB_TCP_PORT = 5555
+DEVTOOLS_PORT = 9222
+WATCH_INTERVAL_SEC = 2.0
+BATTERY_REPORT_SEC = 300.0
 
 
 def find_adb(explicit):
@@ -118,6 +127,79 @@ def battery(adb, serial):
         print(f"  バッテリー {level.group(1)}%（{charging}）")
 
 
+def wait_for_device(adb, timeout_sec):
+    """Wait until a headset is authorized; return its serial or None."""
+    deadline = time.monotonic() + timeout_sec
+    said = None
+    while time.monotonic() < deadline:
+        rows = devices(adb)
+        usable = [s for s, state in rows if state == "device"]
+        if usable:
+            return usable[0]
+        state = rows[0][1] if rows else "absent"
+        if state != said:
+            said = state
+            if state == "unauthorized":
+                print(
+                    "… 未許可: ゴーグルを被り「USB デバッグを許可」→「常に許可」(待っています)",
+                    flush=True,
+                )
+            else:
+                print(
+                    "… 端末が見えません: USB ケーブルと電源を確認(待っています)",
+                    flush=True,
+                )
+        time.sleep(WATCH_INTERVAL_SEC)
+    return None
+
+
+def ensure_reverse(adb, serial, port, devtools):
+    """Add the reverse (and the DevTools forward); return True when the reverse is listed."""
+    run([adb, "-s", serial, "reverse", f"tcp:{port}", f"tcp:{port}"])
+    if devtools:
+        run(
+            [
+                adb,
+                "-s",
+                serial,
+                "forward",
+                f"tcp:{DEVTOOLS_PORT}",
+                "localabstract:chrome_devtools_remote",
+            ]
+        )
+    _, rev = run([adb, "-s", serial, "reverse", "--list"])
+    return f"tcp:{port}" in rev
+
+
+def watch(adb, port, devtools):
+    """Re-add the reverse whenever the USB link re-enumerates (Ctrl+C to stop)."""
+    print(
+        "見張り中: USB が切れて戻ったら reverse を張り直します(Ctrl+C で終了)",
+        flush=True,
+    )
+    last_state, last_battery = None, 0.0
+    while True:
+        rows = devices(adb)
+        usable = [s for s, state in rows if state == "device"]
+        state = "device" if usable else (rows[0][1] if rows else "absent")
+        stamp = time.strftime("%H:%M:%S")
+        if state != last_state:
+            print(f"{stamp} adb: {state}", flush=True)
+            last_state = state
+        if usable:
+            _, rev = run([adb, "-s", usable[0], "reverse", "--list"])
+            if f"tcp:{port}" not in rev:
+                ok = ensure_reverse(adb, usable[0], port, devtools)
+                print(
+                    f"{stamp} 再列挙を検出 → reverse tcp:{port} を張り直した: {'✓' if ok else '✗'}",
+                    flush=True,
+                )
+            if time.monotonic() - last_battery > BATTERY_REPORT_SEC:
+                last_battery = time.monotonic()
+                battery(adb, usable[0])
+        time.sleep(WATCH_INTERVAL_SEC)
+
+
 def switch_to_wifi(adb, serial):
     """Move adb to TCP/IP so the USB port is free for a charger; returns the new serial."""
     _, out = run(
@@ -153,6 +235,22 @@ def build_parser():
         "--adb", default=None, help="adb の実行ファイル（未指定=PATH と既知の場所）"
     )
     ap.add_argument("--check", action="store_true", help="adb と端末の状態を見るだけ")
+    ap.add_argument(
+        "--wait",
+        type=float,
+        default=0,
+        help="端末が許可済みになるまで最長この秒数待つ(0=待たない)",
+    )
+    ap.add_argument(
+        "--watch",
+        action="store_true",
+        help="開いた後も終わらず、USB が再列挙されたら reverse を張り直し続ける",
+    )
+    ap.add_argument(
+        "--devtools",
+        action="store_true",
+        help=f"Chrome DevTools の口(localhost:{DEVTOOLS_PORT})も forward する(遠隔操作用)",
+    )
     ap.add_argument("--spectator", action="store_true", help="観客用 URL を開く")
     ap.add_argument(
         "--no-open", action="store_true", help="URL を開かない（reverse だけ張る）"
@@ -187,7 +285,13 @@ def main():
     _, ver = run([adb, "version"])
     print(f"adb: {adb}\n{ver.strip().splitlines()[0] if ver.strip() else ''}")
     serial = explain(devices(adb))
+    if serial is None and args.wait > 0 and not args.check:
+        serial = wait_for_device(adb, args.wait)
+        if serial is not None:
+            print(f"✓ {serial}: 接続済み(adb 可・USB)")
     if serial is None:
+        if args.wait > 0 and not args.check:
+            sys.exit(f"{args.wait:.0f} 秒待っても許可されませんでした")
         return
     battery(adb, serial)
     if args.check:
@@ -197,6 +301,8 @@ def main():
     code, out = run(
         [adb, "-s", serial, "reverse", f"tcp:{args.port}", f"tcp:{args.port}"]
     )
+    if args.devtools:
+        ensure_reverse(adb, serial, args.port, True)
     _, rev = run([adb, "-s", serial, "reverse", "--list"])
     if code != 0 or f"tcp:{args.port}" not in rev:
         # 張れたことを一覧で確かめる（返事だけ成功して張れていない場合を ✓ にしない）
@@ -252,6 +358,11 @@ def main():
         cmd = [scrcpy, "-s", serial, *args.scrcpy_args.split()]
         print(f"scrcpy 起動: {' '.join(cmd)}（閉じると終了）")
         subprocess.run(cmd, check=False)
+    if args.watch:
+        try:
+            watch(adb, args.port, args.devtools)
+        except KeyboardInterrupt:
+            print("\n見張り終了")
 
 
 if __name__ == "__main__":

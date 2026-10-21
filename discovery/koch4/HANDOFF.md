@@ -25,7 +25,7 @@ VR をすぐ動かす（操作者側の Mac と Quest Pro）:
 ```
 twinarm の discovery/koch4 で VR を実機と Quest Pro で立ち上げます。AGENTS.md（実機安全）→ discovery/koch4/HANDOFF.md → manual/vr.html の順に読んでください。Quest の準備（Meta アカウント・開発者モード）がまだなら manual/quest_setup.html から。
 - 最初に git pull → cd discovery → ./koch4/start.sh check を実行し、「起動できるもの」と Quest の接続・電池残量を私に見せる（腕は動かない）
-- 腕が動くコマンド（./koch4/start.sh vr・vr2）は、私がこの会話で明示的に頼んだときだけ実行する。ポートは私が渡す。実機の挙動は私の報告だけを事実にする
+- 腕が動くコマンド（koch4/mac/3_VR1人目_リーダーB.command＝koch.sh vr-leader、4_VR2人目_フォロワーB.command＝vr-follower。従来の ./koch4/start.sh vr・vr2 も可）は、私がこの会話で明示的に頼んだときだけ実行する。ポートは fest 設定のシリアル番号で解決される（違う腕なら --list で私が直す）。実機の挙動は私の報告だけを事実にする
 - Meta アカウントの作成と開発者の登録は私が行う
 - 進め方: CHECKLIST の S0 → U0 → V1（./koch4/start.sh sim と Quest で AR 表示）→ V0 → V-w（./koch4/start.sh vr --extra "--vw-cap 60" から）→ V-c → V-e → V2 → V4 → V5（vr2）→ V3 を 1 つずつ
 ```
@@ -49,6 +49,10 @@ twinarm の discovery/koch4 で VR を実機と Quest Pro で立ち上げます�
 | VR 重さ（`--vw`・肩と肘に電流・握っている間だけ。Kt は機種別） | ✅ | domain テスト 29 件 | V-w（向きと上限。腕反力は実機未検証） |
 | **一人称の位置合わせ（C）**: コントローラ先端／指先で実機の指先を 2〜3 点触って台の x/y/z/yaw を最小二乗で解く・残差表示・保存 | ✅（10/4） | 解法の自己診断 `koch4SelfTest()` が真値に一致（残差 0） | V-c（Quest Pro・実機で残差と体感） |
 | **空間アンカー**（10/19）: 確定(保存) で台の位置を WebXR の永続アンカーに登録（`requestPersistentHandle`→localStorage）・AR 開始時に `restorePersistentAnchor` で復元し、毎フレーム「アンカーの姿勢×差分」で台を置く。位置合わせ・編集は差分を持ち直し、保存で登録し直す。失敗時は設定値と C に戻る。`?anchors=0`・「A アンカー解除」 | ✅（10/19・desktop） | 自己診断 `koch4AnchorSelfTest()`（差分の往復・原点が変わっても台がアンカーに追従）・`node --check` | V-c の 3 項目（再 AR・付け替え・境界引き直し） |
+| **AR 中の操作はつかんで動かす**（10/19・実機）: Quest Browser は AR 中に DOM overlay（ボタン・文字・案内）を描かない（Meta フォーラムで裏取り）。分身の 35 cm 以内でつまむ／グリップ／トリガー長押し → 台が手に貼り付いて動く（平行移動＋yaw）→ 離して 1.5 秒で保存＝アンカー登録。音で合図（つかむ 1・離す 2・保存 3・点取り 1）。コントローラに基準点の小球と光線。Mac からの遠隔操作は Chrome DevTools（`adb forward tcp:9222 localabstract:chrome_devtools_remote`・`koch4.startCalib()`／`koch4.stopCalib(true)`） | ✅（10/19） | 自己診断 `koch4GrabSelfTest()`・`node --check` | Quest Pro 実機でつかんで移動・保存・アンカー登録まで動作（ユーザー 10/19）。向きの合わせやすさと再 AR の復元は確認中 |
+| **土台の回転が 100 に張り付く**（10/19・実機）: shoulder_pan の較正は 0〜4095 の 1 回転・サーボは多回転モード → 電源投入後に土台を 1 回転以上回すと読み値が ±100 に固定され、分身の土台だけ止まる。逆向きに 1 回転戻せば復帰（AC 抜き差しでも） | 現象の記録 | — | 恒久策は未定（teleop で 4096 の剰余を取る／較正の範囲を見直す） |
+| **置き場所を寄せ、物が乗る面の高さ `desk.y` を新設**（10/19・実機）: 既定の spot を 22〜27 cm → 12〜15 cm（スポンジ −10/12・ボール 0/15・鉄ブロック 10/12 cm）。`scene.desk.y`（既定 0・`solo_B` は 0.04）で物・置く的・物理の床をその面に。編集モードに「高さ y」。ブリッジも `y` を受けて保存。理由: 腕の全長近くの机の面は実機の指先が届かず「地面より下じゃないと掴めない」（ユーザー 10/19） | ✅（10/19） | `node --check`・ruff・ty | 実機で高さ 4 cm・距離 12〜15 cm の体感はユーザー確認待ち |
+| **起動の一本化と Mac からの遠隔操作**（10/19 夜）: `mac/koch.sh vr-leader`／`vr-follower`（＝`.command`）が、uv sync・設定（無ければ `config/koch4_config.fest.json` から）・ポートのシリアル解決・ブリッジ・teleop・Mac の操作ページ（`?spectator=1&info=1`）・Quest の許可待ち→reverse→ページを開く→USB の見張り（`koch4_quest_usb.py --wait --watch --devtools`）まで自動。ブリッジに `POST /op`（位置合わせ開始／確定／取消／中止・配置リセット・アンカー解除・再読込）と `POST /status`（ページの点数・残差・アンカー）、`/state` に `cfg_version`（Mac で保存した設定をゴーグルが 1 秒以内に読み直す）。フェスの形は Mac 1＝リーダー B＋Quest #1、Mac 2＝フォロワー B＋Quest #2。要件は `REQUIREMENTS_VR.md`、記録は `LOG_261019_VR.md` | ✅（10/19） | `node --check`・ruff・ty・`bash -n`・`rehearse` 7 シナリオ通過・操作キューの往復（Mac → Quest Browser のページで calib_start/cancel）・操作ページのボタン（headless Chrome で高さ ±1 cm → 版が上がりブリッジが保存） | Mac 2＋Quest #2 の実機、`.command` のダブルクリック起動は未 |
 | **投げる・落とす・跳ねる**（放した瞬間の指先速度・重力・空気抵抗・机／床の反発と摩擦・物体同士の衝突・音） | ✅（10/4） | Chrome（sim）で握る→放す→机に落ちる・編集・視点切替 | V4（実機の握りで投げる。速度上限 5 m/s・反発値の体感） |
 | **2 人**（`--vr2`: ペアのフォロワー機を手で動かす 2 人目の入力装置。`--leader-type koch_follower`＝腕トルク抜き・gripper だけ壁・M288 換算。重さは肘＝電流、**肩（XL430）＝PWM モード**（電流制御が無いため電圧で。握っている間だけトルク ON・`--vw-pwm-scale`／`--vw-pwm-cap`）。ブリッジ `--arms B,F`・分身 2 体） | ✅（10/4） | launcher dry-run・bridge `--sim --arms B,F`・ページで 2 体・肩 PWM の書込み順序を `--selftest` で確認（0 を書いてからトルク ON・解放時に Mode 4 と上限 885 へ復帰） | V5（実機。肩 PWM の向きと強さ・握手に戻したとき肩が保持できること） |
 | **USB 接続** `koch4_quest_usb.py`（adb reverse＋Quest Browser で `http://localhost:<port>/` を開く・`--mirror`=scrcpy・**`--wifi`＝adb を Wi-Fi に切替えて USB の口を充電器に空ける**・`--check` は電池残量も表示） | ✅（10/4） | `--check`（adb 無しの経路） | U0（開発者モード・adb 疎通・30 分の電池の減り・adb over Wi-Fi で reverse が張れるか） |
@@ -60,6 +64,9 @@ twinarm の discovery/koch4 で VR を実機と Quest Pro で立ち上げます�
 | **VR を 2 人が別々に**（10/5・Mac）: リーダー B とフォロワー B を別々の人が手で動かし、それぞれ自分の空間・自分の主観で掴む。ブリッジを腕ごとに 1 つ（1 人目 8444・2 人目 8443、2 人目の分身の設定は `config/solo_F/`）。入口は `mac/koch.sh`（`handshake`／`vr-leader`／`vr-follower`／`all`／`status`／`stop`）と、同じフォルダの `.command`（Finder でダブルクリック） | ✅（10/5） | — | Mac のブラウザ 2 枚で 2 本同時に動作（ユーザー確認: 2 人目の分身の向きと肩の可動域）。Quest 2 台は未接続。`.command` と `all` からの実機起動は未実施 |
 | **摩擦アシスト**（10/5）`--assist elbow_flex,wrist_flex`: 手で動かすフォロワー機は減速比 288:1 で、力を出していなくても重い（ユーザー報告 10/5）。動かしている向きへ小さな電流を足す（上限 `--assist-cap` 既定 25 mA・最大 80）。向きが逆なら `--assist-invert`。肩と土台（XL430）は対象外 | ✅（10/5） | — | domain テスト 7 件・通し稽古 `vr2`（手首の電流が上限以内・リーダーには出ない）。**実機未検証**（軽くなるか・手を離して止まるか・向き） |
 | **VR ページの関節名**（10/5）: 分身の各関節に名札（1 土台の回転〜6 グリッパ）、HUD に関節ごとの読み値と分身の角度。`J` で切替 | ✅（10/5） | — | 2 人目の分身合わせで使用（ユーザー） |
+| **見せる用の画面が既定**（10/5）: 関節の名札・状態の文字・キー一覧・小窓の名前を出さない（置けた数だけ）。`H` で文字、`J` で名札と関節の読み値。`?info=1` で最初から文字あり | ✅（10/5） | — | 画面キャプチャで確認 |
+| **置く的**（10/5）: 机の上に物体と同じ色の丸が 3 つ。放して丸の中で止まれば OK（丸が緑・音）、3 つ置けたらクリアと秒数。`B` で出す／消す、`R` でやり直し。投げ入れる遊び（ゴール）は実機を乱暴に振られるので作らない（ユーザー 10/5）。腕なしの確認は `?demo=place` | ✅（10/5） | — | 仮想の腕のページで `?demo=place` を画面キャプチャ（丸が緑になり「置けた数」が増える）。実機での置きやすさ・丸の大きさと位置は未確認 |
+| **VR ページの視点 5 種**（10/5）: `V` で 一人称（台座の後ろから腕の伸びる向き）→ 手先カメラ（手首に付いて動く）→ 俯瞰（真上・固定。指先に連動する俯瞰は酔うので廃止＝ユーザー 10/5）→ 接写（物体の向こう側に固定）→ 俯瞰（ドラッグで回す）。`?view=top` `?view=macro` で指定して開ける（モニタを並べるときは `?spectator=1&view=top`） | ✅（10/5） | — | `M` で画面の割り方（主画面＋右に手先カメラと接写の小窓＝既定／手先カメラ｜接写の左右 2 分割／1 画面。`?layout=pip|split|single`）。ヘッドレス Chrome の画面キャプチャで 3 視点と 2 つの割り方の描画を確認。見え方の良し悪しはユーザーの確認待ち |
 | 分身の見せ方 G（実体／半透明／指先だけ・AR のとき）・一人称プレビュー V（モニタ用・既定）・観客ページ `?spectator=1` | ✅ | Chrome | — |
 | アラート（上限・過負荷停止・温度・重さ上限・通信断・壁解除・未接続→VR 赤帯／パネル赤チップ。2 本のときは `[B]` `[F]` 付き） | ✅ | sim で赤帯目視 | 実機で各条件 |
 | 腕 3 軸反力 `--ff arm` | ✅（旧実装） | — | 実機未検証（フェスでは使わない） |
@@ -103,7 +110,10 @@ GitHub から main を新しく取得して `uv sync` → `./koch4/start.sh chec
 
 | 見たいこと | ファイル |
 |---|---|
-| まず起動したい・図で見たい | `start.sh`・`manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`・Meta アカウントの作り方から USB 接続まで＝`quest_setup.html`） |
+| まず起動したい・図で見たい | `mac/*.command`（VR の正本・ダブルクリック）・`mac/koch.sh`・`start.sh`・`manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`・Quest＝`quest_setup.html`・借用機の初期化＝`quest_reset.html`） |
+| VR の要件と設計判断・10/19 の実機ログ | `REQUIREMENTS_VR.md`・`LOG_261019_VR.md` |
+| Quest を繋ぐ・見張る・Mac から遠隔操作 | `koch4_quest_usb.py`（`--wait`・`--watch`・`--devtools`）・ブリッジの `/op` `/status`・操作ページ `?spectator=1&info=1` |
+| 新しい Mac に配る設定（4 本のシリアル） | `config/koch4_config.fest.json`（`koch.sh` が `koch4_config.json` の無いときに写す） |
 | 腕なしでソフトの通り道を確かめたい | `simbus/`（`README.md`・`rehearse.py`・仮想のバス `dynamixel_sdk/`） |
 | 何がどう動くか（一覧・危険度・流れ） | `README.md` |
 | 実機での手順と記録欄 | `CHECKLIST.md`（TEST／W／U／V の各節・運用メモ＝経路表・接続手順・ブラウザ・アラート表） |
@@ -132,7 +142,7 @@ uv run python koch4/koch4_dual_launch.py --init       # config/koch4_config.json
 ```
 握手用 Mac: フォロワーを USB で挿し `./koch4/start.sh host A <port>`（B は `host B <port>`）。起動時に、操作者側の設定に書く宛先（IP と 9101／9102）を表示する。
 操作者側 Mac: config の `follower_host` に `udp://<IP>:9101` → `uv run python koch4/koch4_dual_launch.py --ff gripper`。有線に戻す＝`--follower wired`。
-Mac でダブルクリック起動: `koch4/mac/` の `.command`（全部起動／握手 A／VR 1 人目／VR 2 人目／動作確認／全部停止）。中身は `./koch4/mac/koch.sh <名前>`。握手は差分反射式（`--ff-style error`・フリーなら戻らない。10/5 にユーザーが戻りバネ式を「フリーなのに戻るのはおかしい」と指摘）。
+Mac でダブルクリック起動: `koch4/mac/` の `.command`（最初の確認／全部起動／握手 A／VR 1 人目／VR 2 人目／Quest 再接続／動作確認／全部停止）。中身は `./koch4/mac/koch.sh <名前>`。**10/19 から VR の正本は `koch.sh vr-leader`／`vr-follower`**: uv sync・設定（無ければ `koch4_config.fest.json` から）・ポートのシリアル解決・ブリッジ・teleop・Mac の操作ページ・Quest の許可待ち→reverse→ページを開く→USB の見張り、まで自動。フェスは MacBook Pro 1＝リーダー B＋Quest #1、MacBook Pro 2＝フォロワー B＋Quest #2（Mac 同士の通信なし）。握手は差分反射式（`--ff-style error`・フリーなら戻らない。10/5 にユーザーが戻りバネ式を「フリーなのに戻るのはおかしい」と指摘）。
 握手: `./koch4/start.sh handshake`（ペア A だけなら `--pair A` を足す）。VR（USB・1 人）: `./koch4/start.sh vr`（＝`koch4_dual_launch.py --pair B --vr B --vw --vr-http --no-panel --follower none`＋12 秒後に `koch4_quest_usb.py --port 8444`）。
 VR（2 人）: `./koch4/start.sh vr2`（`--vr2` を足す。フォロワー機は接続直後にトルクが抜けるので手で支える）。初回の重さは `./koch4/start.sh vr2 --extra "--vw-cap 60 --vw-pwm-cap 80"` で。
 `git pull` が `koch4_twin.json` の手元の変更で止まったら `git stash` → `git pull`（旧形式の内容は新形式に読み込める）。

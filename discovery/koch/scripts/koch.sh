@@ -27,7 +27,7 @@ here="$(cd "$(dirname "$0")" && pwd)"        # scripts/
 root="$(cd "$here/.." && pwd)"               # discovery/koch（uv プロジェクトの場所）
 cd "$root"
 
-PY=".venv/bin/python3"
+PY="$root/.venv/bin/python3"
 ASSIST="${ASSIST-elbow_flex,wrist_flex}"
 ASSIST_CAP="${ASSIST_CAP:-25}"
 MAX_REL="${MAX_REL:-20}"
@@ -37,7 +37,7 @@ PAIR="${PAIR:-B}"
 QUEST="${QUEST:-1}"
 QUEST_WAIT="${QUEST_WAIT:-900}"
 QUEST_DELAY_SEC=8                            # ブリッジが聞き始めるのを待ってからゴーグルでページを開く
-FEST_CONFIG="config/config.fest.json"   # フェスの 4 本（A/B のリーダー・フォロワー）のシリアル入り。初回はこれから作る
+FEST_CONFIG="$root/config/config.fest.json"   # フェスの 4 本（A/B のリーダー・フォロワー）のシリアル入り。初回はこれから作る
 # 腕ごとに別のブリッジ（＝別の空間・別のページ）と別の分身設定。番号は握手（8765/8766/8780）と重ならない
 case "$PAIR" in
   B) L_LABEL=B;  L_HTTP=8444; L_VIZ=8770; L_CTL=8768; L_CFG="$root/config/solo_B"
@@ -51,10 +51,10 @@ VR_HTTP_PORTS="8444 8443 8445 8446"
 prepare() {  # prepare [vr]: uv・VR ページの部品・設定ファイル（無ければ fest 設定から）・adb（VR のとき）
   command -v uv >/dev/null 2>&1 || { echo "uv が見つかりません。https://docs.astral.sh/uv/ の手順で入れてください"; exit 1; }
   uv sync -q
-  [ -f src/webxr/three.module.js ] || uv run python src/webxr/setup_assets.py
-  if [ ! -f config/config.json ]; then
+  [ -f "$root/src/webxr/three.module.js" ] || uv run python "$root/src/webxr/setup_assets.py"
+  if [ ! -f "$root/config/config.json" ]; then
     if [ -f "$FEST_CONFIG" ]; then
-      cp "$FEST_CONFIG" config/config.json
+      cp "$FEST_CONFIG" "$root/config/config.json"
       echo "config/config.json を fest 設定から作りました（4 本のシリアル番号で現在のポートに解決します）"
     else
       echo "config/config.json がありません。./scripts/start.sh check の案内に従って作ってください"; exit 1
@@ -97,11 +97,11 @@ open_later() {  # open_later <秒> <URL>
 }
 
 pair_port() {  # pair_port leader|follower: 設定ファイルの <役>_serial を今のポート名に解決（無ければ <役>_port を使う）。見つからなければ止まる
-  "$PY" - "$PAIR" "$1" <<'PYEOF'
+  "$PY" - "$PAIR" "$1" "$root/config/config.json" <<'PYEOF'
 import json, sys
 from pathlib import Path
 pair, role = sys.argv[1], sys.argv[2]
-cfg = json.load(open("config/config.json"))["pairs"][pair]
+cfg = json.load(open(sys.argv[3]))["pairs"][pair]
 want, port = cfg.get(f"{role}_serial"), str(cfg.get(f"{role}_port") or "")
 found = None
 if want:

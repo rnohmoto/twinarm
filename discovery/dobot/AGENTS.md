@@ -7,7 +7,7 @@ safety rules there apply to everything here: the Magician is a real arm.
 Read @README.md for the script inventory, each script's hardware risk, the quick start, and the
 first-time setup manual.
 
-When the task is to run or re-set-up the bench demo, read [`HANDOFF.md`](HANDOFF.md) next: it holds
+When the task is to run or re-set-up the bench demo, read [`docs/HANDOFF.md`](docs/HANDOFF.md) next: it holds
 the verified configuration (port, camera lock, heights, zones, calibration) and the exact commands to
 redo each step.
 
@@ -31,10 +31,10 @@ redo each step.
   `[project.scripts]` line. Do not refactor these into the `twinarm/` library; the design source of
   truth is `robotics/TacitCapture/91_…` and `93_…` (the planning repo), and this directory is the
   runnable port of `robotics/scripts/magician_pnp/`.
-- `config.json`, `assets/` and `logs/` stay in this directory, not in `src/`. Reach them through
-  `dobot.paths` (`CONFIG_PATH`, `ASSETS_DIR`, `LOGS_DIR`, `from_root()` for the relative paths
-  stored in `config.json`) so a console script works from any current directory. Never resolve them
-  against the cwd or against `__file__`.
+- `config.json` lives in `src/`; `assets/` and `logs/` stay in this directory. Reach all three
+  through `dobot.paths` (`CONFIG_PATH`, `ASSETS_DIR`, `LOGS_DIR`, `from_root()` for the relative
+  paths stored in `config.json`) so a console script works from any current directory. Never
+  resolve them against the cwd or against `__file__`.
 - Tests live in `src/dobot/tests/` and must pass with no hardware attached (`uv run pytest`). Add a
   test for any new guard or pure function before wiring it to hardware.
 - `demo.py` (`dobot-demo`) is the only long-running process that owns the camera and the arm, and it
@@ -45,7 +45,7 @@ redo each step.
 - `launcher.py` (`dobot-launcher`) is the operator's entry point. It must never move the arm on its own: the arm moves only through
   its start / restart / calibrate buttons, each labelled as such, and it stops the demo before opening any tool that
   needs the camera or the serial port. Keep the settings it exposes to the few knobs an operator tunes on site.
-- `config.json` is generated from `config.py` defaults (`uv run dobot-config config.json`)
+- `config.json` is generated from `config.py` defaults (`uv run dobot-config src/config.json`)
   and then edited by `dobot-setup` on the real bench. Do not hand-write coordinates into it
   from here; they come from the arm's pose on site.
 - Ruff docstring rules (`D`) are switched off for this sandbox in `pyproject.toml`; `F` and import

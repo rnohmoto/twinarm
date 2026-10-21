@@ -6,7 +6,7 @@
   ボタンを押したときだけ。較正は端末（Terminal）を開いて走らせる（各点で Enter を押す対話があるため）。
 - 置き場の調整（zones_view.py）とカメラ確認は腕を動かさない。実演が動いている間はカメラとポートを
   渡せないので、先に停止してから開く。
-起動: ./start.sh launcher（Mac は start.command をダブルクリック）。--dry で実機なしの実演を起動する。
+起動: ./scripts/start.sh launcher（Mac は scripts/start.command をダブルクリック）。--dry で実機なしの実演を起動する。
 """
 from __future__ import annotations
 
@@ -179,7 +179,7 @@ class Launcher:
 
     # --- tools (arm does not move unless the tool itself moves it)
     def calibrate_command(self) -> str:
-        return f"cd {PROJECT_ROOT} && uv run dobot-calibrate --config {self.config_path.name} --object {CALIBRATE_OBJECT} --drive"
+        return f"cd {PROJECT_ROOT} && uv run dobot-calibrate --config {self.config_path} --object {CALIBRATE_OBJECT} --drive"
 
     def open_calibration(self) -> str:
         """実演を止めてから、端末で較正（--drive。腕が動く）を開く。Mac 以外はコマンドを返すだけ。"""

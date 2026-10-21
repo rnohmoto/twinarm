@@ -44,10 +44,13 @@
 - 構成を src レイアウトへ移行。トップレベルの 22 本の .py を `src/dobot/` パッケージに入れ、ベア名 import を
   `from dobot.X import …` に、テストを `src/dobot/tests/` に移した（`sys.path` 書き換えは廃止）。
 - 操作者が打つコマンドを console script に統一（`dobot-launcher`・`dobot-demo`・`dobot-calibrate` など 11 本）。
-  `./start.sh` と `start.bat` も同じ名前を呼ぶ。ランチャーが子プロセスを起こす経路は `python -m dobot.demo`。
-- `config.json`・`assets/`・`logs/` はこれまでどおり `dobot/` 直下に置き、`dobot.paths`（`CONFIG_PATH`・
-  `ASSETS_DIR`・`LOGS_DIR`・`from_root()`）経由で解決する。カレントディレクトリ依存を解消したので、
-  どこから実行しても同じファイルを読む。
+  起動スクリプトも同じ名前を呼ぶ。ランチャーが子プロセスを起こす経路は `python -m dobot.demo`。
+- 続けてトップレベルを片付けた: 起動スクリプト 5 本（`start.sh`・`start.command`・`start.bat`・`setup.sh`・
+  `setup.command`）を `scripts/` へ、`HANDOFF.md` を `docs/` へ、`config.json` を `src/` へ移した。
+  各スクリプトは `cd "$(dirname "$0")/.."`（`.bat` は `cd /d "%~dp0.."`）でプロジェクトルートに降りてから動く。
+- `config.json` は `src/config.json`、`assets/` と `logs/` は `dobot/` 直下。いずれも `dobot.paths`
+  （`CONFIG_PATH`・`ASSETS_DIR`・`LOGS_DIR`・`from_root()`）経由で解決するので、どこから実行しても同じ
+  ファイルを読む。文書とスクリプトの参照もこの配置に合わせて直した。
 - 挙動は変えていない。テスト 126 件・ruff の既存指摘 25 件・ty の 138 件はいずれも移行前と同じ。
   実機は動かしていない。
 

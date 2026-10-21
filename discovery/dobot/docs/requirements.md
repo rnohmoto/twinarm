@@ -39,7 +39,7 @@ Dobot Magician が拾って指定の置き場へ運ぶ実演を、**説明員が
 | `zones_view.py` | 置き場をカメラ画像の上でクリックして決める |
 | `robot_magician.py` / `robot_dobot.py` | ロボット制御（公式プロトコル直接、作業域ガード、非常停止レーン、関節補間移動） |
 | `voice_front.py` / `asr.py` / `rule_parser.py` / `llm_agent.py` | 声の UI、faster-whisper、日本語ルール解析、（任意）Claude |
-| `config.json` / `assets/homography.json` | 設定（実機値でコミット）／較正結果（同じ机ならそのまま使える） |
+| `src/config.json` / `assets/homography.json` | 設定（実機値でコミット）／較正結果（同じ机ならそのまま使える） |
 
 ## 4. 機能要件
 
@@ -50,7 +50,7 @@ Dobot Magician が拾って指定の置き場へ運ぶ実演を、**説明員が
 - F1.4 解釈は日本語ルール（色・置き場の別名、否定「赤じゃなくて青」、曖昧なら確認）。Claude は任意
 
 ### F2 物体の認識
-- F2.1 色の範囲（HSV）と形（面積・縦横比・円形度）で、4 色ブロックとボールを検出する。範囲は `config.json` で調整できる
+- F2.1 色の範囲（HSV）と形（面積・縦横比・円形度）で、4 色ブロックとボールを検出する。範囲は `src/config.json` で調整できる
 - F2.2 画像座標をホモグラフィでロボット座標（mm）に変換し、各物の大きさ（長辺 mm）も推定する
 - F2.3 作業域の外にある物は「見えているが届かない」と表示する
 
@@ -79,8 +79,8 @@ Dobot Magician が拾って指定の置き場へ運ぶ実演を、**説明員が
 - F6.4 ランチャーの設定フォーム: 速さ、退避高さ、吸着待ち、補間、映像の反転、fps、確認待ち、Claude の ON/OFF。保存前に検証し、保存前の設定はバックアップする
 
 ### F7 運用
-- F7.1 起動は 1 操作（`start.command` のダブルクリック、または `./start.sh`）。停止は画面のボタン
-- F7.2 別の Mac へは `git clone` → `setup.command` の 1 回で準備できる。同じ机なら較正もそのまま使える
+- F7.1 起動は 1 操作（`scripts/start.command` のダブルクリック、または `./scripts/start.sh`）。停止は画面のボタン
+- F7.2 別の Mac へは `git clone` → `scripts/setup.command` の 1 回で準備できる。同じ机なら較正もそのまま使える
 - F7.3 実演のログ（jsonl）と作業記録を `logs/` に残す
 
 ## 5. 非機能要件（実測つき）
@@ -91,8 +91,8 @@ Dobot Magician が拾って指定の置き場へ運ぶ実演を、**説明員が
 | 較正の精度 | RMS 3 mm 以下 | 1.91 mm（10/16）、3.10 mm（10/19、カメラ移動後） |
 | 映像 | 12 fps 以上、動作中も更新 | 14.2 fps |
 | 非常停止 | 1.5 秒以内に停止 | 1.2 秒（10/15） |
-| 起動 | 1 操作で、ブラウザが自動で開く | `start.command` |
-| 再現性 | 設定・較正を git 管理、同じ机なら clone 直後に起動 | `config.json`・`assets/homography.json` をコミット |
+| 起動 | 1 操作で、ブラウザが自動で開く | `scripts/start.command` |
+| 再現性 | 設定・較正を git 管理、同じ机なら clone 直後に起動 | `src/config.json`・`assets/homography.json` をコミット |
 | 信頼性 | 機材なしで通るテストで回帰を防ぐ | 126 件 |
 
 ## 6. 制約と前提
@@ -101,7 +101,7 @@ Dobot Magician が拾って指定の置き場へ運ぶ実演を、**説明員が
 - 色の判定は照明に依存する。照明や露出が変わったら `objects[].ranges` を調整する（ウィザード 7 番で確認）
 - カメラかロボットを動かしたら較正（5 分）が必要。トレイを置き直したら置き場の設定（1 分）が必要
 - 声は静かな環境を想定（faster-whisper small、日本語）。騒がしい会場では文字入力を併用する
-- Windows は `start.bat` があるが未検証
+- Windows は `scripts\start.bat` があるが未検証
 
 ## 7. 受け入れ基準（確認済み）
 

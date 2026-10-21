@@ -1,7 +1,7 @@
 """実演ランナー: ブラウザ UI（panel_web）＋対話モード（発話→意図→拾って置く）＋自動ループ（attract）。
 
   uv run dobot-demo --dry-run                                     # 実機なし・合成画像。http://127.0.0.1:8790
-  uv run dobot-demo --config config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
+  uv run dobot-demo --config src/config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
   uv run dobot-demo ... --attract                                 # 誰も話さなければ自動で「右へ運ぶ→片付ける」
   uv run dobot-demo --dry-run --once "赤いブロックを右のトレイに置いて"   # 1 発話だけ処理して終了（動作確認）
 

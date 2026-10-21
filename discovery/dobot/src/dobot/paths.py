@@ -1,7 +1,7 @@
-"""Project folders and file names, resolved from the checkout rather than from ``src/``.
+"""Project folders and file names, resolved from the checkout rather than from the cwd.
 
-Every entry point takes ``--config``; these are only its defaults. ``config.json``,
-``assets/`` and ``logs/`` stay beside ``pyproject.toml`` where the operator edits them,
+Every entry point takes ``--config``; these are only its defaults. ``config.json`` sits in
+``src/`` beside the package, while ``assets/`` and ``logs/`` stay beside ``pyproject.toml``,
 so they are found through ``PROJECT_ROOT`` instead of the current directory.
 
 This assumes an editable install (``uv sync``'s default): ``__file__`` is the real file
@@ -12,7 +12,7 @@ this bench never installs.
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]  # discovery/dobot, the uv project
-CONFIG_PATH = PROJECT_ROOT / "config.json"
+CONFIG_PATH = PROJECT_ROOT / "src" / "config.json"
 ASSETS_DIR = PROJECT_ROOT / "assets"
 LOGS_DIR = PROJECT_ROOT / "logs"
 

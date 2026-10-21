@@ -311,7 +311,7 @@ class Wizard:
         self.save()
         print("\n=== 設定のまとめ ===")
         print(summarize(self.cfg, self.homography_path))
-        print(f"\n次: ./start.sh demo（または uv run dobot-demo --config config.json --no-llm）"
+        print(f"\n次: ./scripts/start.sh demo（または uv run dobot-demo --config src/config.json --no-llm）"
               f"  → http://127.0.0.1:{self.cfg.demo.panel_port}  ロボットは config.json の backend={self.cfg.robot.backend}")
 
     def close(self) -> None:

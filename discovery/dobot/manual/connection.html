@@ -48,7 +48,7 @@
   <text x="105" y="180" text-anchor="middle" font-weight="bold">PC</text>
   <text x="105" y="202" text-anchor="middle" font-size="12">Mac または Windows</text>
   <text x="105" y="222" text-anchor="middle" font-size="12">USB 口 2 つ</text>
-  <text x="105" y="242" text-anchor="middle" font-size="12">start.sh で起動</text>
+  <text x="105" y="242" text-anchor="middle" font-size="12">scripts/start.sh で起動</text>
   <rect x="20" y="20" width="170" height="80" rx="10" fill="#eaf2fb" stroke="#3498db" stroke-width="2"/>
   <text x="105" y="50" text-anchor="middle" font-weight="bold">俯瞰カメラ</text>
   <text x="105" y="72" text-anchor="middle" font-size="12">C920n・USB・45cm 上</text>
@@ -126,14 +126,14 @@
   </ol>
 </div>
 <pre>cd twinarm/dobot
-./start.sh              # Mac / Linux（初回は uv が Python 環境を作る）
-.\start.bat             # Windows（PowerShell／コマンドプロンプト。ダブルクリックでも可）
+./scripts/start.sh      # Mac / Linux（初回は uv が Python 環境を作る）
+.\scripts\start.bat     # Windows（PowerShell／コマンドプロンプト。ダブルクリックでも可）
 
-./start.sh wizard       # 設定をやり直す
-./start.sh demo         # 実演画面だけ起動（http://127.0.0.1:8790）
-./start.sh dry          # 実機を繋がずに画面だけ確認
-./start.sh check        # カメラ一覧・ポート候補・テスト（読み取りのみ）</pre>
-<p>ウィザードは、カメラ → ロボット（ポートを候補から選ぶ）→ マーカー → 較正 → 置き場 → 物の高さ → 検出の確認 → 試運転、の順に進み、結果を <code>config.json</code> に保存します。腕が動くのは <code>y</code> と答えた場面だけです。個別の確認は次のコマンドでもできます。</p>
+./scripts/start.sh wizard  # 設定をやり直す
+./scripts/start.sh demo    # 実演画面だけ起動（http://127.0.0.1:8790）
+./scripts/start.sh dry     # 実機を繋がずに画面だけ確認
+./scripts/start.sh check   # カメラ一覧・ポート候補・テスト（読み取りのみ）</pre>
+<p>ウィザードは、カメラ → ロボット（ポートを候補から選ぶ）→ マーカー → 較正 → 置き場 → 物の高さ → 検出の確認 → 試運転、の順に進み、結果を <code>src/config.json</code> に保存します。腕が動くのは <code>y</code> と答えた場面だけです。個別の確認は次のコマンドでもできます。</p>
 <pre>uv run dobot-check-robot --list                          # 候補ポートを表示（自動では選ばない）
 uv run dobot-check-robot --port /dev/tty.usbserial-XXXX  # 接続して現在位置を読む（動かない）
 uv run dobot-check-robot --port /dev/tty.usbserial-XXXX --home   # ホーム姿勢へ動く
@@ -190,7 +190,7 @@ uv run dobot-check-camera --list ; uv run dobot-check-camera --index 0</pre>
   <ol class="mb-0">
     <li>サーミスタ（3D プリンタ用 NTC 100kΩ・ケーブル付き）の先端を J1（土台）モーターの筐体にカプトンテープで密着させる。</li>
     <li>電源を切った状態で、サーミスタの 2 線を Temp（EIO1）と GND に挿す（デュポンワイヤ）。</li>
-    <li>ADC のフルスケール電圧を確かめる。何も繋がない状態で <code>check_robot.py --port … --adc 1</code> を実行し、読み値が 4095 付近なら 3.3V、2700 付近なら 5V。後者なら <code>config.json</code> の <code>demo.temp_adc_fullscale_v</code> を 5.0 にする。</li>
+    <li>ADC のフルスケール電圧を確かめる。何も繋がない状態で <code>dobot-check-robot --port … --adc 1</code> を実行し、読み値が 4095 付近なら 3.3V、2700 付近なら 5V。後者なら <code>config.json</code> の <code>demo.temp_adc_fullscale_v</code> を 5.0 にする。</li>
     <li>サーミスタを繋いで <code>check_robot.py --port … --temp 1</code> を実行すると温度が表示される。室温と放射温度計の値が合うことを確かめる（ずれるなら <code>demo.temp_beta</code> を調整）。</li>
     <li><code>config.json</code> の <code>demo.temp_eio</code> を 1 にすると、実演画面に温度が出て、60℃ 以上で自動動作（ループ・自動ループ）が休止し、50℃ 未満で再開する（しきい値は <code>demo.temp_stop_c</code>／<code>temp_resume_c</code>）。</li>
   </ol>

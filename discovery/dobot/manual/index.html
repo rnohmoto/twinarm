@@ -254,12 +254,12 @@ uv run dobot-check-camera --index 0        # 写った絵が logs/camera_check_*
 <h2 id="s4">4. ソフトの準備（uv・テスト・疎通チェック）</h2>
 <h3>4.0 いちばん早い道: 設定ウィザード</h3>
 <div class="step">
-  <p class="mb-1"><strong>Magician とカメラを繋いだら（接続マニュアル §2）、次の 1 本で §4.2〜§6 と初回のピックまでを順に通せます。</strong>設定が済んでいなければウィザード、済んでいれば実演画面が起動します。各ステップの結果は <code>config.json</code> に保存され、途中から再開できます。腕が動くのは <code>y</code> と答えたときだけです。</p>
+  <p class="mb-1"><strong>Magician とカメラを繋いだら（接続マニュアル §2）、次の 1 本で §4.2〜§6 と初回のピックまでを順に通せます。</strong>設定が済んでいなければウィザード、済んでいれば実演画面が起動します。各ステップの結果は <code>src/config.json</code> に保存され、途中から再開できます。腕が動くのは <code>y</code> と答えたときだけです。</p>
 <pre>cd twinarm/dobot
-./start.sh              # Mac / Linux（初回は uv が Python 環境を作る）
-.\start.bat             # Windows（PowerShell／コマンドプロンプト。エクスプローラーからのダブルクリックでも可）
-./start.sh wizard       # 設定をやり直す（1 カメラ → 2 ロボット → 3 マーカー → 4 較正 → 5 置き場 → 6 高さ → 7 検出 → 8 試運転）</pre>
-  <p class="mb-0">ウィザードが終わると、次回から <code>./start.sh</code> だけで実演画面（§7）が開きます。以下 4.1〜6 は、ウィザードが中で何をしているかの説明と、個別にやり直すときの手順です。</p>
+./scripts/start.sh      # Mac / Linux（初回は uv が Python 環境を作る）
+.\scripts\start.bat     # Windows（PowerShell／コマンドプロンプト。エクスプローラーからのダブルクリックでも可）
+./scripts/start.sh wizard  # 設定をやり直す（1 カメラ → 2 ロボット → 3 マーカー → 4 較正 → 5 置き場 → 6 高さ → 7 検出 → 8 試運転）</pre>
+  <p class="mb-0">ウィザードが終わると、次回から <code>./scripts/start.sh</code> だけで実演画面（§7）が開きます。以下 4.1〜6 は、ウィザードが中で何をしているかの説明と、個別にやり直すときの手順です。</p>
 </div>
 <h3>4.1 環境を作る（初回のみ・ハード不要）</h3>
 <pre>cd twinarm/dobot
@@ -279,7 +279,7 @@ uv run dobot-check-robot --port /dev/tty.usbserial-XXXX  # 接続して現在位
 uv run dobot-check-robot --port /dev/tty.usbserial-XXXX --home        # ホーム姿勢へ動く
 uv run dobot-check-robot --port /dev/tty.usbserial-XXXX --round-trip  # 作業域内を 1 往復</pre>
 <p>Windows は <code>--port COM5</code> のように書く。ポートは自動では選びません（間違った機器に指令を送らないため）。</p>
-<div class="step">設定ファイル <code>config.json</code> の <code>camera.index</code> と <code>robot.port</code> に、ここで分かった番号とポートを書いておくと、以後の引数が省けます。</div>
+<div class="step">設定ファイル <code>src/config.json</code> の <code>camera.index</code> と <code>robot.port</code> に、ここで分かった番号とポートを書いておくと、以後の引数が省けます。</div>
 <div class="gate"><strong>関門 4</strong>: テスト全 passed・カメラ報告 2 行が合格・<code>--home</code> でホーム姿勢に動いて止まる。</div>
 
 <!-- ===================================================== -->
@@ -300,7 +300,7 @@ uv run dobot-check-robot --port /dev/tty.usbserial-XXXX --round-trip  # 作業�
 <figcaption>図 5-1: マーカーの配置。対象物はマーカーの内側に置く（外側は補間が効かない）。</figcaption>
 </figure>
 <pre>uv run dobot-calibrate --make-markers assets/markers   # 印刷用 PNG を出す → 4 枚印刷して厚紙に貼る
-uv run dobot-calibrate --config config.json            # カメラで 4 枚を検出 → 各マーカー中心へ吸盤先端をジョグ → space で座標を記録</pre>
+uv run dobot-calibrate --config src/config.json        # カメラで 4 枚を検出 → 各マーカー中心へ吸盤先端をジョグ → space で座標を記録</pre>
 <div class="step">
   <ol class="mb-0">
     <li>マーカーを四隅に貼る（図 5-1）。カメラ画面で 4 枚とも検出されることを確認。</li>
@@ -330,7 +330,7 @@ uv run dobot-calibrate --config config.json            # カメラで 4 枚を�
 
 <!-- ===================================================== -->
 <h2 id="s7">7. 初めてのピック＆プレースと実演画面</h2>
-<pre>uv run dobot-demo --config config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
+<pre>uv run dobot-demo --config src/config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
 #   → ブラウザで http://127.0.0.1:8790 を開く（同じ PC。別 PC から見るなら --panel-port と PC の IP で）
 #   → 画面の入力欄に「赤いブロックを右のトレイに置いて」→ 送る
 #   → 20 回連続で成功（吸着ミス 1 回以内）が M3 の合格</pre>

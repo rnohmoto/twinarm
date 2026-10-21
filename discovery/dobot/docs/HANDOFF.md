@@ -1,17 +1,17 @@
 # dobot 引き継ぎ — Magician 実演を再現する（2026-10-19 時点）
 
 この文書だけで、実演の起動・使い方・設定のやり直しができるようにしてある。経緯の記録は
-`logs/bench_20261015.md` と `logs/bench_20261016.md`、コードの一覧と各スクリプトの危険度は `README.md`。
+`../logs/bench_20261015.md` と `../logs/bench_20261016.md`、コードの一覧と各スクリプトの危険度は [`../README.md`](../README.md)。
 
 ## 0. 起動は 1 コマンド
 
 ```bash
-cd dobot && ./start.sh launcher   # Finder なら start.command をダブルクリック（同じもの）。Windows は start.bat（ランチャー無し）
+cd dobot && ./scripts/start.sh launcher   # Finder なら scripts/start.command をダブルクリック（同じもの）。Windows は scripts\start.bat（ランチャー無し）
 ```
 
 ブラウザにランチャー（http://127.0.0.1:8789）が開く。「実演を起動」で実演（http://127.0.0.1:8790）。停止・再起動・較正・置き場・設定・ログも
-この画面から。新しい Mac は先に `setup.command`（1 回）。説明員向けの手順は [docs/operation-manual.md](docs/operation-manual.md)、
-導入は [docs/setup-manual.md](docs/setup-manual.md)。
+この画面から。新しい Mac は先に `scripts/setup.command`（1 回）。説明員向けの手順は [操作マニュアル](operation-manual.md)、
+導入は [導入手順](setup-manual.md)。
 
 - 設定が揃っていれば実演画面（`dobot-demo`）が立ち上がり、ブラウザで http://127.0.0.1:8790 が開く。終了は Ctrl+C
 - **起動時に腕がホーム姿勢へ動く。** 腕の周りを空けてから実行する
@@ -34,13 +34,13 @@ cd dobot && ./start.sh launcher   # Finder なら start.command をダブルク�
 | 音声 | faster-whisper `small`（`~/.cache/huggingface`、初回 480 MB）。マイクは Mac 内蔵。ターミナルにマイクの許可が必要 |
 | 解析 | ルールベース（`config.json` の `llm.enabled=false`）。Claude を使うなら `true` にして `ANTHROPIC_API_KEY` |
 
-`config.json` はこの値でコミットしてある。ポートだけは PC・ケーブルで変わる（`ls /dev/cu.usbserial-*`）。
+`src/config.json` はこの値でコミットしてある。ポートだけは PC・ケーブルで変わる（`ls /dev/cu.usbserial-*`）。
 
 ## 2. 起動前の確認（腕は動かない）
 
 ```bash
-./start.sh check                                        # カメラ一覧・ポート候補・オフラインテスト
-uv run dobot-check-robot --config config.json       # つないで現在位置を読むだけ
+./scripts/start.sh check                                # カメラ一覧・ポート候補・オフラインテスト
+uv run dobot-check-robot --config src/config.json       # つないで現在位置を読むだけ
 ```
 
 候補ポートが「なし」と出ても、CH9102 はその一覧に出ないだけ。`config.json` のポートが `/dev/cu.*` に存在すればよい。
@@ -61,11 +61,11 @@ uv run dobot-check-robot --config config.json       # つないで現在位置�
 机からトレイをどけ、青ブロックを 1 個用意して:
 
 ```bash
-uv run dobot-calibrate --config config.json --object blue_cube --drive
+uv run dobot-calibrate --config src/config.json --object blue_cube --drive
 ```
 
 腕が 3×3 の 9 点を回り、各点でブロック上面の 8 mm 上に止まる。吸盤の真下にブロックを置いて Enter、を 9 回。
-終わると RMS と前回との差が出る。**RMS 3 mm 以下なら合格。** 前の較正は `logs/homography_before_drive_*.json` に残る。
+終わると RMS と前回との差が出る。**RMS 3 mm 以下なら合格。** 前の較正は `../logs/homography_before_drive_*.json` に残る。
 「腕を手で当てて座標を読む」方式（`--drive` なし）は使わない: たわみで 7〜11 mm ずれた（2026-10-16）。
 
 ### 4.2 置き場（トレイの位置）— 腕は動かない
@@ -82,7 +82,7 @@ uv run dobot-zones
 腕のロック解除ボタンを押しながら吸盤を当て、座標を読む:
 
 ```bash
-uv run dobot-check-robot --config config.json      # pose x= y= z= が出る
+uv run dobot-check-robot --config src/config.json      # pose x= y= z= が出る
 ```
 
 - 物の上面に当てた z → `config.json` の `objects[].z_pick` = その z − 1
@@ -104,14 +104,14 @@ uv run --no-sync python -c "from faster_whisper import WhisperModel; WhisperMode
 
 ### 4.6 別の PC で動かす
 
-`git clone` → `cd dobot && uv sync --extra voice --extra llm` → `config.json` の `robot.port` を直す → 4.5 → 4.4 → 4.1 → 4.2 → 4.3 → `./start.sh`。
-Windows は `start.bat`（ポートは `COMn`、カメラ index は `dobot-check-camera --list` で確認）。
+`git clone` → `cd dobot && uv sync --extra voice --extra llm` → `src/config.json` の `robot.port` を直す → 4.5 → 4.4 → 4.1 → 4.2 → 4.3 → `./scripts/start.sh`。
+Windows は `scripts\start.bat`（ポートは `COMn`、カメラ index は `dobot-check-camera --list` で確認）。
 
 ## 5. 既知の注意
 
 - 置き場は「中心」だけでなく置く位置（スロット）も作業域に入っている必要がある（`dobot-zones` が確認する）
 - 色の範囲（HSV）は `config.json` の `objects[].ranges`。照明が変わって検出が崩れたら `dobot-setup --from 7` で枠を確認
-- `./start.sh wizard` を 1 番から通すと `config.json` を上書きしていく。途中からは `--from N`
+- `./scripts/start.sh wizard` を 1 番から通すと `src/config.json` を上書きしていく。途中からは `--from N`
 - `uv run pytest` は実機の較正ファイルがあっても通る（2026-10-19 修正）。ポート 8790 を実演が使っている間はパネルのテスト 2 件が落ちる
 - `config.bak_*.json` はウィザードと `dobot-zones` が保存前に残すコピー（git 管理外）
 
@@ -133,8 +133,8 @@ Windows は `start.bat`（ポートは `COMn`、カメラ index は `dobot-check
 ## 7. 新しい会話の起動プロンプト（コピペ）
 
 ```
-twinarm-main の dobot で Dobot Magician の実演を再開します。dobot/AGENTS.md → dobot/HANDOFF.md の順に読んでください。
-- 腕が動くコマンド（./start.sh、dobot-calibrate --drive、dobot-setup の y）は私がこの会話で頼んだときだけ実行する
-- ポートは config.json のものを使い、推測しない。実機の挙動は私が実行して報告した結果だけを事実にする
-- まず ./start.sh check の結果を見せてから、./start.sh で実演を起動する手順を案内して
+twinarm-main の dobot で Dobot Magician の実演を再開します。dobot/AGENTS.md → dobot/docs/HANDOFF.md の順に読んでください。
+- 腕が動くコマンド（./scripts/start.sh、dobot-calibrate --drive、dobot-setup の y）は私がこの会話で頼んだときだけ実行する
+- ポートは src/config.json のものを使い、推測しない。実機の挙動は私が実行して報告した結果だけを事実にする
+- まず ./scripts/start.sh check の結果を見せてから、./scripts/start.sh で実演を起動する手順を案内して
 ```

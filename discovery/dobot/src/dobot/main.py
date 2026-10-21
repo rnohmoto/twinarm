@@ -8,9 +8,9 @@
        uv run dobot-pnp --dry-run --no-llm --text "赤いブロックを右のトレイに置いて"
   2) カメラだけ実物（検出のチューニング。'q' で終了）
        uv run dobot-pnp --tune --camera-index 0
-  3) キャリブ（別コマンド）: uv run dobot-calibrate --config config.json   ← ArUco 4枚を机に貼って実行
-  4) ロボットだけ実物（LLM 無し）: uv run dobot-pnp --config config.json --robot pydobot --no-llm
-  5) 本番: uv run dobot-pnp --config config.json --robot pydobot
+  3) キャリブ（別コマンド）: uv run dobot-calibrate --config src/config.json   ← ArUco 4枚を机に貼って実行
+  4) ロボットだけ実物（LLM 無し）: uv run dobot-pnp --config src/config.json --robot pydobot --no-llm
+  5) 本番: uv run dobot-pnp --config src/config.json --robot pydobot
      （ANTHROPIC_API_KEY を環境変数に。無ければ自動でルール解析にフォールバック）
 
 キー（パネルウィンドウ）: space=話す（PTT） / h=ホーム / e=非常停止 / r=停止解除 / q=終了

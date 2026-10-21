@@ -276,7 +276,7 @@ uv run koch-teleop --leader-port <L> --leader-id koch_leader_B \
 ### V1 — 分身の空間投影（Quest Pro・USB）
 
 ```bash
-uv run python webxr/setup_assets.py                              # 初回のみ(three.js 取得)
+uv run python src/webxr/setup_assets.py                              # 初回のみ(three.js 取得)
 uv run koch-bridge --sim --http --port 8444  # まずテレオペなし
 uv run koch-quest --port 8444               # 別ターミナル: reverse を張り Quest Browser で http://localhost:8444/ を開く
 ```

@@ -4,7 +4,7 @@ Put the parent folder first on ``PYTHONPATH`` and lerobot's ``DynamixelMotorsBus
 simulated servos instead of a serial port, so the koch modules can be run end to end with
 no arms attached (start-up, mode switching, the frame loop, shutdown):
 
-    PYTHONPATH=simbus KOCH_SIMBUS=<scenario.json> koch-teleop ...
+    PYTHONPATH=src/koch/simbus KOCH_SIMBUS=<scenario.json> koch-teleop ...
 
 This is a rehearsal of the *software path* only. It does not model forces, friction, heat
 or timing of real servos, so nothing observed here says how the arms behave.

@@ -58,7 +58,7 @@ twinarm の discovery/koch で VR を実機と Quest Pro で立ち上げます�
 | **USB 接続** `quest_usb.py`（adb reverse＋Quest Browser で `http://localhost:<port>/` を開く・`--mirror`=scrcpy・**`--wifi`＝adb を Wi-Fi に切替えて USB の口を充電器に空ける**・`--check` は電池残量も表示） | ✅（10/4） | `--check`（adb 無しの経路） | U0（開発者モード・adb 疎通・30 分の電池の減り・adb over Wi-Fi で reverse が張れるか） |
 | **起動スクリプトと HTML マニュアル**: `start.sh`（check／handshake／host／vr／vr2／sim／rehearse／quest／wifi／manual。後ろに書いた引数はランチャへ渡る）・`manual/index.html`・`handshake.html`・`vr.html`・`quest_setup.html`（図解・関門・困ったとき・参考資料） | ✅（10/4） | Git Bash で全モードを実行（check・dry-run・rehearse）・ブラウザで目視 | Mac で `./scripts/start.sh check` から |
 | **準備状況の表示** `launch.py --doctor`（`check` が呼ぶ）: 設定ファイル・ポートの有無・較正ファイル・VR ページの部品から、握手／VR 1 人／VR 2 人の起動可否を出す。ポートは開かない | ✅（10/4 夜） | 実行して表示を確認 | Mac の実際の設定で |
-| **通し稽古** `simbus/`（仮想の Dynamixel バス＋`rehearse.py` の 7 シナリオ）: lerobot 0.6.1 の実物の上で、ランチャ・teleop・ブリッジ・パネル・host を起動から終了まで通し、書込みの順序・EEPROM 書込みの拒否・終了時のトルクを検査する | ✅（10/4 夜） | 7 シナリオ・69 項目すべて通過 | Mac で 1 回（CHECKLIST S0）。**実機の挙動は分からない** |
+| **通し稽古** `src/koch/simbus/`（仮想の Dynamixel バス＋`rehearse.py` の 7 シナリオ）: lerobot 0.6.1 の実物の上で、ランチャ・teleop・ブリッジ・パネル・host を起動から終了まで通し、書込みの順序・EEPROM 書込みの拒否・終了時のトルクを検査する | ✅（10/4 夜） | 7 シナリオ・69 項目すべて通過 | Mac で 1 回（CHECKLIST S0）。**実機の挙動は分からない** |
 | **較正の不一致で止まる**: ランチャ配下では lerobot の問い（ENTER でファイルの値を EEPROM に書く）が見えないので、理由を出して終了する。EEPROM は書かない。端末で直接実行したときは従来どおり lerobot が尋ねる | ✅（10/4 夜） | 通し稽古 `mismatch` | 不一致が起きたとき |
 | **握手（A）と VR（B）の同時起動**（端末 2 つ・片方を止めても他方は続く）／VR 1 人はリーダーだけ（`--follower none`。フォロワーは繋がなくてよい）／子プロセスが異常終了したら理由（記録の末尾）を画面に出し、ランチャも異常終了を返す | ✅（10/4 夜） | 通し稽古 `fest`・`vr`・`mismatch` | 実機 |
 | **VR を 2 人が別々に**（10/5・Mac）: リーダー B とフォロワー B を別々の人が手で動かし、それぞれ自分の空間・自分の主観で掴む。ブリッジを腕ごとに 1 つ（1 人目 8444・2 人目 8443、2 人目の分身の設定は `config/solo_F/`）。入口は `scripts/koch.sh`（`handshake`／`vr-leader`／`vr-follower`／`all`／`status`／`stop`）と、同じフォルダの `.command`（Finder でダブルクリック） | ✅（10/5） | — | Mac のブラウザ 2 枚で 2 本同時に動作（ユーザー確認: 2 人目の分身の向きと肩の可動域）。Quest 2 台は未接続。`.command` と `all` からの実機起動は未実施 |
@@ -114,13 +114,13 @@ GitHub から main を新しく取得して `uv sync` → `./scripts/start.sh ch
 | VR の要件と設計判断・10/19 の実機ログ | `REQUIREMENTS_VR.md`・`LOG_261019_VR.md` |
 | Quest を繋ぐ・見張る・Mac から遠隔操作 | `quest_usb.py`（`--wait`・`--watch`・`--devtools`）・ブリッジの `/op` `/status`・操作ページ `?spectator=1&info=1` |
 | 新しい Mac に配る設定（4 本のシリアル） | `config/config.fest.json`（`koch.sh` が `config.json` の無いときに写す） |
-| 腕なしでソフトの通り道を確かめたい | `simbus/`（`README.md`・`rehearse.py`・仮想のバス `dynamixel_sdk/`） |
+| 腕なしでソフトの通り道を確かめたい | `src/koch/simbus/`（`README.md`・`rehearse.py`・仮想のバス `dynamixel_sdk/`） |
 | 何がどう動くか（一覧・危険度・流れ） | `README.md` |
 | 実機での手順と記録欄 | `CHECKLIST.md`（TEST／W／U／V の各節・運用メモ＝経路表・接続手順・ブラウザ・アラート表） |
 | 1 ペアの制御（力覚・壁・重さ・無線フォロワー・2 人目の `--leader-type koch_follower`） | `teleop.py`（冒頭 docstring が仕様） |
 | 2 ペア起動・VR 起動・2 人（`--vr2`）・有線／無線切替 | `launch.py`・`config/config.example.json` |
 | 握手用 PC 側（フォロワー host） | `follower_host.py`（docstring にプロトコル） |
-| VR の見え方・物理・位置合わせ・編集モード | `webxr/index.html`（`DEFAULTS`・`stepPhysics`・`solveCalib`）・`bridge.py`（`/state` `/config` `/contact`・設定 v2） |
+| VR の見え方・物理・位置合わせ・編集モード | `src/webxr/index.html`（`DEFAULTS`・`stepPhysics`・`solveCalib`）・`bridge.py`（`/state` `/config` `/contact`・設定 v2） |
 | Quest を USB で繋ぐ・充電しながら使う | `quest_usb.py`（`--check` → `--port 8444` → `--wifi` → `--mirror`） |
 | パネル | `panel.py` |
 | 制御則の正本（テスト付き） | `../../twinarm/src/twinarm/domain/gripper_feedback.py`・`link_watchdog.py`（`mise run test` in `twinarm/`） |
@@ -133,7 +133,7 @@ git clone https://github.com/rnohmoto/twinarm.git && cd twinarm/discovery/koch &
 ./scripts/start.sh check                                # 自己診断・準備状況・ポート・Quest の接続と電池（腕は動かない。VR ページの部品も取得）
 ./scripts/start.sh rehearse                             # 腕なしの通し稽古（仮想のサーボ・約 3 分）
 ./scripts/start.sh manual                               # 図解マニュアルを開く
-uv run python webxr/setup_assets.py                    # three.js を取得（VR を使う Mac だけ）
+uv run python src/webxr/setup_assets.py                    # three.js を取得（VR を使う Mac だけ）
 uv run koch-teleop --selftest        # ハード無しで制御則を確認
 uv run koch-launch --list       # ポートとシリアル（読み取りのみ）
 uv run koch-launch --init       # config/config.json を作って記入

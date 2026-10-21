@@ -32,4 +32,4 @@ depends = ["format --check", "type", "test"]
 [tasks.rehearse]
 description = "Launch paths against simulated servos: no arms, about 3 minutes, binds the live session's localhost ports; pass scenario names to run some"
 usage = 'arg "[scenarios]" var=#true help="handshake | vr | vr2 | wireless | mismatch | dropout | fest (default: all)"'
-run = "uv run python simbus/rehearse.py ${usage_scenarios:-}"
+run = "uv run python src/koch/simbus/rehearse.py ${usage_scenarios:-}"

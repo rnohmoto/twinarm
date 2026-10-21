@@ -5,9 +5,9 @@ Runs the real launcher, teleop, bridge, panel and follower host against the virt
 Dynamixel bus in this folder (``dynamixel_sdk/``) and checks what they did: frame rate,
 feedback commands, register write order, refused EEPROM writes, torque at exit.
 
-  uv run python simbus/rehearse.py            # every scenario
-  uv run python simbus/rehearse.py vr2        # one: handshake | vr | vr2 | wireless | mismatch | dropout | fest
-  uv run python simbus/rehearse.py --list
+  uv run python src/koch/simbus/rehearse.py            # every scenario
+  uv run python src/koch/simbus/rehearse.py vr2        # one: handshake | vr | vr2 | wireless | mismatch | dropout | fest
+  uv run python src/koch/simbus/rehearse.py --list
 
 仮想のサーボで握手・VR・2 人・無線・較正不一致・通信断を通し、起動から終了までのソフトの
 経路を確かめる。**実機の挙動は分からない**（力・摩擦・発熱・実時間は模擬していない）。
@@ -32,7 +32,7 @@ if callable(_reconfigure):  # Windows cp932 console: never crash on symbols
     _reconfigure(encoding="utf-8", errors="replace")
 
 HERE = Path(__file__).resolve().parent
-KOCH = HERE.parent  # discovery/koch, the uv project
+KOCH = HERE.parents[2]  # discovery/koch, the uv project
 ROOT = KOCH / "work" / "rehearsal"
 CAL = KOCH / "config" / "calibration"
 IRON = {
@@ -722,9 +722,9 @@ def main():
     unknown = [n for n in names if n not in SCENARIOS]
     if unknown:
         sys.exit(f"知らないシナリオ: {unknown}（--list で一覧）")
-    if not (KOCH / "webxr" / "three.module.js").exists():
+    if not (KOCH / "src" / "webxr" / "three.module.js").exists():
         sys.exit(
-            "three.module.js がありません → uv run python webxr/setup_assets.py を一度実行"
+            "three.module.js がありません → uv run python src/webxr/setup_assets.py を一度実行"
         )
     busy = ports_busy()
     if busy:

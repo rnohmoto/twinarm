@@ -39,7 +39,7 @@ need_uv() {
 }
 
 need_assets() {
-  [ -f webxr/three.module.js ] || uv run python webxr/setup_assets.py
+  [ -f src/webxr/three.module.js ] || uv run python src/webxr/setup_assets.py
 }
 
 need_config() {
@@ -59,9 +59,9 @@ migrate_from_koch4() {
     mv "$old/config/koch4_config.json" config/config.json || { echo "⚠ 移行に失敗: koch4/config/koch4_config.json"; exit 1; }
     echo "移行: koch4/config/koch4_config.json → config/config.json"
   fi
-  if [ -f "$old/webxr/three.module.js" ] && [ ! -f webxr/three.module.js ]; then
-    mv "$old/webxr/three.module.js" webxr/three.module.js || { echo "⚠ 移行に失敗: koch4/webxr/three.module.js"; exit 1; }
-    echo "移行: koch4/webxr/three.module.js → webxr/three.module.js"
+  if [ -f "$old/webxr/three.module.js" ] && [ ! -f src/webxr/three.module.js ]; then
+    mv "$old/webxr/three.module.js" src/webxr/three.module.js || { echo "⚠ 移行に失敗: koch4/webxr/three.module.js"; exit 1; }
+    echo "移行: koch4/webxr/three.module.js → src/webxr/three.module.js"
   fi
   if [ -d "$old/work" ] && [ ! -d work ]; then
     mv "$old/work" work || { echo "⚠ 移行に失敗: koch4/work/"; exit 1; }
@@ -88,8 +88,8 @@ case "$mode" in
     migrate_from_koch4
     need_uv
     uv run koch-teleop --selftest
-    if [ ! -f webxr/three.module.js ]; then
-      uv run python webxr/setup_assets.py || echo "⚠ VR ページの部品を取得できません。ネットに繋がるときにもう一度 check を実行してください"
+    if [ ! -f src/webxr/three.module.js ]; then
+      uv run python src/webxr/setup_assets.py || echo "⚠ VR ページの部品を取得できません。ネットに繋がるときにもう一度 check を実行してください"
     fi
     uv run koch-launch --doctor || true
     uv run koch-launch --list || true
@@ -143,7 +143,7 @@ case "$mode" in
     ;;
   rehearse)
     need_uv; need_assets
-    exec uv run python simbus/rehearse.py "$@"
+    exec uv run python src/koch/simbus/rehearse.py "$@"
     ;;
   quest)
     need_uv

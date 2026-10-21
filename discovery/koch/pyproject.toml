@@ -37,8 +37,9 @@ requires = ["uv_build>=0.12.5,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-# Co-located test packages stay out of the wheel; they import dev-only deps.
-wheel-exclude = ["tests"]
+# Co-located test packages stay out of the wheel; they import dev-only deps. The simbus
+# rehearsal harness is a bench tool, not part of the library either.
+wheel-exclude = ["tests", "simbus"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
@@ -49,8 +50,9 @@ markers = [
 ]
 
 [tool.coverage.run]
-# Tests live inside the package; they are not part of the measured surface.
-omit = ["*/tests/*"]
+# Tests and the simbus rehearsal harness live inside the package; neither is part of the
+# measured surface.
+omit = ["*/tests/*", "*/simbus/*"]
 
 [tool.ruff]
 extend = "../../pyproject.toml"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 r"""VR bridge for the koch virtual-object demo (network only; stdlib only).
 
-Serves ``webxr/`` (the three.js page) to the Quest Pro browser, republishes the
+Serves ``src/webxr/`` (the three.js page) to the Quest Pro browser, republishes the
 telemetry of one or two teleop processes as ``/state`` (one arm each), keeps the
 twin/object configuration (``config/twin.json``: per-arm joint spans/offsets/
 signs and base placement, objects with stiffness/cap/mass/bounce and their spots,
@@ -22,7 +22,7 @@ so every page reloads ``/config`` when another page saved it::
   koch-bridge --arms B,F --telemetry 8770,8773 --ctl-port 8768,8772 --port 8444
         │ GET /state /config                       ▲ POST /contact {"arm":"B","vwall":…}
         ▼                                          │ POST /config
-  Quest Pro browser  https://<Mac の IP>:8444/  (webxr/index.html; ?spectator=1 = 見るだけ)
+  Quest Pro browser  https://<Mac の IP>:8444/  (src/webxr/index.html; ?spectator=1 = 見るだけ)
 
 The page decides *which* object each twin's gripper is touching; each teleop decides
 *whether* its trigger is inside that object and writes the servo registers; the
@@ -565,7 +565,7 @@ def make_handler(ctl_sock, config_path):
                 return None
 
         def do_GET(self):
-            """Serve /state and /config as JSON, everything else from webxr/."""
+            """Serve /state and /config as JSON, everything else from src/webxr/."""
             route = self.path.split("?")[0]
             if route == "/state":
                 self.send_json(public_state())
@@ -766,7 +766,7 @@ def main():
     args = build_parser().parse_args()
     if not (WEBXR_DIR / "three.module.js").exists():
         sys.exit(
-            f"three.module.js がありません: {WEBXR_DIR}\n→ uv run python webxr/setup_assets.py を一度実行"
+            f"three.module.js がありません: {WEBXR_DIR}\n→ uv run python src/webxr/setup_assets.py を一度実行"
         )
     arms = split_list(args.arms)
     if not arms:

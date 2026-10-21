@@ -51,7 +51,7 @@ VR_HTTP_PORTS="8444 8443 8445 8446"
 prepare() {  # prepare [vr]: uv・VR ページの部品・設定ファイル（無ければ fest 設定から）・adb（VR のとき）
   command -v uv >/dev/null 2>&1 || { echo "uv が見つかりません。https://docs.astral.sh/uv/ の手順で入れてください"; exit 1; }
   uv sync -q
-  [ -f webxr/three.module.js ] || uv run python webxr/setup_assets.py
+  [ -f src/webxr/three.module.js ] || uv run python src/webxr/setup_assets.py
   if [ ! -f config/config.json ]; then
     if [ -f "$FEST_CONFIG" ]; then
       cp "$FEST_CONFIG" config/config.json

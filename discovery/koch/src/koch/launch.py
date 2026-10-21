@@ -460,7 +460,7 @@ def doctor(args, config_path):
     print(
         ""
         if asset.exists()
-        else "  → uv run python webxr/setup_assets.py（要ネット・1 回）"
+        else "  → uv run python src/webxr/setup_assets.py（要ネット・1 回）"
     )
     print(f"  {mark[twin.exists()]} 分身と物体の設定 {twin.name}")
     if not config_path.exists():

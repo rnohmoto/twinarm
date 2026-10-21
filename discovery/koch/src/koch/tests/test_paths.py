@@ -19,7 +19,7 @@ def test_root_is_the_project_checkout_not_the_package() -> None:
 def test_default_folders_hang_off_root() -> None:
     assert paths.CONFIG_DIR == paths.ROOT / "config"
     assert paths.WORK_DIR == paths.ROOT / "work"
-    assert paths.WEBXR_DIR == paths.ROOT / "webxr"
+    assert paths.WEBXR_DIR == paths.ROOT / "src" / "webxr"
 
 
 @pytest.mark.unit

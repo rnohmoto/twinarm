@@ -26,8 +26,10 @@ A new session starts at [`docs/HANDOFF.md`](docs/HANDOFF.md).
 - Importing any `koch` module must stay free of side effects (no port opened, no logger touched);
   `koch.console` is called from `main()`. `tests/test_entry_points.py` and `tests/test_tools.py`
   enforce it.
-- `simbus/` is the rehearsal harness and stays outside the package: its fake `dynamixel_sdk` is put
-  on `PYTHONPATH` to shadow the real one. Child processes are spawned as `python -m koch.<module>`
-  so that shadowing is inherited.
+- `src/koch/simbus/` is the rehearsal harness: its fake `dynamixel_sdk` is put on `PYTHONPATH` to
+  shadow the real one, so the folder's location does not matter to the shadowing. Child processes
+  are spawned as `python -m koch.<module>` so that shadowing is inherited. It sits inside the
+  package but is not part of it: `pyproject.toml` keeps it out of the wheel and out of coverage,
+  like `tests/`.
 - `main()` and the frame loop in `teleop.py` keep their hardware-tested shape on purpose; extract pure
   logic into modules, do not restructure the loop without an arm session to verify it.

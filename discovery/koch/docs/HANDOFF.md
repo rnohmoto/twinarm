@@ -13,28 +13,28 @@
 ```
 twinarm の discovery/koch で握手を実機で立ち上げます。AGENTS.md（実機安全）→ discovery/koch/docs/HANDOFF.md → manual/handshake.html の順に読んでください。
 - いま動いている PC を最初に宣言する（操作者側の Mac か、握手用の 2 台目の Mac か）
-- 最初に git pull → cd discovery/koch → ./start.sh check を実行し、「起動できるもの」の表を私に見せる（腕は動かない）
+- 最初に git pull → cd discovery/koch → ./scripts/start.sh check を実行し、「起動できるもの」の表を私に見せる（腕は動かない）
 - 設定ファイルのポートは私が渡す（--list の結果から私が選ぶ。推測しない。リーダーとフォロワーは入替不可）
-- 腕が動くコマンド（./start.sh handshake・host）は、私がこの会話で明示的に頼んだときだけ実行する。実機の挙動は私が実行して報告した結果だけを事実にする
+- 腕が動くコマンド（./scripts/start.sh handshake・host）は、私がこの会話で明示的に頼んだときだけ実行する。実機の挙動は私が実行して報告した結果だけを事実にする
 - 進め方: CHECKLIST の S0 → TEST 0 → 1b → 2 → 2b → 3 → 4 →（無線にするなら W0〜W4）を 1 つずつ。各テストの記録欄を埋める
-- ペア A だけで握手する日は ./start.sh handshake --pair A（ペア B の VR と同時に動かせる）
+- ペア A だけで握手する日は ./scripts/start.sh handshake --pair A（ペア B の VR と同時に動かせる）
 ```
 
 VR をすぐ動かす（操作者側の Mac と Quest Pro）:
 
 ```
 twinarm の discovery/koch で VR を実機と Quest Pro で立ち上げます。AGENTS.md（実機安全）→ discovery/koch/docs/HANDOFF.md → manual/vr.html の順に読んでください。Quest の準備（Meta アカウント・開発者モード）がまだなら manual/quest_setup.html から。
-- 最初に git pull → cd discovery/koch → ./start.sh check を実行し、「起動できるもの」と Quest の接続・電池残量を私に見せる（腕は動かない）
-- 腕が動くコマンド（mac/3_VR1人目_リーダーB.command＝koch.sh vr-leader、4_VR2人目_フォロワーB.command＝vr-follower。従来の ./start.sh vr・vr2 も可）は、私がこの会話で明示的に頼んだときだけ実行する。ポートは fest 設定のシリアル番号で解決される（違う腕なら --list で私が直す）。実機の挙動は私の報告だけを事実にする
+- 最初に git pull → cd discovery/koch → ./scripts/start.sh check を実行し、「起動できるもの」と Quest の接続・電池残量を私に見せる（腕は動かない）
+- 腕が動くコマンド（mac/3_VR1人目_リーダーB.command＝koch.sh vr-leader、4_VR2人目_フォロワーB.command＝vr-follower。従来の ./scripts/start.sh vr・vr2 も可）は、私がこの会話で明示的に頼んだときだけ実行する。ポートは fest 設定のシリアル番号で解決される（違う腕なら --list で私が直す）。実機の挙動は私の報告だけを事実にする
 - Meta アカウントの作成と開発者の登録は私が行う
-- 進め方: CHECKLIST の S0 → U0 → V1（./start.sh sim と Quest で AR 表示）→ V0 → V-w（./start.sh vr --extra "--vw-cap 60" から）→ V-c → V-e → V2 → V4 → V5（vr2）→ V3 を 1 つずつ
+- 進め方: CHECKLIST の S0 → U0 → V1（./scripts/start.sh sim と Quest で AR 表示）→ V0 → V-w（./scripts/start.sh vr --extra "--vw-cap 60" から）→ V-c → V-e → V2 → V4 → V5（vr2）→ V3 を 1 つずつ
 ```
 
 どちらの会話にも共通:
 
 - 結果は robotics の TacitCapture に実機ログ md（61_ と同じ型・新番号）として残す
-- コードを直すときは twinarm の規則（AGENTS.md・.claude/rules）に従う。koch のコードは `koch` パッケージのモジュール同士で import する（`uv` は discovery/koch で）。制御則は twinarm/src/twinarm/domain が正で、src/koch/feedback.py・link.py はその逐語の写し（tests/test_mirror.py が照合する）。変えるときは twinarm 側を先に直してから写す。直したら `./start.sh rehearse` を通してから実機へ
-- 入口は `./start.sh`（check／handshake／host／vr／vr2／sim／rehearse／quest／wifi／manual）。図解の手引きは `docs/manual/index.html`
+- コードを直すときは twinarm の規則（AGENTS.md・.claude/rules）に従う。koch のコードは `koch` パッケージのモジュール同士で import する（`uv` は discovery/koch で）。制御則は twinarm/src/twinarm/domain が正で、src/koch/feedback.py・link.py はその逐語の写し（tests/test_mirror.py が照合する）。変えるときは twinarm 側を先に直してから写す。直したら `./scripts/start.sh rehearse` を通してから実機へ
+- 入口は `./scripts/start.sh`（check／handshake／host／vr／vr2／sim／rehearse／quest／wifi／manual）。図解の手引きは `docs/manual/index.html`
 
 ## 2. 現状（何ができていて、何が未検証か）
 
@@ -56,7 +56,7 @@ twinarm の discovery/koch で VR を実機と Quest Pro で立ち上げます�
 | **投げる・落とす・跳ねる**（放した瞬間の指先速度・重力・空気抵抗・机／床の反発と摩擦・物体同士の衝突・音） | ✅（10/4） | Chrome（sim）で握る→放す→机に落ちる・編集・視点切替 | V4（実機の握りで投げる。速度上限 5 m/s・反発値の体感） |
 | **2 人**（`--vr2`: ペアのフォロワー機を手で動かす 2 人目の入力装置。`--leader-type koch_follower`＝腕トルク抜き・gripper だけ壁・M288 換算。重さは肘＝電流、**肩（XL430）＝PWM モード**（電流制御が無いため電圧で。握っている間だけトルク ON・`--vw-pwm-scale`／`--vw-pwm-cap`）。ブリッジ `--arms B,F`・分身 2 体） | ✅（10/4） | launcher dry-run・bridge `--sim --arms B,F`・ページで 2 体・肩 PWM の書込み順序を `--selftest` で確認（0 を書いてからトルク ON・解放時に Mode 4 と上限 885 へ復帰） | V5（実機。肩 PWM の向きと強さ・握手に戻したとき肩が保持できること） |
 | **USB 接続** `quest_usb.py`（adb reverse＋Quest Browser で `http://localhost:<port>/` を開く・`--mirror`=scrcpy・**`--wifi`＝adb を Wi-Fi に切替えて USB の口を充電器に空ける**・`--check` は電池残量も表示） | ✅（10/4） | `--check`（adb 無しの経路） | U0（開発者モード・adb 疎通・30 分の電池の減り・adb over Wi-Fi で reverse が張れるか） |
-| **起動スクリプトと HTML マニュアル**: `start.sh`（check／handshake／host／vr／vr2／sim／rehearse／quest／wifi／manual。後ろに書いた引数はランチャへ渡る）・`manual/index.html`・`handshake.html`・`vr.html`・`quest_setup.html`（図解・関門・困ったとき・参考資料） | ✅（10/4） | Git Bash で全モードを実行（check・dry-run・rehearse）・ブラウザで目視 | Mac で `./start.sh check` から |
+| **起動スクリプトと HTML マニュアル**: `start.sh`（check／handshake／host／vr／vr2／sim／rehearse／quest／wifi／manual。後ろに書いた引数はランチャへ渡る）・`manual/index.html`・`handshake.html`・`vr.html`・`quest_setup.html`（図解・関門・困ったとき・参考資料） | ✅（10/4） | Git Bash で全モードを実行（check・dry-run・rehearse）・ブラウザで目視 | Mac で `./scripts/start.sh check` から |
 | **準備状況の表示** `launch.py --doctor`（`check` が呼ぶ）: 設定ファイル・ポートの有無・較正ファイル・VR ページの部品から、握手／VR 1 人／VR 2 人の起動可否を出す。ポートは開かない | ✅（10/4 夜） | 実行して表示を確認 | Mac の実際の設定で |
 | **通し稽古** `simbus/`（仮想の Dynamixel バス＋`rehearse.py` の 7 シナリオ）: lerobot 0.6.1 の実物の上で、ランチャ・teleop・ブリッジ・パネル・host を起動から終了まで通し、書込みの順序・EEPROM 書込みの拒否・終了時のトルクを検査する | ✅（10/4 夜） | 7 シナリオ・69 項目すべて通過 | Mac で 1 回（CHECKLIST S0）。**実機の挙動は分からない** |
 | **較正の不一致で止まる**: ランチャ配下では lerobot の問い（ENTER でファイルの値を EEPROM に書く）が見えないので、理由を出して終了する。EEPROM は書かない。端末で直接実行したときは従来どおり lerobot が尋ねる | ✅（10/4 夜） | 通し稽古 `mismatch` | 不一致が起きたとき |
@@ -75,7 +75,7 @@ Mac 側から来た分（branch `rn/feat/koch4-vr-objects`・9/20 以降）: A/B
 
 ### 10/4 夜の通し確認で分かったこと（Windows・仮想のサーボ・lerobot 0.6.1 の実物）
 
-GitHub から main を新しく取得して `uv sync` → `./start.sh check` → `rehearse` を通した。握手 2 ペア・VR 1 人・VR 2 人・無線フォロワー・通信断からの復帰・過負荷エラーの警告は、起動から終了まで例外なく走り、スクリプトが使うレジスタ名はリーダー（XL330-M077）とフォロワー（XL430-W250・XL330-M288）の全機種で lerobot の制御表に存在した。見つかって直した点:
+GitHub から main を新しく取得して `uv sync` → `./scripts/start.sh check` → `rehearse` を通した。握手 2 ペア・VR 1 人・VR 2 人・無線フォロワー・通信断からの復帰・過負荷エラーの警告は、起動から終了まで例外なく走り、スクリプトが使うレジスタ名はリーダー（XL330-M077）とフォロワー（XL430-W250・XL330-M288）の全機種で lerobot の制御表に存在した。見つかって直した点:
 
 - 新しく取得した直後は VR ページの部品（three.module.js）が無く、ブリッジが黙って終了していた → `check` が取得し、子プロセスの終了理由を画面に出す
 - 較正が腕の中の値と違うと、lerobot の問いが記録ファイルに隠れて待ち続けていた → 理由を出して止まる（EEPROM は書かない）
@@ -89,12 +89,12 @@ GitHub から main を新しく取得して `uv sync` → `./start.sh check` →
 
 - **2 ペア原則**: 既定は 2 ペア同時、パネル 1 枚、ゲインは全ペア同じ値。1 本ずつはいじらない
 - **VR は別枠**: 握手 2 ペアと混ぜない。リーダー 1 本の別コマンド（`--pair B --vr B --vw`）。2 人にするときは同じペアのフォロワー機を手で（`--vr2`）
-- **フェスの形（ユーザー 10/4）**: アーム A＝握手、アーム B＝VR。端末を 2 つ開き、`./start.sh handshake --pair A` と `./start.sh vr` を別々に起動する
+- **フェスの形（ユーザー 10/4）**: アーム A＝握手、アーム B＝VR。端末を 2 つ開き、`./scripts/start.sh handshake --pair A` と `./scripts/start.sh vr` を別々に起動する
 - **リーダー有線・フォロワー無線・バックアップ有線**: 握手用 PC は 2 台目の MacBook Pro（Pi は不要）。無線は 5 GHz の自前ルータ。会場のゲスト Wi-Fi は使わない
 - **反力の設計**: 壁はサーボ内部ループ（Mode 5: Goal_Position=壁・Goal_Current=上限・P ゲイン=硬さ）に置き、ホストは接触の ON/OFF だけ。重さは握っている間だけ肩・肘に電流。完全モーター模倣は不要
 - **一人称**: パススルー AR で実機を見ながら、分身は半透明か指先だけ。位置合わせは VR 内のコントローラ（C）で、数値の微調整だけ編集モード（E）。配置リセットは VR 内のボタン（R）
 - **Quest の接続**: 本命 USB＋adb reverse（開発者モードが前提）・退路 自前 5 GHz ルータ＋自己署名 https の警告承諾
-- **Quest の電源**: バッテリーは公称 1〜2 時間（45W ドックで満充電 約 2 時間）なので、バッテリーだけでは 1 日もたない。45W 電源アダプターと充電ケーブルは箱に同梱。Mac からは映像を送っておらず（関節角度だけ・腕 2 本で毎秒約 40 kB）、USB の口を充電に回して Wi-Fi で繋いでも体験は変わらない。A: USB のまま 30 分測る／A+: 充電ポート付き Link ケーブル／B: `start.sh wifi`（adb over Wi-Fi）＋45W アダプター／C: ドック補助
+- **Quest の電源**: バッテリーは公称 1〜2 時間（45W ドックで満充電 約 2 時間）なので、バッテリーだけでは 1 日もたない。45W 電源アダプターと充電ケーブルは箱に同梱。Mac からは映像を送っておらず（関節角度だけ・腕 2 本で毎秒約 40 kB）、USB の口を充電に回して Wi-Fi で繋いでも体験は変わらない。A: USB のまま 30 分測る／A+: 充電ポート付き Link ケーブル／B: `scripts/start.sh wifi`（adb over Wi-Fi）＋45W アダプター／C: ドック補助
 - **実機の事実（ユーザー報告 9/20）**: ゴルフボールは超ぎりぎり持てる。摩擦不足で落ちる／角度と加速度によっては過負荷停止して落ちる → `--grip-ma`・摩擦材・`--max-rel` 低め。卓球ボール 40 mm が安全側
 
 ## 4. 決めどころ（未裁定）
@@ -110,7 +110,7 @@ GitHub から main を新しく取得して `uv sync` → `./start.sh check` →
 
 | 見たいこと | ファイル |
 |---|---|
-| まず起動したい・図で見たい | `mac/*.command`（VR の正本・ダブルクリック）・`mac/koch.sh`・`start.sh`・`manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`・Quest＝`quest_setup.html`・借用機の初期化＝`quest_reset.html`） |
+| まず起動したい・図で見たい | `mac/*.command`（VR の正本・ダブルクリック）・`mac/koch.sh`・`scripts/start.sh`・`manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`・Quest＝`quest_setup.html`・借用機の初期化＝`quest_reset.html`） |
 | VR の要件と設計判断・10/19 の実機ログ | `REQUIREMENTS_VR.md`・`LOG_261019_VR.md` |
 | Quest を繋ぐ・見張る・Mac から遠隔操作 | `quest_usb.py`（`--wait`・`--watch`・`--devtools`）・ブリッジの `/op` `/status`・操作ページ `?spectator=1&info=1` |
 | 新しい Mac に配る設定（4 本のシリアル） | `config/config.fest.json`（`koch.sh` が `config.json` の無いときに写す） |
@@ -130,9 +130,9 @@ GitHub から main を新しく取得して `uv sync` → `./start.sh check` →
 ```bash
 git clone https://github.com/rnohmoto/twinarm.git && cd twinarm/discovery/koch && uv sync
 # main に入っている（2026-10-04 マージ）。rn/feat/koch4-vr-fps と rn/feat/koch4-vr-objects も同じ内容なので、どのブランチにいても git pull で届く
-./start.sh check                                # 自己診断・準備状況・ポート・Quest の接続と電池（腕は動かない。VR ページの部品も取得）
-./start.sh rehearse                             # 腕なしの通し稽古（仮想のサーボ・約 3 分）
-./start.sh manual                               # 図解マニュアルを開く
+./scripts/start.sh check                                # 自己診断・準備状況・ポート・Quest の接続と電池（腕は動かない。VR ページの部品も取得）
+./scripts/start.sh rehearse                             # 腕なしの通し稽古（仮想のサーボ・約 3 分）
+./scripts/start.sh manual                               # 図解マニュアルを開く
 uv run python webxr/setup_assets.py                    # three.js を取得（VR を使う Mac だけ）
 uv run koch-teleop --selftest        # ハード無しで制御則を確認
 uv run koch-launch --list       # ポートとシリアル（読み取りのみ）
@@ -140,11 +140,11 @@ uv run koch-launch --init       # config/config.json を作って記入
 # 較正 JSON は config/calibration/ に A/B 両ペア分が入っている（9/20 Mac 作成）
 # Quest を USB で: brew install --cask android-platform-tools → 開発者モード → uv run koch-quest --check
 ```
-握手用 Mac: フォロワーを USB で挿し `./start.sh host A <port>`（B は `host B <port>`）。起動時に、操作者側の設定に書く宛先（IP と 9101／9102）を表示する。
+握手用 Mac: フォロワーを USB で挿し `./scripts/start.sh host A <port>`（B は `host B <port>`）。起動時に、操作者側の設定に書く宛先（IP と 9101／9102）を表示する。
 操作者側 Mac: config の `follower_host` に `udp://<IP>:9101` → `uv run koch-launch --ff gripper`。有線に戻す＝`--follower wired`。
 Mac でダブルクリック起動: `mac/` の `.command`（最初の確認／全部起動／握手 A／VR 1 人目／VR 2 人目／Quest 再接続／動作確認／全部停止）。中身は `./mac/koch.sh <名前>`。**10/19 から VR の正本は `koch.sh vr-leader`／`vr-follower`**: uv sync・設定（無ければ `config.fest.json` から）・ポートのシリアル解決・ブリッジ・teleop・Mac の操作ページ・Quest の許可待ち→reverse→ページを開く→USB の見張り、まで自動。フェスは MacBook Pro 1＝リーダー B＋Quest #1、MacBook Pro 2＝フォロワー B＋Quest #2（Mac 同士の通信なし）。握手は差分反射式（`--ff-style error`・フリーなら戻らない。10/5 にユーザーが戻りバネ式を「フリーなのに戻るのはおかしい」と指摘）。
-握手: `./start.sh handshake`（ペア A だけなら `--pair A` を足す）。VR（USB・1 人）: `./start.sh vr`（＝`launch.py --pair B --vr B --vw --vr-http --no-panel --follower none`＋12 秒後に `quest_usb.py --port 8444`）。
-VR（2 人）: `./start.sh vr2`（`--vr2` を足す。フォロワー機は接続直後にトルクが抜けるので手で支える）。初回の重さは `./start.sh vr2 --extra "--vw-cap 60 --vw-pwm-cap 80"` で。
+握手: `./scripts/start.sh handshake`（ペア A だけなら `--pair A` を足す）。VR（USB・1 人）: `./scripts/start.sh vr`（＝`launch.py --pair B --vr B --vw --vr-http --no-panel --follower none`＋12 秒後に `quest_usb.py --port 8444`）。
+VR（2 人）: `./scripts/start.sh vr2`（`--vr2` を足す。フォロワー機は接続直後にトルクが抜けるので手で支える）。初回の重さは `./scripts/start.sh vr2 --extra "--vw-cap 60 --vw-pwm-cap 80"` で。
 `git pull` が `twin.json` の手元の変更で止まったら `git stash` → `git pull`（旧形式の内容は新形式に読み込める）。
 
 ## 7. 根拠が要るときの正本（robotics リポジトリ・user-m-s/robotics）
@@ -159,4 +159,4 @@ VR（2 人）: `./start.sh vr2`（`--vr2` を足す。フォロワー機は接�
 
 ## 8. 安全（AGENTS.md の要約）
 
-動かす・トルクを抜く・ID を書くのはユーザーが明示的に頼んだときだけ（`start.sh handshake／vr／vr2` は腕が動く）。ポートは推測しない。実機の挙動はユーザーの報告だけが事実。終了は Ctrl+C の後に両アームの AC アダプタを抜く。`--leader-type koch_follower`（2 人目）は接続直後に腕のトルクが抜けるので、腕を手で支えてから起動する。
+動かす・トルクを抜く・ID を書くのはユーザーが明示的に頼んだときだけ（`scripts/start.sh handshake／vr／vr2` は腕が動く）。ポートは推測しない。実機の挙動はユーザーの報告だけが事実。終了は Ctrl+C の後に両アームの AC アダプタを抜く。`--leader-type koch_follower`（2 人目）は接続直後に腕のトルクが抜けるので、腕を手で支えてから起動する。

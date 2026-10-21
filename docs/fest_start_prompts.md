@@ -27,10 +27,10 @@ uname -m                                   # arm64 であること（Intel は�
 xcode-select --install                     # git。入っていれば「already installed」
 curl -LsSf https://astral.sh/uv/install.sh | sh    # uv。終わったらターミナルを開き直す
 git clone https://github.com/rnohmoto/twinarm.git && cd twinarm/discovery/koch
-./start.sh check                     # uv sync（Python 3.13 と依存を自動取得・約 200 MB）→ selftest → three.js 取得 → ポート一覧 → adb の有無
+./scripts/start.sh check                     # uv sync（Python 3.13 と依存を自動取得・約 200 MB）→ selftest → three.js 取得 → ポート一覧 → adb の有無
 uv run koch-launch --list    # ポート名と USB シリアル番号（読み取りのみ）
 uv run koch-launch --init    # config/config.json の雛形 → この Mac に挿す腕の行だけ記入（推測しない）
-./start.sh rehearse                  # 仮想のサーボで通し稽古・約 3 分。「すべて通りました」で合格
+./scripts/start.sh rehearse                  # 仮想のサーボで通し稽古・約 3 分。「すべて通りました」で合格
 ```
 VR の Mac（B・C）はさらに:
 ```bash
@@ -54,7 +54,7 @@ export ANTHROPIC_API_KEY=...               # 無ければルール解析だけ�
 twinarm の discovery/koch で握手（ペア A だけ）を実機で立ち上げます。いま動いている PC は「握手の Mac A」です。
 読む順: AGENTS.md（実機安全）→ discovery/koch/docs/HANDOFF.md → discovery/koch/docs/manual/handshake.html → discovery/koch/docs/CHECKLIST.md の S0・TEST 2・2b・5・6 → docs/fest_start_prompts.md §2。
 やりたいこと: フェスの握手体験（来場者がフォロワー A に手を出し、操作者がリーダー A で握り返す。ミラー制御なし）を、実機で 30 分通し、握手ハンドを付けた形まで確かめる。
-- 最初に git pull → cd discovery/koch → ./start.sh check を実行し、「起動できるもの」の表とポート一覧を私に見せる（腕は動かない）
+- 最初に git pull → cd discovery/koch → ./scripts/start.sh check を実行し、「起動できるもの」の表とポート一覧を私に見せる（腕は動かない）
 - config/config.json のペア A のポートは私が渡す（--list の結果から私が選ぶ。推測しない。リーダーとフォロワーは入替不可）
 - 腕が動くコマンド（./mac/koch.sh handshake。中身は launch.py --pair A --ff gripper --grip-ma 500 --extra "--ff-style error --max-rel 20 --ff-ke 15 --ff-cap 500"。ゲインと上限は 10/19 の仮設定）は、私がこの会話で明示的に頼んだときだけ実行する。実機の挙動は私の報告だけを事実にする
 - 進め方: S0 → TEST 2（ペア A 単独の回帰）→ 2b（フォロワー握力の上限 500 mA で過負荷停止と滑りの境）→ 5（30 分の連続稼働）→ 6（握手ハンド装着後の体験リハ）を 1 つずつ。各テストの記録欄を埋める
@@ -67,12 +67,12 @@ twinarm の discovery/koch で握手（ペア A だけ）を実機で立ち上�
 twinarm の discovery/koch で VR（1 人目・リーダー B）を実機と Quest Pro で立ち上げます。いま動いている PC は「VR の Mac B」です。
 読む順: AGENTS.md → discovery/koch/docs/HANDOFF.md → discovery/koch/docs/manual/vr.html → discovery/koch/docs/CHECKLIST.md の S0・U0・V 系 → docs/fest_start_prompts.md §2。Quest の準備（開発者モード・USB の許可）がまだなら discovery/koch/docs/manual/quest_setup.html の ②〜⑦ から。
 やりたいこと: ゴーグルの中の仮想の物（スポンジ・ボール・鉄ブロック）をリーダー B で握ったときに、硬さと重さが手に返る状態にし、10/19 の体験に出せるかを判断する。
-- 最初に git pull → cd discovery/koch → ./start.sh check を実行し、「起動できるもの」と Quest の接続・電池残量を私に見せる（腕は動かない）
+- 最初に git pull → cd discovery/koch → ./scripts/start.sh check を実行し、「起動できるもの」と Quest の接続・電池残量を私に見せる（腕は動かない）
 - 腕が動くコマンド（mac/3_VR1人目_リーダーB.command＝PAIR=B ./mac/koch.sh vr-leader。重さ 60 mA・肘反転・Quest の許可待ちと reverse・USB の見張り・Mac の操作ページまで自動）は、私が明示的に頼んだときだけ。ポートは fest 設定のシリアル番号で解決される（違う腕なら --list で直す）。実機の挙動は私の報告だけを事実にする
 - AR 中はゴーグルにボタンも文字も出ない（Quest Browser は DOM overlay を描かない）。位置合わせはゴーグルの中で分身をつまんで動かす（離して 1.5 秒で保存＝アンカー登録）。細かい操作と状態の確認は Mac の操作ページ（http://localhost:8444/?spectator=1&info=1）から
-- 進め方: S0 → U0 → V1（./start.sh sim と Quest で表示）→ V0（壁だけ・ゴーグルなし）→ V-w（重さの上限は低くから）→ V-c（つかんで合わせ・アンカー復元）→ V-e（編集モード・高さと置き場所）→ V2（実機リーダー × VR）→ V4（投げる・落とす）→ V3（フェス形態の判断）を 1 つずつ。10/19 の記録は discovery/koch/docs/LOG_261019_VR.md、要件は REQUIREMENTS_VR.md
+- 進め方: S0 → U0 → V1（./scripts/start.sh sim と Quest で表示）→ V0（壁だけ・ゴーグルなし）→ V-w（重さの上限は低くから）→ V-c（つかんで合わせ・アンカー復元）→ V-e（編集モード・高さと置き場所）→ V2（実機リーダー × VR）→ V4（投げる・落とす）→ V3（フェス形態の判断）を 1 つずつ。10/19 の記録は discovery/koch/docs/LOG_261019_VR.md、要件は REQUIREMENTS_VR.md
 - V-e で、物体ごとの硬さ p_gain（50 刻み）と上限 cap_ma（10 刻み）をゴーグル内のスライダで掃引し、体感と CSV（--extra "--csv"）を記録する。既定はスポンジ P250／120 mA・ボール P900／350・鉄ブロック P2000／450。保存先は config/twin.json（Mac C に写すなら枝に載せる）
-- 給電: 電池残量を 30 分の体験の前後で記録する（USB のまま／充電口つきケーブル／Wi-Fi 切替 ./start.sh wifi）
+- 給電: 電池残量を 30 分の体験の前後で記録する（USB のまま／充電口つきケーブル／Wi-Fi 切替 ./scripts/start.sh wifi）
 - 終わったら実機ログ md を書く（docs/fest_start_prompts.md §5）
 ```
 
@@ -81,7 +81,7 @@ twinarm の discovery/koch で VR（1 人目・リーダー B）を実機と Que
 twinarm の discovery/koch で VR の 2 人目（フォロワー B を手で動かす側・別の空間）を実機と Quest Pro で立ち上げます。いま動いている PC は「VR の Mac C」です。
 読む順: AGENTS.md → discovery/koch/docs/HANDOFF.md → discovery/koch/docs/manual/vr.html → discovery/koch/docs/CHECKLIST.md の S0・U0・V5 → docs/fest_start_prompts.md §2。
 やりたいこと: 2 人目がフォロワー B を手で動かして、同じ仮想の物を握れる状態にする（1 人目と同じ体験を 2 台目のゴーグルで）。
-- 最初に git pull → cd discovery/koch → ./start.sh check。Quest の接続は uv run koch-quest --check
+- 最初に git pull → cd discovery/koch → ./scripts/start.sh check。Quest の接続は uv run koch-quest --check
 - config/config.json は無ければ fest 設定（4 本のシリアル入り）から自動で作られ、ポートはシリアル番号で解決される。違う腕を挿すときだけ --list を見て私が直す（推測しない）
 - 起動は mac/4_VR2人目_フォロワーB.command（＝PAIR=B ./mac/koch.sh vr-follower。ページは http://localhost:8443/）。Quest Pro #2 の許可（この Mac で「常に許可」）が済んでいれば、ゴーグルのページは自動で開き、USB が切れても見張りが張り直す。Mac の操作ページは http://localhost:8443/?spectator=1&info=1
 - 接続直後と終了時にフォロワー B のトルクが抜ける。私が腕を支えてから Enter を押す。腕が動くコマンドは私が明示的に頼んだときだけ。実機の挙動は私の報告だけを事実にする
@@ -108,4 +108,4 @@ twinarm の dobot で卓上ロボット（Dobot Magician）のピック＆プレ
 ## 5. 記録
 - robotics リポジトリ（user-m-s/robotics）がこの Mac にあるなら、`TacitCapture/` に実機ログ md（61_ の型・119_ 以降の番号）を書き、`.claude/cases/` の該当案件に 1 節足す。
 - 無ければ、Claude にこの会話の末尾へ「実機ログ」（日付・Mac・段ごとの結果・数値・直した設定・次）を書かせ、`discovery/koch/docs/CHECKLIST.md` の記録欄を埋める。後で robotics に写す。
-- twinarm のコードを直したときは枝 → `discovery/koch/start.sh rehearse`（koch）／`uv run pytest`（dobot）→ 実機。main へのマージは本人の指示があるときだけ。
+- twinarm のコードを直したときは枝 → `discovery/koch/scripts/start.sh rehearse`（koch）／`uv run pytest`（dobot）→ 実機。main へのマージは本人の指示があるときだけ。

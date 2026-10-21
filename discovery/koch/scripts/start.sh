@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # Koch 4 本（握手・VR）起動スクリプト（Mac）。discovery/koch（uv プロジェクト）で動く。
-#   ./start.sh                  使い方を表示
-#   ./start.sh check            腕に触れない確認: 制御則の自己診断・準備状況・ポート一覧・Quest の adb（VR ページの部品も取得する）
-#   ./start.sh handshake [...]  握手: 握り返しあり・パネル http://127.0.0.1:8780。既定は 2 ペア。1 ペアだけなら handshake --pair A
-#   ./start.sh host A|B <port>  握手用の 2 台目の PC で: フォロワーを無線で受ける側（<port> はフォロワーのシリアルポート）
-#   ./start.sh vr [...]         VR 1 人: リーダーだけで仮想物体（重さあり）＋ Quest を USB で開く（フォロワーは繋がなくてよい）
-#   ./start.sh vr2 [...]        VR 2 人: 上に加えて、同じペアのフォロワー機も手で握る入力装置に
-#   ./start.sh sim              実機なしで VR ページを確認（Mac のブラウザが開く）
-#   ./start.sh rehearse [名前]  腕なしの通し稽古: 仮想のサーボで握手・VR・2 人・無線を起動から終了まで（--list で一覧）
-#   ./start.sh quest            Quest を繋ぎ直したとき: adb reverse を張り直してページを開く
-#   ./start.sh wifi             給電用: adb を Wi-Fi に切替える（USB の口を充電器に空ける）
-#   ./start.sh manual           マニュアル（HTML）を開く
+#   ./scripts/start.sh                  使い方を表示
+#   ./scripts/start.sh check            腕に触れない確認: 制御則の自己診断・準備状況・ポート一覧・Quest の adb（VR ページの部品も取得する）
+#   ./scripts/start.sh handshake [...]  握手: 握り返しあり・パネル http://127.0.0.1:8780。既定は 2 ペア。1 ペアだけなら handshake --pair A
+#   ./scripts/start.sh host A|B <port>  握手用の 2 台目の PC で: フォロワーを無線で受ける側（<port> はフォロワーのシリアルポート）
+#   ./scripts/start.sh vr [...]         VR 1 人: リーダーだけで仮想物体（重さあり）＋ Quest を USB で開く（フォロワーは繋がなくてよい）
+#   ./scripts/start.sh vr2 [...]        VR 2 人: 上に加えて、同じペアのフォロワー機も手で握る入力装置に
+#   ./scripts/start.sh sim              実機なしで VR ページを確認（Mac のブラウザが開く）
+#   ./scripts/start.sh rehearse [名前]  腕なしの通し稽古: 仮想のサーボで握手・VR・2 人・無線を起動から終了まで（--list で一覧）
+#   ./scripts/start.sh quest            Quest を繋ぎ直したとき: adb reverse を張り直してページを開く
+#   ./scripts/start.sh wifi             給電用: adb を Wi-Fi に切替える（USB の口を充電器に空ける）
+#   ./scripts/start.sh manual           マニュアル（HTML）を開く
 # [...] はランチャへそのまま渡す追加の引数（例: --pair A / --follower wired / --dry-run / --csv）
 # 握手（ペア A）と VR（ペア B）は、端末を 2 つ開けば同時に動かせる: handshake --pair A と vr
 # 環境変数: VR_PAIR=A|B（既定 B）  GRIP_MA=フォロワー握力の電流上限 mA（既定 500）  VR_MIRROR=1 で VR 1 人でもフォロワーを動かす
 # 握手・VR は実機が動く。ポートは config/config.json に書いたものを使う（推測しない）。
 set -e
-here="$(cd "$(dirname "$0")" && pwd)"
+here="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$here"   # discovery/koch（uv プロジェクトの場所）
 
 VR_PAIR="${VR_PAIR:-B}"
@@ -79,7 +79,7 @@ has_arg() {  # has_arg --dry-run "$@"
   return 1
 }
 
-usage() { sed -n '2,17p' "$here/start.sh" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,17p' "$here/scripts/start.sh" | sed 's/^# \{0,1\}//'; }
 
 mode="${1:-help}"
 [ $# -gt 0 ] && shift
@@ -104,7 +104,7 @@ case "$mode" in
     case "$pair" in
       A) listen=9101 ;;
       B) listen=9102 ;;
-      *) echo "使い方: ./start.sh host A|B <フォロワーのシリアルポート>"; exit 1 ;;
+      *) echo "使い方: ./scripts/start.sh host A|B <フォロワーのシリアルポート>"; exit 1 ;;
     esac
     if [ -z "$port" ]; then
       echo "フォロワーのシリアルポートを渡してください（推測しません）。"

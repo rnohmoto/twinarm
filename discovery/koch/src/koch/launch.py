@@ -509,7 +509,7 @@ def doctor(args, config_path):
         row = "  ".join(f"{mark[ok]} {name}" for name, ok in modes.items())
         print(f"    ペア {pair}: {row}")
     print(
-        "  ※ 無線の握手は、握手用の PC でフォロワー側（start.sh host）が先に動いていること"
+        "  ※ 無線の握手は、握手用の PC でフォロワー側（scripts/start.sh host）が先に動いていること"
     )
 
 

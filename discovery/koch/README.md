@@ -15,7 +15,7 @@ here.
 
 ```
 koch/                      a uv project: `cd discovery/koch && uv sync`
-├── start.sh               one entry point: check / handshake / host / vr / vr2 / sim / rehearse / quest / wifi / manual
+├── scripts/start.sh       one entry point: check / handshake / host / vr / vr2 / sim / rehearse / quest / wifi / manual
 ├── mac/                   koch.sh (the launcher of record for VR) and the *.command files for Finder
 ├── src/koch/              the package behind the console scripts
 │   ├── teleop.py          one pair: teleop + telemetry + leader force feedback (3 styles + virtual wall/weight)
@@ -50,9 +50,9 @@ is read and written under `config/calibration/` instead of `~/.cache/huggingface
 ```bash
 cd discovery/koch
 uv sync                 # one venv for everything here (lerobot, pyserial, matplotlib, dynamixel-sdk)
-./start.sh check        # no hardware: self-test, readiness report, port list, Quest check
+./scripts/start.sh check        # no hardware: self-test, readiness report, port list, Quest check
 mise run check          # ruff + ty + the offline tests
-./start.sh rehearse     # about 3 minutes against simulated servos; run it alone
+./scripts/start.sh rehearse     # about 3 minutes against simulated servos; run it alone
 ```
 
 | Console script | Module | What it is |
@@ -74,9 +74,9 @@ Python-internal spawns use `python -m koch.<module>` (same venv, inherits the si
 
 ## Entry points for the fest
 
-`./start.sh <mode>` from this folder — `check` / `handshake [...]` / `host A|B <port>` / `vr [...]`
+`./scripts/start.sh <mode>` from this folder — `check` / `handshake [...]` / `host A|B <port>` / `vr [...]`
 / `vr2 [...]` / `sim` / `rehearse [name]` / `quest` / `wifi` / `manual`. Arguments after the mode go
-to the launcher (`./start.sh handshake --pair A`, `./start.sh vr --extra "--vw-cap 60"`).
+to the launcher (`./scripts/start.sh handshake --pair A`, `./scripts/start.sh vr --extra "--vw-cap 60"`).
 Environment: `VR_PAIR=A|B` (default B), `GRIP_MA` (default 500), `VR_MIRROR=1`.
 
 `./mac/koch.sh <mode>` is the launcher of record for VR and what the `mac/*.command` files run from
@@ -105,7 +105,7 @@ Risk classes are the ones defined in [`../README.md`](../README.md).
 | `koch-set-id` | `<port> <current-id> <new-id>`: change one motor's ID; refuses unless exactly that motor is on the bus. `--setup --port <port> [--id] [--type]`: lerobot's `setup_motors()` (IDs and baud, interactively). | writes motor config | — |
 | `koch-current` | Real-time current/load plots for one or two arms straight from the bus, with per-axis statistics on exit and a CSV under `work/csv/`. Cannot share a port with a running teleop. | **torque off** on every listed ID at start and at exit; `--torque on` energizes instead | CSV out |
 | `python -m koch.tools.<name>` | Bench diagnostics promoted from the old `work/tools/`: `preflight` (read-only go/no-go), `register_snapshot`, `reg_diff`, `pos_trace` (read-only), `match_leader` and `fit_twin` (rewrite calibration / twin JSON; no motor writes), `watchdog` (network only), `spawn_detached`, `torque_off` (**torque off**, cleanup after a crash). | read-only except `torque_off` | serial, files |
-| `webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. `start.sh check` runs it. | none | network (once) |
+| `webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. `scripts/start.sh check` runs it. | none | network (once) |
 | `simbus/rehearse.py` | Runs the launcher, teleop, bridge, panel and follower host against simulated servos (`simbus/dynamixel_sdk`, a stand-in for the SDK that lerobot loads from `PYTHONPATH`) and checks frame rate, feedback commands, register write order, refused EEPROM writes and torque at exit. Scenarios: `handshake` `vr` `vr2` `wireless` `mismatch` `dropout` `fest`. See [`simbus/README.md`](simbus/README.md). | none (no port is opened; fixed localhost ports, so not next to a live session) | logs in `work/rehearsal/` |
 
 ## Wireless follower (leader wired to the Mac, follower on its own computer)
@@ -227,11 +227,11 @@ docs/CHECKLIST.md; write the test first (TDD rule in `../../.claude/rules/common
 ## Migrating a Mac from `discovery/koch4/` (temporary, until after the fest)
 
 `git pull` renames the tracked files but leaves the git-ignored ones behind in the old folder.
-Run `./start.sh check` (that is what `mac/0_最初の確認.command` runs) **before** any other
+Run `./scripts/start.sh check` (that is what `mac/0_最初の確認.command` runs) **before** any other
 `.command`: those create a fresh `config/config.json` from the fest file, after which the old
 per-Mac config is only warned about.
-`./start.sh check` moves the files once: `koch4/config/koch4_config.json` → `config/config.json`,
+`./scripts/start.sh check` moves the files once: `koch4/config/koch4_config.json` → `config/config.json`,
 `koch4/webxr/three.module.js` → `webxr/`, `koch4/work/` → `work/`, then removes the empty
 `koch4/`. The venv is new (`discovery/koch/.venv`); `uv sync` reuses the download cache, and
-`discovery/.venv` can be deleted. Remove `migrate_from_koch4` from `start.sh` and this section
+`discovery/.venv` can be deleted. Remove `migrate_from_koch4` from `scripts/start.sh` and this section
 after the fest.

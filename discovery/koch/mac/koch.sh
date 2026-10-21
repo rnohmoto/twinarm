@@ -57,7 +57,7 @@ prepare() {  # prepare [vr]: uv・VR ページの部品・設定ファイル（�
       cp "$FEST_CONFIG" config/config.json
       echo "config/config.json を fest 設定から作りました（4 本のシリアル番号で現在のポートに解決します）"
     else
-      echo "config/config.json がありません。./start.sh check の案内に従って作ってください"; exit 1
+      echo "config/config.json がありません。./scripts/start.sh check の案内に従って作ってください"; exit 1
     fi
   fi
   if [ "${1:-}" = "vr" ] && [ "$QUEST" = "1" ] && ! command -v adb >/dev/null 2>&1 && [ ! -x /opt/homebrew/bin/adb ]; then
@@ -68,7 +68,7 @@ prepare() {  # prepare [vr]: uv・VR ページの部品・設定ファイル（�
 
 ports_free() {  # ports_free <名前> <UDP 番号...> -- <TCP 番号...>: 使用中なら理由を出して止まる
   local what="$1"; shift
-  "$PY" - "$@" <<'PYEOF' || { echo "⛔ $what は起動しません。同じものが既に動いているか、通し稽古（start.sh rehearse）の最中です。"; echo "   ./mac/koch.sh status で確認し、止めてからもう一度起動してください。"; exit 1; }
+  "$PY" - "$@" <<'PYEOF' || { echo "⛔ $what は起動しません。同じものが既に動いているか、通し稽古（scripts/start.sh rehearse）の最中です。"; echo "   ./mac/koch.sh status で確認し、止めてからもう一度起動してください。"; exit 1; }
 import socket, sys
 kind, busy = socket.SOCK_DGRAM, []
 for a in sys.argv[1:]:

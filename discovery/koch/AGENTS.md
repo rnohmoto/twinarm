@@ -16,7 +16,7 @@ A new session starts at [`docs/HANDOFF.md`](docs/HANDOFF.md).
 - Never guess a serial port. `koch-launch --list` shows what is plugged in; the user says which is
   the leader and which is the follower.
 - Run `uv` here (`cd discovery/koch && uv sync`), never in `discovery/`. `mise run check` runs
-  ruff, ty and the offline pytest suite; `./start.sh rehearse` (or `mise run rehearse`) drives the
+  ruff, ty and the offline pytest suite; `./scripts/start.sh rehearse` (or `mise run rehearse`) drives the
   launch paths against simulated servos for about three minutes. Run both after changing anything
   under `src/koch/`. Run the rehearsal alone: its frame-rate checks sit a couple of fps above what a
   busy machine delivers.

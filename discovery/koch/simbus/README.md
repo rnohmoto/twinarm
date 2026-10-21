@@ -6,9 +6,9 @@ VR bridge, the panel and the follower host run end to end with no arms attached.
 drives them through seven scenarios and checks what they did.
 
 ```bash
-./start.sh rehearse            # every scenario, about 3 minutes
-./start.sh rehearse vr2        # one scenario
-./start.sh rehearse --list
+./scripts/start.sh rehearse            # every scenario, about 3 minutes
+./scripts/start.sh rehearse vr2        # one scenario
+./scripts/start.sh rehearse --list
 ```
 
 Run it after `uv sync` on a new machine, and after changing anything under src/koch/, before the arms.

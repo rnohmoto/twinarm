@@ -21,5 +21,5 @@
       "cams": ""
     }
   },
-  "_memo": "フェスの 4 本（2026-09-30 記入・10/19 確認）。mac/koch.sh は config.json が無いとこれを写して使い、ポート名は USB シリアル番号（leader_serial/follower_serial）で現在の /dev/cu.usbmodem* に解決する。別の腕を挿すときは --list のシリアルに書き換える。リーダーとフォロワーは入替不可。"
+  "_memo": "フェスの 4 本（2026-09-30 記入・10/19 確認）。scripts/koch.sh は config.json が無いとこれを写して使い、ポート名は USB シリアル番号（leader_serial/follower_serial）で現在の /dev/cu.usbmodem* に解決する。別の腕を挿すときは --list のシリアルに書き換える。リーダーとフォロワーは入替不可。"
 }

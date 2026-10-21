@@ -15,8 +15,8 @@ here.
 
 ```
 koch/                      a uv project: `cd discovery/koch && uv sync`
-├── scripts/start.sh       one entry point: check / handshake / host / vr / vr2 / sim / rehearse / quest / wifi / manual
-├── mac/                   koch.sh (the launcher of record for VR) and the *.command files for Finder
+├── scripts/               start.sh, one entry point: check / handshake / host / vr / vr2 / sim / rehearse / quest / wifi / manual;
+│                          koch.sh (the launcher of record for VR) and the *.command files for Finder
 ├── src/koch/              the package behind the console scripts
 │   ├── teleop.py          one pair: teleop + telemetry + leader force feedback (3 styles + virtual wall/weight)
 │   ├── launch.py          both pairs by default (--pair A|B for staging), one panel, fixed ports, logs
@@ -70,7 +70,7 @@ mise run check          # ruff + ty + the offline tests
 | `koch-current` | `koch.current_monitor` | standalone current recorder |
 
 Python-internal spawns use `python -m koch.<module>` (same venv, inherits the simbus `PYTHONPATH`);
-`mac/koch.sh` does the same so `status` / `stop` see one process per session.
+`scripts/koch.sh` does the same so `status` / `stop` see one process per session.
 
 ## Entry points for the fest
 
@@ -79,7 +79,7 @@ Python-internal spawns use `python -m koch.<module>` (same venv, inherits the si
 to the launcher (`./scripts/start.sh handshake --pair A`, `./scripts/start.sh vr --extra "--vw-cap 60"`).
 Environment: `VR_PAIR=A|B` (default B), `GRIP_MA` (default 500), `VR_MIRROR=1`.
 
-`./mac/koch.sh <mode>` is the launcher of record for VR and what the `mac/*.command` files run from
+`./scripts/koch.sh <mode>` is the launcher of record for VR and what the `scripts/*.command` files run from
 Finder: `handshake` / `vr-leader` / `vr-follower` / `quest` / `all` / `status` / `stop`, with
 `PAIR=A|B` (default B). It creates `config/config.json` from `config/config.fest.json` when missing,
 resolves ports by USB serial, opens the Mac operator page (`?spectator=1&info=1`), waits for the
@@ -94,7 +94,7 @@ Risk classes are the ones defined in [`../README.md`](../README.md).
 | ------ | ------- | ------------- | --------- |
 | `koch-teleop` | One pair. `--ff gripper --ff-style spring` (default; the 2026-09-04 fixes) / `--ff-style error` / `--ff arm` (untested on hardware) / `--ff vwall` (virtual wall, follower optional: `--follower-port none`) / `--vw` (virtual weight on `shoulder_lift` + `elbow_flex`, only while an object is grasped; `--vw-scale`, `--vw-cap` 120 mA, `--vw-invert`) / `--follower-grip-ma` (Goal_Current cap on the follower gripper against overload shutdowns). `--leader-type koch_follower` uses a Koch follower *moved by hand* as the input device (second player: arm joints torque-free, gripper wall only, weight on the elbow by current and on the XL430 shoulder by PWM mode with `--vw-pwm-scale` / `--vw-pwm-cap`, M288 current scaling, `--arm-label`). `--selftest` runs the laws with no hardware. | moves motors; force feedback and `--vw` put leader joints into current control; `vwall` holds the leader gripper in current-based position mode | UDP telemetry out (`--viz-port`, comma list), control in (`--ctl-port`), CSV in `work/csv/` |
 | `koch-launch` | `--list` ports+serials (read-only), `--init` config template, `--doctor` readiness report (config, port names present, calibration files, VR asset → what can start; opens nothing), `--follower wireless` / `wired` / `none` (`none` = leader only, the follower need not be plugged in: one-player VR), `--pair both` (default) / `A` / `B`, `--vr A|B` (+`--vw`) adds the bridge and forces that pair to `vwall`, `--vr2` also starts that pair's follower as a hand-moved second input (ports 8771/8772/8773) and gives the bridge both arms, `--grip-ma`, `--dry-run`. Ports: A 8765/8766 (+8769/8443), B 8767/8768 (+8770/8444), panel 8780. | launches `koch-teleop` → moves motors | logs in `work/logs/dual_*.log` |
-| `mac/koch.sh` and `mac/*.command` | Mac launchers and the launcher of record for VR (the `.command` files start from Finder with a double click): `handshake` (pair A, `--ff-style error`), `vr-leader` (leader by hand, page on 8444/8445), `vr-follower` (follower by hand in its own scene, page on 8443/8446, twin config in `config/solo_F/`), `quest` (re-add the reverse and reopen the page), `all`, `status`, `stop`. `PAIR=A|B`. Creates `config/config.json` from `config/config.fest.json` when missing, resolves ports by USB serial, opens the Mac operator page (`?spectator=1&info=1`), waits for the headset's USB-debugging allow, adds the reverse and reopens it whenever the USB link re-enumerates (10/19). | moves motors, torque off (`vr-follower` at start and stop, `stop`) | serial, UDP, HTTP |
+| `scripts/koch.sh` and `scripts/*.command` | Mac launchers and the launcher of record for VR (the `.command` files start from Finder with a double click): `handshake` (pair A, `--ff-style error`), `vr-leader` (leader by hand, page on 8444/8445), `vr-follower` (follower by hand in its own scene, page on 8443/8446, twin config in `config/solo_F/`), `quest` (re-add the reverse and reopen the page), `all`, `status`, `stop`. `PAIR=A|B`. Creates `config/config.json` from `config/config.fest.json` when missing, resolves ports by USB serial, opens the Mac operator page (`?spectator=1&info=1`), waits for the headset's USB-debugging allow, adds the reverse and reopens it whenever the USB link re-enumerates (10/19). | moves motors, torque off (`vr-follower` at start and stop, `stop`) | serial, UDP, HTTP |
 | `koch-panel` | One page for all launched pairs: status chips and 4 graphs per pair, one row of sliders and mode buttons (OFF / gripper / arm / vwall) that go to every pair. | network only, but it commands live teleop sessions | HTTP `--http`, UDP in `--telemetry` (list), out `--ctl-port` (list) |
 | `koch-plot` | matplotlib telemetry viewer. | network only | UDP in |
 | `koch-calib` | Torque off both arms, hold the same pose by hand, print raw ticks and normalized % per joint with the JSON fix to apply. Reads `config/calibration/`. | torque off (both arms) | reads calibration JSON |
@@ -227,7 +227,7 @@ docs/CHECKLIST.md; write the test first (TDD rule in `../../.claude/rules/common
 ## Migrating a Mac from `discovery/koch4/` (temporary, until after the fest)
 
 `git pull` renames the tracked files but leaves the git-ignored ones behind in the old folder.
-Run `./scripts/start.sh check` (that is what `mac/0_最初の確認.command` runs) **before** any other
+Run `./scripts/start.sh check` (that is what `scripts/0_最初の確認.command` runs) **before** any other
 `.command`: those create a fresh `config/config.json` from the fest file, after which the old
 per-Mac config is only warned about.
 `./scripts/start.sh check` moves the files once: `koch4/config/koch4_config.json` → `config/config.json`,

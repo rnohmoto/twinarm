@@ -94,13 +94,13 @@
 <ol class="mb-0">
   <li>リーダー B の AC アダプタ（5V）を挿す。腕は机に寝かせておく。1 人で遊ぶときに使うのはリーダーだけで、フォロワー B は繋がなくて構いません。</li>
   <li>ゴーグルを USB-C ケーブルで Mac に繋ぐ。</li>
-  <li>Mac で起動する。Finder で <code>mac/3_VR1人目_リーダーB.command</code> をダブルクリック（ターミナルなら <code>cd twinarm/discovery/koch</code> → <code>PAIR=B ./mac/koch.sh vr-leader</code>）。
+  <li>Mac で起動する。Finder で <code>scripts/3_VR1人目_リーダーB.command</code> をダブルクリック（ターミナルなら <code>cd twinarm/discovery/koch</code> → <code>PAIR=B ./scripts/koch.sh vr-leader</code>）。
   依存の同期 → 設定（無ければ fest 設定から作る）→ ポートの解決（USB シリアル番号）→ ブリッジと腕の制御 → Mac のブラウザに<strong>操作ページ</strong>（観客モード＋文字）→ Quest の許可を待って <code>http://localhost:8444/</code> をゴーグルで開く、まで自動で進みます。USB が切れても見張りが張り直します（10/19 から）。</li>
   <li>ゴーグルを被り、ページ下の <strong>「AR表示（パススルー）」</strong> をコントローラで押す。現実の机とアームが見え、その上に仮想の物が 3 つ浮かびます。</li>
   <li>初回と、ゴーグルの境界（ガーディアン）を引き直した後は、<a href="#s4">§4 の位置合わせ</a>をする。</li>
 </ol>
 </div>
-<p>先に実機なしで画面だけ見たいときは <code>./scripts/start.sh sim</code>（Mac のブラウザに模擬の腕と物体が出ます）。ゴーグルを繋ぎ直したいときは <code>mac/7_Quest再接続.command</code>（＝<code>./mac/koch.sh quest</code>）。従来の <code>./scripts/start.sh vr</code> も使えますが、Quest の見張りと操作ページは <code>koch.sh</code> 側だけです。握手（ペア A）を別の端末で動かしたままでも起動できます。</p>
+<p>先に実機なしで画面だけ見たいときは <code>./scripts/start.sh sim</code>（Mac のブラウザに模擬の腕と物体が出ます）。ゴーグルを繋ぎ直したいときは <code>scripts/7_Quest再接続.command</code>（＝<code>./scripts/koch.sh quest</code>）。従来の <code>./scripts/start.sh vr</code> も使えますが、Quest の見張りと操作ページは <code>koch.sh</code> 側だけです。握手（ペア A）を別の端末で動かしたままでも起動できます。</p>
 <p><strong>Mac の操作ページ</strong>（<code>http://localhost:8444/?spectator=1&amp;info=1</code>・自動で開く）には、ゴーグルの状態（AR 中か・位置合わせの点数と残差・アンカー）が 1 秒ごとに出て、下のボタンでゴーグルのページを遠隔操作できます: 「ゴーグル: C 位置合わせ」「確定(保存)」「取消(1 点)」「中止」「ゴーグル: A アンカー解除」「ゴーグル: 再読込」「高さ ±1 cm」「置き場所 近く／遠く」「R 配置リセット」。<kbd>E</kbd> で直した設定もゴーグルに 1 秒以内に反映されます。</p>
 <div class="gate"><strong>関門 3</strong>: ゴーグルの中で、アームを動かすと半透明の分身が同じ姿勢で動く。AR 中はゴーグルにボタンも文字も出ない（Quest Browser は DOM overlay を描かない・10/19 実機）ので、「実機」「送信OK」の文字は Mac のブラウザで <code>http://localhost:8444/?spectator=1&amp;info=1</code> を開いて見る。</div>
 
@@ -200,7 +200,7 @@
 <ol class="mb-0">
   <li>MacBook Pro 2 にフォロワー B を USB で繋ぎ、AC アダプタ（12V）を挿す。Quest Pro #2 も USB で繋ぐ（この Mac でも「USB デバッグを許可」→「常に許可」が要る。<a href="quest_setup.html#s7">Quest の準備 §7</a>）。</li>
   <li>フォロワー B の腕を<strong>手で支える</strong>（起動直後に腕の力が抜けて落ちます）。</li>
-  <li>Finder で <code>mac/4_VR2人目_フォロワーB.command</code> をダブルクリック（ターミナルなら <code>PAIR=B ./mac/koch.sh vr-follower</code>）。案内に従って Enter。ページは <code>http://localhost:8443/</code>（ゴーグルは自動で開く・Mac は操作ページ）。</li>
+  <li>Finder で <code>scripts/4_VR2人目_フォロワーB.command</code> をダブルクリック（ターミナルなら <code>PAIR=B ./scripts/koch.sh vr-follower</code>）。案内に従って Enter。ページは <code>http://localhost:8443/</code>（ゴーグルは自動で開く・Mac は操作ページ）。</li>
   <li>2 人目も <a href="#s4">§4</a> と同じく、ゴーグルの中で分身をつかんで実機に重ねる。</li>
   <li>Mac 1 台にまとめるとき（ゴーグル 1 台＋モニタ）は従来の <code>./scripts/start.sh vr2</code>（分身 2 体が 1 ページ。<kbd>Tab</kbd> で切替）か、同じ Mac で <code>vr-leader</code> と <code>vr-follower</code> の両方（ページ 2 枚）。</li>
 </ol>

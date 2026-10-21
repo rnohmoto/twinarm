@@ -25,7 +25,7 @@ VR をすぐ動かす（操作者側の Mac と Quest Pro）:
 ```
 twinarm の discovery/koch で VR を実機と Quest Pro で立ち上げます。AGENTS.md（実機安全）→ discovery/koch/docs/HANDOFF.md → manual/vr.html の順に読んでください。Quest の準備（Meta アカウント・開発者モード）がまだなら manual/quest_setup.html から。
 - 最初に git pull → cd discovery/koch → ./scripts/start.sh check を実行し、「起動できるもの」と Quest の接続・電池残量を私に見せる（腕は動かない）
-- 腕が動くコマンド（mac/3_VR1人目_リーダーB.command＝koch.sh vr-leader、4_VR2人目_フォロワーB.command＝vr-follower。従来の ./scripts/start.sh vr・vr2 も可）は、私がこの会話で明示的に頼んだときだけ実行する。ポートは fest 設定のシリアル番号で解決される（違う腕なら --list で私が直す）。実機の挙動は私の報告だけを事実にする
+- 腕が動くコマンド（scripts/3_VR1人目_リーダーB.command＝koch.sh vr-leader、4_VR2人目_フォロワーB.command＝vr-follower。従来の ./scripts/start.sh vr・vr2 も可）は、私がこの会話で明示的に頼んだときだけ実行する。ポートは fest 設定のシリアル番号で解決される（違う腕なら --list で私が直す）。実機の挙動は私の報告だけを事実にする
 - Meta アカウントの作成と開発者の登録は私が行う
 - 進め方: CHECKLIST の S0 → U0 → V1（./scripts/start.sh sim と Quest で AR 表示）→ V0 → V-w（./scripts/start.sh vr --extra "--vw-cap 60" から）→ V-c → V-e → V2 → V4 → V5（vr2）→ V3 を 1 つずつ
 ```
@@ -52,7 +52,7 @@ twinarm の discovery/koch で VR を実機と Quest Pro で立ち上げます�
 | **AR 中の操作はつかんで動かす**（10/19・実機）: Quest Browser は AR 中に DOM overlay（ボタン・文字・案内）を描かない（Meta フォーラムで裏取り）。分身の 35 cm 以内でつまむ／グリップ／トリガー長押し → 台が手に貼り付いて動く（平行移動＋yaw）→ 離して 1.5 秒で保存＝アンカー登録。音で合図（つかむ 1・離す 2・保存 3・点取り 1）。コントローラに基準点の小球と光線。Mac からの遠隔操作は Chrome DevTools（`adb forward tcp:9222 localabstract:chrome_devtools_remote`・`koch4.startCalib()`／`koch4.stopCalib(true)`） | ✅（10/19） | 自己診断 `koch4GrabSelfTest()`・`node --check` | Quest Pro 実機でつかんで移動・保存・アンカー登録まで動作（ユーザー 10/19）。向きの合わせやすさと再 AR の復元は確認中 |
 | **土台の回転が 100 に張り付く**（10/19・実機）: shoulder_pan の較正は 0〜4095 の 1 回転・サーボは多回転モード → 電源投入後に土台を 1 回転以上回すと読み値が ±100 に固定され、分身の土台だけ止まる。逆向きに 1 回転戻せば復帰（AC 抜き差しでも） | 現象の記録 | — | 恒久策は未定（teleop で 4096 の剰余を取る／較正の範囲を見直す） |
 | **置き場所を寄せ、物が乗る面の高さ `desk.y` を新設**（10/19・実機）: 既定の spot を 22〜27 cm → 12〜15 cm（スポンジ −10/12・ボール 0/15・鉄ブロック 10/12 cm）。`scene.desk.y`（既定 0・`solo_B` は 0.04）で物・置く的・物理の床をその面に。編集モードに「高さ y」。ブリッジも `y` を受けて保存。理由: 腕の全長近くの机の面は実機の指先が届かず「地面より下じゃないと掴めない」（ユーザー 10/19） | ✅（10/19） | `node --check`・ruff・ty | 実機で高さ 4 cm・距離 12〜15 cm の体感はユーザー確認待ち |
-| **起動の一本化と Mac からの遠隔操作**（10/19 夜）: `mac/koch.sh vr-leader`／`vr-follower`（＝`.command`）が、uv sync・設定（無ければ `config/config.fest.json` から）・ポートのシリアル解決・ブリッジ・teleop・Mac の操作ページ（`?spectator=1&info=1`）・Quest の許可待ち→reverse→ページを開く→USB の見張り（`quest_usb.py --wait --watch --devtools`）まで自動。ブリッジに `POST /op`（位置合わせ開始／確定／取消／中止・配置リセット・アンカー解除・再読込）と `POST /status`（ページの点数・残差・アンカー）、`/state` に `cfg_version`（Mac で保存した設定をゴーグルが 1 秒以内に読み直す）。フェスの形は Mac 1＝リーダー B＋Quest #1、Mac 2＝フォロワー B＋Quest #2。要件は `REQUIREMENTS_VR.md`、記録は `LOG_261019_VR.md` | ✅（10/19） | `node --check`・ruff・ty・`bash -n`・`rehearse` 7 シナリオ通過・操作キューの往復（Mac → Quest Browser のページで calib_start/cancel）・操作ページのボタン（headless Chrome で高さ ±1 cm → 版が上がりブリッジが保存） | Mac 2＋Quest #2 の実機、`.command` のダブルクリック起動は未 |
+| **起動の一本化と Mac からの遠隔操作**（10/19 夜）: `scripts/koch.sh vr-leader`／`vr-follower`（＝`.command`）が、uv sync・設定（無ければ `config/config.fest.json` から）・ポートのシリアル解決・ブリッジ・teleop・Mac の操作ページ（`?spectator=1&info=1`）・Quest の許可待ち→reverse→ページを開く→USB の見張り（`quest_usb.py --wait --watch --devtools`）まで自動。ブリッジに `POST /op`（位置合わせ開始／確定／取消／中止・配置リセット・アンカー解除・再読込）と `POST /status`（ページの点数・残差・アンカー）、`/state` に `cfg_version`（Mac で保存した設定をゴーグルが 1 秒以内に読み直す）。フェスの形は Mac 1＝リーダー B＋Quest #1、Mac 2＝フォロワー B＋Quest #2。要件は `REQUIREMENTS_VR.md`、記録は `LOG_261019_VR.md` | ✅（10/19） | `node --check`・ruff・ty・`bash -n`・`rehearse` 7 シナリオ通過・操作キューの往復（Mac → Quest Browser のページで calib_start/cancel）・操作ページのボタン（headless Chrome で高さ ±1 cm → 版が上がりブリッジが保存） | Mac 2＋Quest #2 の実機、`.command` のダブルクリック起動は未 |
 | **投げる・落とす・跳ねる**（放した瞬間の指先速度・重力・空気抵抗・机／床の反発と摩擦・物体同士の衝突・音） | ✅（10/4） | Chrome（sim）で握る→放す→机に落ちる・編集・視点切替 | V4（実機の握りで投げる。速度上限 5 m/s・反発値の体感） |
 | **2 人**（`--vr2`: ペアのフォロワー機を手で動かす 2 人目の入力装置。`--leader-type koch_follower`＝腕トルク抜き・gripper だけ壁・M288 換算。重さは肘＝電流、**肩（XL430）＝PWM モード**（電流制御が無いため電圧で。握っている間だけトルク ON・`--vw-pwm-scale`／`--vw-pwm-cap`）。ブリッジ `--arms B,F`・分身 2 体） | ✅（10/4） | launcher dry-run・bridge `--sim --arms B,F`・ページで 2 体・肩 PWM の書込み順序を `--selftest` で確認（0 を書いてからトルク ON・解放時に Mode 4 と上限 885 へ復帰） | V5（実機。肩 PWM の向きと強さ・握手に戻したとき肩が保持できること） |
 | **USB 接続** `quest_usb.py`（adb reverse＋Quest Browser で `http://localhost:<port>/` を開く・`--mirror`=scrcpy・**`--wifi`＝adb を Wi-Fi に切替えて USB の口を充電器に空ける**・`--check` は電池残量も表示） | ✅（10/4） | `--check`（adb 無しの経路） | U0（開発者モード・adb 疎通・30 分の電池の減り・adb over Wi-Fi で reverse が張れるか） |
@@ -61,7 +61,7 @@ twinarm の discovery/koch で VR を実機と Quest Pro で立ち上げます�
 | **通し稽古** `simbus/`（仮想の Dynamixel バス＋`rehearse.py` の 7 シナリオ）: lerobot 0.6.1 の実物の上で、ランチャ・teleop・ブリッジ・パネル・host を起動から終了まで通し、書込みの順序・EEPROM 書込みの拒否・終了時のトルクを検査する | ✅（10/4 夜） | 7 シナリオ・69 項目すべて通過 | Mac で 1 回（CHECKLIST S0）。**実機の挙動は分からない** |
 | **較正の不一致で止まる**: ランチャ配下では lerobot の問い（ENTER でファイルの値を EEPROM に書く）が見えないので、理由を出して終了する。EEPROM は書かない。端末で直接実行したときは従来どおり lerobot が尋ねる | ✅（10/4 夜） | 通し稽古 `mismatch` | 不一致が起きたとき |
 | **握手（A）と VR（B）の同時起動**（端末 2 つ・片方を止めても他方は続く）／VR 1 人はリーダーだけ（`--follower none`。フォロワーは繋がなくてよい）／子プロセスが異常終了したら理由（記録の末尾）を画面に出し、ランチャも異常終了を返す | ✅（10/4 夜） | 通し稽古 `fest`・`vr`・`mismatch` | 実機 |
-| **VR を 2 人が別々に**（10/5・Mac）: リーダー B とフォロワー B を別々の人が手で動かし、それぞれ自分の空間・自分の主観で掴む。ブリッジを腕ごとに 1 つ（1 人目 8444・2 人目 8443、2 人目の分身の設定は `config/solo_F/`）。入口は `mac/koch.sh`（`handshake`／`vr-leader`／`vr-follower`／`all`／`status`／`stop`）と、同じフォルダの `.command`（Finder でダブルクリック） | ✅（10/5） | — | Mac のブラウザ 2 枚で 2 本同時に動作（ユーザー確認: 2 人目の分身の向きと肩の可動域）。Quest 2 台は未接続。`.command` と `all` からの実機起動は未実施 |
+| **VR を 2 人が別々に**（10/5・Mac）: リーダー B とフォロワー B を別々の人が手で動かし、それぞれ自分の空間・自分の主観で掴む。ブリッジを腕ごとに 1 つ（1 人目 8444・2 人目 8443、2 人目の分身の設定は `config/solo_F/`）。入口は `scripts/koch.sh`（`handshake`／`vr-leader`／`vr-follower`／`all`／`status`／`stop`）と、同じフォルダの `.command`（Finder でダブルクリック） | ✅（10/5） | — | Mac のブラウザ 2 枚で 2 本同時に動作（ユーザー確認: 2 人目の分身の向きと肩の可動域）。Quest 2 台は未接続。`.command` と `all` からの実機起動は未実施 |
 | **摩擦アシスト**（10/5）`--assist elbow_flex,wrist_flex`: 手で動かすフォロワー機は減速比 288:1 で、力を出していなくても重い（ユーザー報告 10/5）。動かしている向きへ小さな電流を足す（上限 `--assist-cap` 既定 25 mA・最大 80）。向きが逆なら `--assist-invert`。肩と土台（XL430）は対象外 | ✅（10/5） | — | domain テスト 7 件・通し稽古 `vr2`（手首の電流が上限以内・リーダーには出ない）。**実機未検証**（軽くなるか・手を離して止まるか・向き） |
 | **VR ページの関節名**（10/5）: 分身の各関節に名札（1 土台の回転〜6 グリッパ）、HUD に関節ごとの読み値と分身の角度。`J` で切替 | ✅（10/5） | — | 2 人目の分身合わせで使用（ユーザー） |
 | **見せる用の画面が既定**（10/5）: 関節の名札・状態の文字・キー一覧・小窓の名前を出さない（置けた数だけ）。`H` で文字、`J` で名札と関節の読み値。`?info=1` で最初から文字あり | ✅（10/5） | — | 画面キャプチャで確認 |
@@ -110,7 +110,7 @@ GitHub から main を新しく取得して `uv sync` → `./scripts/start.sh ch
 
 | 見たいこと | ファイル |
 |---|---|
-| まず起動したい・図で見たい | `mac/*.command`（VR の正本・ダブルクリック）・`mac/koch.sh`・`scripts/start.sh`・`manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`・Quest＝`quest_setup.html`・借用機の初期化＝`quest_reset.html`） |
+| まず起動したい・図で見たい | `scripts/*.command`（VR の正本・ダブルクリック）・`scripts/koch.sh`・`scripts/start.sh`・`manual/index.html`（握手＝`handshake.html`・VR＝`vr.html`・Quest＝`quest_setup.html`・借用機の初期化＝`quest_reset.html`） |
 | VR の要件と設計判断・10/19 の実機ログ | `REQUIREMENTS_VR.md`・`LOG_261019_VR.md` |
 | Quest を繋ぐ・見張る・Mac から遠隔操作 | `quest_usb.py`（`--wait`・`--watch`・`--devtools`）・ブリッジの `/op` `/status`・操作ページ `?spectator=1&info=1` |
 | 新しい Mac に配る設定（4 本のシリアル） | `config/config.fest.json`（`koch.sh` が `config.json` の無いときに写す） |
@@ -142,7 +142,7 @@ uv run koch-launch --init       # config/config.json を作って記入
 ```
 握手用 Mac: フォロワーを USB で挿し `./scripts/start.sh host A <port>`（B は `host B <port>`）。起動時に、操作者側の設定に書く宛先（IP と 9101／9102）を表示する。
 操作者側 Mac: config の `follower_host` に `udp://<IP>:9101` → `uv run koch-launch --ff gripper`。有線に戻す＝`--follower wired`。
-Mac でダブルクリック起動: `mac/` の `.command`（最初の確認／全部起動／握手 A／VR 1 人目／VR 2 人目／Quest 再接続／動作確認／全部停止）。中身は `./mac/koch.sh <名前>`。**10/19 から VR の正本は `koch.sh vr-leader`／`vr-follower`**: uv sync・設定（無ければ `config.fest.json` から）・ポートのシリアル解決・ブリッジ・teleop・Mac の操作ページ・Quest の許可待ち→reverse→ページを開く→USB の見張り、まで自動。フェスは MacBook Pro 1＝リーダー B＋Quest #1、MacBook Pro 2＝フォロワー B＋Quest #2（Mac 同士の通信なし）。握手は差分反射式（`--ff-style error`・フリーなら戻らない。10/5 にユーザーが戻りバネ式を「フリーなのに戻るのはおかしい」と指摘）。
+Mac でダブルクリック起動: `scripts/` の `.command`（最初の確認／全部起動／握手 A／VR 1 人目／VR 2 人目／Quest 再接続／動作確認／全部停止）。中身は `./scripts/koch.sh <名前>`。**10/19 から VR の正本は `koch.sh vr-leader`／`vr-follower`**: uv sync・設定（無ければ `config.fest.json` から）・ポートのシリアル解決・ブリッジ・teleop・Mac の操作ページ・Quest の許可待ち→reverse→ページを開く→USB の見張り、まで自動。フェスは MacBook Pro 1＝リーダー B＋Quest #1、MacBook Pro 2＝フォロワー B＋Quest #2（Mac 同士の通信なし）。握手は差分反射式（`--ff-style error`・フリーなら戻らない。10/5 にユーザーが戻りバネ式を「フリーなのに戻るのはおかしい」と指摘）。
 握手: `./scripts/start.sh handshake`（ペア A だけなら `--pair A` を足す）。VR（USB・1 人）: `./scripts/start.sh vr`（＝`launch.py --pair B --vr B --vw --vr-http --no-panel --follower none`＋12 秒後に `quest_usb.py --port 8444`）。
 VR（2 人）: `./scripts/start.sh vr2`（`--vr2` を足す。フォロワー機は接続直後にトルクが抜けるので手で支える）。初回の重さは `./scripts/start.sh vr2 --extra "--vw-cap 60 --vw-pwm-cap 80"` で。
 `git pull` が `twin.json` の手元の変更で止まったら `git stash` → `git pull`（旧形式の内容は新形式に読み込める）。

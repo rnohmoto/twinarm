@@ -40,20 +40,20 @@ if [ "$mode" = "auto" ]; then
 fi
 
 case "$mode" in
-  wizard) shift; exec uv run python setup_wizard.py "$@" ;;   # 例: ./start.sh wizard --from 5
-  launcher) shift; exec uv run python launcher.py "$@" ;;     # ブラウザが開く。--dry で実機なしの練習
+  wizard) shift; exec uv run dobot-setup "$@" ;;   # 例: ./start.sh wizard --from 5
+  launcher) shift; exec uv run dobot-launcher "$@" ;;     # ブラウザが開く。--dry で実機なしの練習
   demo)
     port=$(uv run python -c "import json;print(json.load(open('config.json',encoding='utf-8'))['demo']['panel_port'])")
     ( sleep 4; open_url "http://127.0.0.1:${port}" ) &
-    exec uv run python demo.py --config config.json ;;   # ロボットは config.json の backend(pydobot/magician)
+    exec uv run dobot-demo --config config.json ;;   # ロボットは config.json の backend(pydobot/magician)
   dry)
     ( sleep 4; open_url "http://127.0.0.1:8790" ) &
-    exec uv run python demo.py --dry-run --no-llm ;;
+    exec uv run dobot-demo --dry-run --no-llm ;;
   check)
-    uv run python check_camera.py --list || true
-    uv run python check_robot.py --list
+    uv run dobot-check-camera --list || true
+    uv run dobot-check-robot --list
     uv run pytest -q ;;
-  suction) shift; exec uv run python suction.py "$@" panel ;;
-  jog) shift; exec uv run python jog.py "$@" ;;
+  suction) shift; exec uv run dobot-suction "$@" panel ;;
+  jog) shift; exec uv run dobot-jog "$@" ;;
   *) echo "使い方: ./start.sh [auto|launcher|wizard|demo|dry|check|suction|jog]"; exit 2 ;;
 esac

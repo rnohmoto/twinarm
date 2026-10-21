@@ -24,22 +24,22 @@ if "%MODE%"=="" (
 )
 
 if "%MODE%"=="wizard" (
-  uv run python setup_wizard.py %2 %3
+  uv run dobot-setup %2 %3
   goto :eof
 )
 if "%MODE%"=="demo" (
   start "" http://127.0.0.1:8790
-  uv run python demo.py --config config.json
+  uv run dobot-demo --config config.json
   goto :eof
 )
 if "%MODE%"=="dry" (
   start "" http://127.0.0.1:8790
-  uv run python demo.py --dry-run --no-llm
+  uv run dobot-demo --dry-run --no-llm
   goto :eof
 )
 if "%MODE%"=="check" (
-  uv run python check_camera.py --list
-  uv run python check_robot.py --list
+  uv run dobot-check-camera --list
+  uv run dobot-check-robot --list
   uv run pytest -q
   goto :eof
 )

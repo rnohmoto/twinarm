@@ -13,11 +13,11 @@ cd dobot && ./start.sh launcher   # Finder なら start.command をダブルク�
 この画面から。新しい Mac は先に `setup.command`（1 回）。説明員向けの手順は [docs/operation-manual.md](docs/operation-manual.md)、
 導入は [docs/setup-manual.md](docs/setup-manual.md)。
 
-- 設定が揃っていれば実演画面（`demo.py`）が立ち上がり、ブラウザで http://127.0.0.1:8790 が開く。終了は Ctrl+C
+- 設定が揃っていれば実演画面（`dobot-demo`）が立ち上がり、ブラウザで http://127.0.0.1:8790 が開く。終了は Ctrl+C
 - **起動時に腕がホーム姿勢へ動く。** 腕の周りを空けてから実行する
 - 先に Magician の電源を入れ、本体キーを 2 秒長押ししてホーミング（LED 緑）しておく
 - 画面は上から: カメラ → マイク → 操作ボタン → 記録。状態（待機／動作中／非常停止）はヘッダー。「詳細」を開くと fps やポートなど
-- 映像は 15 fps の専用スレッドで配信され、腕が動いている間も止まらない。**表示は左右反転**（`demo.panel_mirror=true`、来場者がロボットと向かい合う向き）。検出・較正・`zones_view.py` の座標は元の向きのままで、`zones_view.py` も同じ反転で表示する
+- 映像は 15 fps の専用スレッドで配信され、腕が動いている間も止まらない。**表示は左右反転**（`demo.panel_mirror=true`、来場者がロボットと向かい合う向き）。検出・較正・`dobot-zones` の座標は元の向きのままで、`dobot-zones` も同じ反転で表示する
 
 ## 1. いまの構成（2026-10-16 に実機で確認したもの）
 
@@ -30,7 +30,7 @@ cd dobot && ./start.sh launcher   # Finder なら start.command をダブルク�
 | 高さ | ブロック上面 z=-56.1 → `z_pick`=-57.1（4 色）。机面 z=-72.2 → `z_place`=-54.1（面＋厚み＋2）。`z_safe`=20、`z_min`=-80 |
 | 速さ | `speed_pct`=100、`travel_mode`=movj、`ee_settle_s`=0.4（§6） |
 | 置き場 | `tray_right`=(211,-125)。`tray_left`(230,110)・`box_front`(170,0)・`box_back`(280,0)・`start`(235,0) は既定 |
-| 較正 | `assets/homography.json`: `calibrate.py --drive` で 9 点、RMS 1.91 mm（2026-10-16 18:37）。git 管理外なので別 PC では取り直すかコピーする |
+| 較正 | `assets/homography.json`: `dobot-calibrate --drive` で 9 点、RMS 1.91 mm（2026-10-16 18:37）。git 管理外なので別 PC では取り直すかコピーする |
 | 音声 | faster-whisper `small`（`~/.cache/huggingface`、初回 480 MB）。マイクは Mac 内蔵。ターミナルにマイクの許可が必要 |
 | 解析 | ルールベース（`config.json` の `llm.enabled=false`）。Claude を使うなら `true` にして `ANTHROPIC_API_KEY` |
 
@@ -40,7 +40,7 @@ cd dobot && ./start.sh launcher   # Finder なら start.command をダブルク�
 
 ```bash
 ./start.sh check                                        # カメラ一覧・ポート候補・オフラインテスト
-uv run python check_robot.py --config config.json       # つないで現在位置を読むだけ
+uv run dobot-check-robot --config config.json       # つないで現在位置を読むだけ
 ```
 
 候補ポートが「なし」と出ても、CH9102 はその一覧に出ないだけ。`config.json` のポートが `/dev/cu.*` に存在すればよい。
@@ -61,7 +61,7 @@ uv run python check_robot.py --config config.json       # つないで現在位�
 机からトレイをどけ、青ブロックを 1 個用意して:
 
 ```bash
-uv run python calibrate.py --config config.json --object blue_cube --drive
+uv run dobot-calibrate --config config.json --object blue_cube --drive
 ```
 
 腕が 3×3 の 9 点を回り、各点でブロック上面の 8 mm 上に止まる。吸盤の真下にブロックを置いて Enter、を 9 回。
@@ -71,7 +71,7 @@ uv run python calibrate.py --config config.json --object blue_cube --drive
 ### 4.2 置き場（トレイの位置）— 腕は動かない
 
 ```bash
-uv run python zones_view.py
+uv run dobot-zones
 ```
 
 カメラ画像に置き場の丸が出る。数字キー（1〜5）で選び、実物のトレイの真ん中をクリック → s で保存。
@@ -82,19 +82,19 @@ uv run python zones_view.py
 腕のロック解除ボタンを押しながら吸盤を当て、座標を読む:
 
 ```bash
-uv run python check_robot.py --config config.json      # pose x= y= z= が出る
+uv run dobot-check-robot --config config.json      # pose x= y= z= が出る
 ```
 
 - 物の上面に当てた z → `config.json` の `objects[].z_pick` = その z − 1
 - 置く面に物を**つかんだまま**当てた z（＝面＋物の厚み）→ `robot.z_place` = その z ＋ 2
 - `robot.z_min` はどちらより下に
 
-ウィザード（`uv run python setup_wizard.py --from 6`）でも同じことができる。
+ウィザード（`uv run dobot-setup --from 6`）でも同じことができる。
 
 ### 4.4 カメラの固定
 
 Logi Options+ → C922 → フォーカス: 自動 OFF にして机にピント、露出: 自動 OFF、ホワイトバランス: 自動のまま。
-確認は `uv run python check_camera.py --index 0`（読み戻しは AVFoundation の都合で「未確認」と出るが、Options+ 側で固定されていればよい）。
+確認は `uv run dobot-check-camera --index 0`（読み戻しは AVFoundation の都合で「未確認」と出るが、Options+ 側で固定されていればよい）。
 
 ### 4.5 音声モデルの取得（ネットが要る、1 回だけ）
 
@@ -105,15 +105,15 @@ uv run --no-sync python -c "from faster_whisper import WhisperModel; WhisperMode
 ### 4.6 別の PC で動かす
 
 `git clone` → `cd dobot && uv sync --extra voice --extra llm` → `config.json` の `robot.port` を直す → 4.5 → 4.4 → 4.1 → 4.2 → 4.3 → `./start.sh`。
-Windows は `start.bat`（ポートは `COMn`、カメラ index は `check_camera.py --list` で確認）。
+Windows は `start.bat`（ポートは `COMn`、カメラ index は `dobot-check-camera --list` で確認）。
 
 ## 5. 既知の注意
 
-- 置き場は「中心」だけでなく置く位置（スロット）も作業域に入っている必要がある（`zones_view.py` が確認する）
-- 色の範囲（HSV）は `config.json` の `objects[].ranges`。照明が変わって検出が崩れたら `setup_wizard.py --from 7` で枠を確認
+- 置き場は「中心」だけでなく置く位置（スロット）も作業域に入っている必要がある（`dobot-zones` が確認する）
+- 色の範囲（HSV）は `config.json` の `objects[].ranges`。照明が変わって検出が崩れたら `dobot-setup --from 7` で枠を確認
 - `./start.sh wizard` を 1 番から通すと `config.json` を上書きしていく。途中からは `--from N`
 - `uv run pytest` は実機の較正ファイルがあっても通る（2026-10-19 修正）。ポート 8790 を実演が使っている間はパネルのテスト 2 件が落ちる
-- `config.bak_*.json` はウィザードと `zones_view.py` が保存前に残すコピー（git 管理外）
+- `config.bak_*.json` はウィザードと `dobot-zones` が保存前に残すコピー（git 管理外）
 
 ## 6. 速さの調整
 
@@ -134,7 +134,7 @@ Windows は `start.bat`（ポートは `COMn`、カメラ index は `check_camer
 
 ```
 twinarm-main の dobot で Dobot Magician の実演を再開します。dobot/AGENTS.md → dobot/HANDOFF.md の順に読んでください。
-- 腕が動くコマンド（./start.sh、calibrate.py --drive、setup_wizard.py の y）は私がこの会話で頼んだときだけ実行する
+- 腕が動くコマンド（./start.sh、dobot-calibrate --drive、dobot-setup の y）は私がこの会話で頼んだときだけ実行する
 - ポートは config.json のものを使い、推測しない。実機の挙動は私が実行して報告した結果だけを事実にする
 - まず ./start.sh check の結果を見せてから、./start.sh で実演を起動する手順を案内して
 ```

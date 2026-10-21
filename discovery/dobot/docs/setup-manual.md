@@ -49,7 +49,7 @@ Logi Options+（任意だが推奨）: C922 のフォーカスを「自動 OFF�
 ランチャーの「較正をやり直す」、または:
 
 ```bash
-uv run python calibrate.py --config config.json --object blue_cube --drive
+uv run dobot-calibrate --config config.json --object blue_cube --drive
 ```
 
 腕が 3×3 の 9 点を回り、各点でブロック上面の 8 mm 上に止まる。吸盤の真下に青ブロックを置いて Enter。
@@ -58,14 +58,14 @@ uv run python calibrate.py --config config.json --object blue_cube --drive
 
 ### 4.2 置き場（1 分、腕は動かない）
 
-ランチャーの「置き場を調整」、または `uv run python zones_view.py`。数字で選んで実物のトレイの真ん中をクリック、s で保存。
+ランチャーの「置き場を調整」、または `uv run dobot-zones`。数字で選んで実物のトレイの真ん中をクリック、s で保存。
 
 ### 4.3 高さ（2 分、腕は手で動かす）
 
 腕のロック解除ボタンを押しながら吸盤を当て、座標を読む:
 
 ```bash
-uv run python check_robot.py --config config.json      # pose x= y= z=
+uv run dobot-check-robot --config config.json      # pose x= y= z=
 ```
 
 | 当てる場所 | 書く場所 | 値 |
@@ -74,12 +74,12 @@ uv run python check_robot.py --config config.json      # pose x= y= z=
 | 置く面に、ブロックを吸盤に付けたまま底を当てる | `robot.z_place` | 読んだ z ＋ 2 |
 | — | `robot.z_min` | どちらより下（例 −80） |
 
-ウィザードでも可: `uv run python setup_wizard.py --from 5`（5 置き場・6 高さ）。
+ウィザードでも可: `uv run dobot-setup --from 5`（5 置き場・6 高さ）。
 
 ### 4.4 検出の確認（照明が変わったとき）
 
 ```bash
-uv run python setup_wizard.py --only 7
+uv run dobot-setup --only 7
 ```
 
 全部のブロックに枠が付き、余計な枠が無ければ OK。外れる色は `config.json` の `objects[].ranges`（HSV の下限・上限）を広げる。2026-10-19 の値: 緑の彩度下限 50、黄の色相下限 16、木片の縦横比上限 4.0。

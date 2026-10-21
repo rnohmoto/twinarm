@@ -134,20 +134,20 @@
 ./start.sh dry          # 実機を繋がずに画面だけ確認
 ./start.sh check        # カメラ一覧・ポート候補・テスト（読み取りのみ）</pre>
 <p>ウィザードは、カメラ → ロボット（ポートを候補から選ぶ）→ マーカー → 較正 → 置き場 → 物の高さ → 検出の確認 → 試運転、の順に進み、結果を <code>config.json</code> に保存します。腕が動くのは <code>y</code> と答えた場面だけです。個別の確認は次のコマンドでもできます。</p>
-<pre>uv run python check_robot.py --list                          # 候補ポートを表示（自動では選ばない）
-uv run python check_robot.py --port /dev/tty.usbserial-XXXX  # 接続して現在位置を読む（動かない）
-uv run python check_robot.py --port /dev/tty.usbserial-XXXX --home   # ホーム姿勢へ動く
-uv run python check_camera.py --list ; uv run python check_camera.py --index 0</pre>
+<pre>uv run dobot-check-robot --list                          # 候補ポートを表示（自動では選ばない）
+uv run dobot-check-robot --port /dev/tty.usbserial-XXXX  # 接続して現在位置を読む（動かない）
+uv run dobot-check-robot --port /dev/tty.usbserial-XXXX --home   # ホーム姿勢へ動く
+uv run dobot-check-camera --list ; uv run dobot-check-camera --index 0</pre>
 <div class="danger">初代 Magician に衝突検知はありません。ホーミング中と動作中は作業域に手を入れない。止めるときは電源スイッチ。電源を切るときは LED が消えるまで待つ（腕がゆっくり所定位置へ動いてから止まる）。</div>
 <figure class="photo"><img src="img/12_pump_wiring.jpg" alt="ポンプ配線" onerror="this.parentElement.classList.add('missing')"><div class="placeholder">写真 12: ポンプボックスの電源線（SW1）と信号線（GP1）、チューブの取り回し</div><figcaption>写真 2-1: ポンプボックスの配線。</figcaption></figure>
-<div class="gate"><strong>関門</strong>: LED が緑、PC にポートが見える、<code>--home</code> でホーム姿勢へ動いて止まる、<code>check_camera.py</code> が「手動露出が効いています」と「明るさは安定しています」を出す。</div>
+<div class="gate"><strong>関門</strong>: LED が緑、PC にポートが見える、<code>--home</code> でホーム姿勢へ動いて止まる、<code>dobot-check-camera</code> が「手動露出が効いています」と「明るさは安定しています」を出す。</div>
 
 <h2 id="s3">3. カメラの接続</h2>
 <ul>
   <li>PC の USB 2.0 以上の口に直接繋ぐ。ケーブルは 3m 以内（延長するならアクティブケーブル）。</li>
   <li>Magician と同じ USB ハブは避ける。カメラを 2 台にするときは別系統に分ける。</li>
   <li>取り付けは 1/4-20 ネジ（クリップの三脚穴かマジックアーム）。高さ 45cm で真下向き。詳細は初期設定マニュアル §3。</li>
-  <li>露出・ホワイトバランス・オートフォーカスの固定は <code>check_camera.py</code> で確認する。Mac で固定できない場合は Logi Tune か OS の設定で固定する。</li>
+  <li>露出・ホワイトバランス・オートフォーカスの固定は <code>dobot-check-camera</code> で確認する。Mac で固定できない場合は Logi Tune か OS の設定で固定する。</li>
   <li><b>専用カメラが無いとき（MacBook Pro の内蔵カメラ・iPhone の連係カメラ）</b>: 画素からロボット座標への変換はホモグラフィなので、真上でなく斜めから見下ろしても較正（§4 の 4 点）で成立する。置き方は 2 通り。(a) iPhone を連係カメラにして USB で Mac に繋ぎ（会場 Wi-Fi は要らない。iPhone はロック状態・横向き）、クランプ付きアームで作業台の真上 50〜90 cm に固定する。(b) MacBook を高いスタンドに載せ、画面を 30〜40° まで倒して作業台を見下ろす（蓋を閉じ切るとスリープ）。ウェブカメラ用のミラークリップで鏡越しに真下を撮るときは <code>config.json</code> の <code>camera.mirror</code> を true にする（鏡像を戻す）。</li>
   <li>内蔵カメラと iPhone は OpenCV から露出とホワイトバランスを固定できない（macOS の AVFoundation は幅・高さ・fps しか受け付けない）。作業台の端にグレーカード（白い紙でも可）を貼り、<code>camera.reference_roi</code>（x,y,w,h 画素）にその範囲を書くと、毎フレームそこが一定の明るさと色になるように補正する。<code>check_camera.py --ref x,y,w,h</code> で明るさの揺れが減るか確認し、照明は一定にする。</li>
   <li>macOS はターミナルにカメラの権限が要る。Terminal.app から一度起動し「カメラへのアクセスを求めています」で許可する。出ないときは <code>tccutil reset Camera</code> の後に再実行、またはシステム設定 → プライバシーとセキュリティ → カメラ。iPhone や iPad が近くにあるとカメラ番号がずれるので、<code>check_camera.py --list</code> で番号を確かめてから <code>camera.index</code> に書く。</li>

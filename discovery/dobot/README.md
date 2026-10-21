@@ -18,21 +18,21 @@ Magician can and cannot report) · [`manual/purchase.html`](manual/purchase.html
 
 ## Status
 
-Offline tests pass with no hardware (`uv run pytest`). `demo.py --dry-run` runs the whole
+Offline tests pass with no hardware (`uv run pytest`). `dobot-demo --dry-run` runs the whole
 pipeline against a synthetic frame and serves the browser panel. On 2026-10-05 the Magician was
 connected to the Mac for the first time: it answers on a CH9102 USB-serial port (not CP210x) as
-serial number `DT1426040100`, firmware 4.0.6, and accepts the suction command (`suction.py pulse`: read-back
-ON, then OFF). On 2026-10-15 (fest Mac D bench, C922 overhead) the user confirmed on the real arm: `jog.py` step
+serial number `DT1426040100`, firmware 4.0.6, and accepts the suction command (`dobot-suction pulse`: read-back
+ON, then OFF). On 2026-10-15 (fest Mac D bench, C922 overhead) the user confirmed on the real arm: `dobot-jog` step
 moves, the workspace guard refusing x > 300, Esc stopping a held move, the cup holding a wood block;
-`demo.py --robot magician` homed at start, and the stop lane (往復（試運転） → 非常停止 → 停止解除 →
+`dobot-demo --robot magician` homed at start, and the stop lane (往復（試運転） → 非常停止 → 停止解除 →
 ホーム) was accepted within the same second in the panel events. On 2026-10-16 the
-bench was completed end to end: C922 locked through Logi Options+, eye-to-hand calibration with `calibrate.py --drive`
-(RMS 1.91 mm), zones placed on the camera image with `zones_view.py`, pick/place heights measured, and red blocks
+bench was completed end to end: C922 locked through Logi Options+, eye-to-hand calibration with `dobot-calibrate --drive`
+(RMS 1.91 mm), zones placed on the camera image with `dobot-zones`, pick/place heights measured, and red blocks
 picked and placed into both trays by text command on the `magician` backend. The resulting `config.json` is
 committed; `assets/homography.json` is per bench (git-ignored). **Start from [`HANDOFF.md`](HANDOFF.md)** (Japanese)
 to run or redo the setup. On 2026-10-19 the bench was moved and recalibrated (`--drive`, RMS 3.1 mm), motion
 was sped up (one pick-and-place 20 s → 7 s), the camera stream got its own thread, and the operator side was
-finished: `launcher.py` (start/stop/adjust page), `setup.command` for a fresh Mac, and the documents under
+finished: `dobot-launcher` (start/stop/adjust page), `setup.command` for a fresh Mac, and the documents under
 [`docs/`](docs/) (要件定義書・操作マニュアル・導入手順・作業記録). The 20-cycle run is still open.
 
 ## Quick start
@@ -59,8 +59,8 @@ cd dobot
 Suction alone (for filming; the arm does not move, homing is not needed):
 
 ```bash
-uv run python suction.py --port /dev/cu.usbserial-XXXX panel    # two big buttons; Space toggles, O = on, F = off
-uv run python suction.py --port /dev/cu.usbserial-XXXX on       # also: off / status / pulse --seconds 3
+uv run dobot-suction --port /dev/cu.usbserial-XXXX panel    # two big buttons; Space toggles, O = on, F = off
+uv run dobot-suction --port /dev/cu.usbserial-XXXX on       # also: off / status / pulse --seconds 3
 ```
 
 The panel switches the pump off by itself after `--max-on-s` (300 s; 0 disables) and on exit.
@@ -68,7 +68,7 @@ The panel switches the pump off by itself after `--max-on-s` (300 s; 0 disables)
 Controller for filming (**moves the arm**: forward/back, left/right, up/down in fixed steps, plus suction):
 
 ```bash
-./start.sh jog --port /dev/cu.usbserial-XXXX        # or: uv run python jog.py --port ... ; --dry for no hardware
+./start.sh jog --port /dev/cu.usbserial-XXXX        # or: uv run dobot-jog --port ... ; --dry for no hardware
 ```
 
 One press is one straight step of 1/5/10/20 mm; holding a button or key repeats steps one at a time, so
@@ -86,7 +86,7 @@ Or step by step:
 ```bash
 uv sync                                   # first time; creates .venv with Python 3.13
 uv run pytest                             # offline tests — must pass before touching hardware
-uv run python demo.py --dry-run --no-llm  # synthetic camera + recording robot, panel at http://127.0.0.1:8790
+uv run dobot-demo --dry-run --no-llm  # synthetic camera + recording robot, panel at http://127.0.0.1:8790
 ```
 
 With hardware, the wizard walks through the first-time setup and writes `config.json` +
@@ -94,9 +94,9 @@ With hardware, the wizard walks through the first-time setup and writes `config.
 answer `y`):
 
 ```bash
-uv run python setup_wizard.py             # 1 camera · 2 robot · 3 markers · 4 calibrate · 5 zones · 6 heights · 7 detect · 8 smoke test
-uv run python demo.py --config config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
-uv run python demo.py --config config.json --robot magician --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm   # direct protocol + stop lane
+uv run dobot-setup             # 1 camera · 2 robot · 3 markers · 4 calibrate · 5 zones · 6 heights · 7 detect · 8 smoke test
+uv run dobot-demo --config config.json --robot pydobot --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm
+uv run dobot-demo --config config.json --robot magician --port /dev/tty.usbserial-XXXX --camera-index 0 --no-llm   # direct protocol + stop lane
 ```
 
 `--robot magician` (`robot_magician.py`) talks the Dobot protocol directly instead of pydobot: the e-stop button sets
@@ -118,11 +118,11 @@ e-stop lane at once. Needs the `voice` extras (faster-whisper + sounddevice); wi
 Read-only checks used inside the wizard are also standalone:
 
 ```bash
-uv run python check_camera.py --list ; uv run python check_camera.py --index 0
-uv run python check_robot.py --list  ; uv run python check_robot.py --port /dev/tty.usbserial-XXXX
+uv run dobot-check-camera --list ; uv run dobot-check-camera --index 0
+uv run dobot-check-robot --list  ; uv run dobot-check-robot --port /dev/tty.usbserial-XXXX
 ```
 
-## Demo modes (`demo.py`)
+## Demo modes (`dobot-demo`)
 
 | Mode | What happens | Ends when |
 | ---- | ------------ | --------- |
@@ -149,39 +149,47 @@ Risk classes: **read-only** (no motion), **moves arm** (commands motion), **came
 
 | Script | Purpose | Hardware risk |
 | ------ | ------- | ------------- |
-| `launcher.py` | Operator page on port 8789: starts `demo.py` as a child process, stops it through the panel's `quit` (the arm homes first), restarts, opens the `--drive` calibration in a Terminal window, opens `zones_view.py`, takes a camera snapshot while the demo is stopped, edits the common settings in `config.json` with validation and a backup, tails the demo log. | **moves arm** only through its start / restart / calibrate buttons (each labelled) |
+| `dobot-launcher` (`launcher.py`) | Operator page on port 8789: starts `demo.py` as a child process, stops it through the panel's `quit` (the arm homes first), restarts, opens the `--drive` calibration in a Terminal window, opens `zones_view.py`, takes a camera snapshot while the demo is stopped, edits the common settings in `config.json` with validation and a backup, tails the demo log. | **moves arm** only through its start / restart / calibrate buttons (each labelled) |
 | `setup.sh` / `setup.command` / `start.command` | One-time preparation of a fresh Mac (uv → `uv sync --extra voice --extra llm` → Whisper model → offline tests → port and calibration check) and the double-click launcher. | none |
-| `setup_wizard.py` | Guided first-time setup: camera + exposure lock, port + homing check, ArUco markers, calibration, zone teaching (hand-guide with the forearm unlock key, or click on the image with `zones_view.py`), per-object `z_pick`, detection tuning, smoke test. Saves `config.json` after each step. | reads only by default; **moves arm** only after `y` (home / smoke test) |
-| `demo.py` | Demo runner: browser panel + dialog mode + attract loop. Pre-loads the Whisper model at start (the first load downloads ~480 MB; the panel says 準備しています / できました). The mic follows `asr.engine` in `config.json`; `--keyboard` switches to text input only (until 2026-10-16 the demo always forced text input, so the panel mic never worked). One worker thread owns the robot; a separate thread grabs frames, detects and publishes the MJPEG stream at `stream_fps` so the picture keeps moving while the arm does (`panel_mirror` flips the shown picture only); the panel only queues commands (the e-stop button additionally sets the stop event on the HTTP thread). | **moves arm** with `--robot pydobot` / `--robot magician`; `--dry-run` never does |
+| `dobot-setup` (`setup_wizard.py`) | Guided first-time setup: camera + exposure lock, port + homing check, ArUco markers, calibration, zone teaching (hand-guide with the forearm unlock key, or click on the image with `zones_view.py`), per-object `z_pick`, detection tuning, smoke test. Saves `config.json` after each step. | reads only by default; **moves arm** only after `y` (home / smoke test) |
+| `dobot-demo` (`demo.py`) | Demo runner: browser panel + dialog mode + attract loop. Pre-loads the Whisper model at start (the first load downloads ~480 MB; the panel says 準備しています / できました). The mic follows `asr.engine` in `config.json`; `--keyboard` switches to text input only (until 2026-10-16 the demo always forced text input, so the panel mic never worked). One worker thread owns the robot; a separate thread grabs frames, detects and publishes the MJPEG stream at `stream_fps` so the picture keeps moving while the arm does (`panel_mirror` flips the shown picture only); the panel only queues commands (the e-stop button additionally sets the stop event on the HTTP thread). | **moves arm** with `--robot pydobot` / `--robot magician`; `--dry-run` never does |
 | `panel_web.py` | stdlib HTTP server: `/` page, `/stream` MJPEG, `/status` JSON, `POST /cmd`. | none |
-| `check_camera.py` | Enumerate cameras; open one, lock exposure/WB and autofocus (read back), measure brightness jitter, save a snapshot to `logs/`. | camera only |
-| `suction.py` | Suction pump ON/OFF only: `on` / `off` / `status` / `pulse` commands and a two-button browser panel (port 8791). Talks the Dobot protocol directly (immediate command, no queue, no pydobot). | **runs the pump**; never moves the arm; `--dry` touches nothing |
-| `jog.py` | Filming controller: browser panel (port 8791) with step moves on X/Y/Z, stop, alarm clear and suction ON/OFF. Reuses `suction.py`'s worker and panel; targets pass the workspace guard. | **moves arm** on every button press; `--dry` never does |
-| `check_robot.py` | List candidate ports (`--list`); connect and print pose; `--home` / `--round-trip` move the arm; `--dry` rehearses without hardware. | read-only by default; **moves arm** with flags |
-| `calibrate.py` | Eye-to-hand calibration: print ArUco markers (`--make-markers`) or use an object as the marker (`--object blue_cube`), then fit pixels→robot XY into `assets/homography.json` while *you* move the arm. Each recorded point is saved at once to `assets/homography.pairs.json`, so a crash loses nothing: rerun to continue, `--fresh` to start over. `--drive --object blue_cube` instead lets the **robot** visit a 3×3 grid, stop just above the block height, wait for you to put the block under the cup, park aside and read the camera — pairs are then commanded-position → pixel, which removes the hand-teaching bias (the 2026-10-16 picks aimed a few mm outward). | read-only; **moves arm** with `--drive` |
-| `zones_view.py` | Zone placement on the camera image (needs the calibration): draws the arm workspace and every zone in `config.json` over the live frame; pick a zone with `1`–`9`/Tab, click where it should be and `s` saves (`config.bak_*` kept). Clicks outside the arm's workspace are refused. Replaces the hand-guided step 5 of the wizard; `--image file.jpg` previews on a still. | camera only; never connects to the robot |
-| `main.py` | CLI app (OpenCV window): `--tune` (camera only), `--dry-run`, or live with `--robot pydobot`. `demo.py` reuses its `build()`. | **moves arm** when `--robot pydobot` |
+| `dobot-check-camera` (`check_camera.py`) | Enumerate cameras; open one, lock exposure/WB and autofocus (read back), measure brightness jitter, save a snapshot to `logs/`. | camera only |
+| `dobot-suction` (`suction.py`) | Suction pump ON/OFF only: `on` / `off` / `status` / `pulse` commands and a two-button browser panel (port 8791). Talks the Dobot protocol directly (immediate command, no queue, no pydobot). | **runs the pump**; never moves the arm; `--dry` touches nothing |
+| `dobot-jog` (`jog.py`) | Filming controller: browser panel (port 8791) with step moves on X/Y/Z, stop, alarm clear and suction ON/OFF. Reuses `suction.py`'s worker and panel; targets pass the workspace guard. | **moves arm** on every button press; `--dry` never does |
+| `dobot-check-robot` (`check_robot.py`) | List candidate ports (`--list`); connect and print pose; `--home` / `--round-trip` move the arm; `--dry` rehearses without hardware. | read-only by default; **moves arm** with flags |
+| `dobot-calibrate` (`calibrate.py`) | Eye-to-hand calibration: print ArUco markers (`--make-markers`) or use an object as the marker (`--object blue_cube`), then fit pixels→robot XY into `assets/homography.json` while *you* move the arm. Each recorded point is saved at once to `assets/homography.pairs.json`, so a crash loses nothing: rerun to continue, `--fresh` to start over. `--drive --object blue_cube` instead lets the **robot** visit a 3×3 grid, stop just above the block height, wait for you to put the block under the cup, park aside and read the camera — pairs are then commanded-position → pixel, which removes the hand-teaching bias (the 2026-10-16 picks aimed a few mm outward). | read-only; **moves arm** with `--drive` |
+| `dobot-zones` (`zones_view.py`) | Zone placement on the camera image (needs the calibration): draws the arm workspace and every zone in `config.json` over the live frame; pick a zone with `1`–`9`/Tab, click where it should be and `s` saves (`config.bak_*` kept). Clicks outside the arm's workspace are refused. Replaces the hand-guided step 5 of the wizard; `--image file.jpg` previews on a still. | camera only; never connects to the robot |
+| `dobot-pnp` (`main.py`) | CLI app (OpenCV window): `--tune` (camera only), `--dry-run`, or live with `--robot pydobot`. `demo.py` reuses its `build()`. | **moves arm** when `--robot pydobot` |
 | `robot_dobot.py` | pydobot wrapper with workspace guard (AABB + reach annulus), emergency stop, dry-run robot; refuses to guess a port. | **moves arm** with `--live` |
 | `robot_magician.py` | Direct-protocol backend (`--robot magician`, built on `jog.py`/`suction.py`): queue-index motion wait that watches the e-stop event, ForceStop → Clear → pump-off halt lane, two-stage suction release (both immediate commands), alarm read before and during motion; joint-interpolated travel (MOVJ) with straight-line descents (`travel_mode`). No pydobot. | **moves arm** with `--robot magician` |
 | `camera.py` / `detect.py` / `planner.py` | UVC/RealSense/file camera with exposure lock and read-back; HSV + shape detection; TaskExecutor (observe → select → pick and place, tidy up; placement avoids every detected object using its size in mm and refuses when the zone is full). | camera / via robot |
 | `rule_parser.py` / `llm_agent.py` | Japanese rule parser (offline; flags ambiguous utterances and takes the last-named object after a negation; wider stop words; home before tidy) / Claude tool-use agent (enum-only arguments, no coordinates from the LLM; tools: list_objects, pick_and_place, tidy_up, go_home, stop). | none |
 | `asr.py` / `tts.py` | Hold-to-talk recorder (ring buffer with pre/post-roll, no Enter) + faster-whisper with per-segment confidence and a hallucination/confidence gate / VOICEVOX-say-SAPI. Optional extras. | none |
 | `voice_front.py` | Voice dialog state machine on its own ASR thread: record → transcribe → rule parse → show heard text + interpretation → countdown run, 「これですか？」 for ambiguous ones, stop words → e-stop lane. Hands only confirmed intents to the worker. | none (serial untouched) |
-| `config.py` | Dataclasses + JSON (`python config.py config.json` writes the defaults). | none |
-| `tests/` | Offline tests: detection incl. shapes, homography, parsing, guards, executor, panel HTTP, demo runner, wizard helpers, stop lane (fake arm + dry-run panel e-stop), voice UI (fake mic stream, transcript gate, 99-utterance parser regression in `tests/data/`, dialog state machine, panel round trip). | none |
+| `dobot-config` (`config.py`) | Dataclasses + JSON (`uv run dobot-config config.json` writes the defaults). | none |
+| `src/dobot/tests/` | Offline tests: detection incl. shapes, homography, parsing, guards, executor, panel HTTP, demo runner, wizard helpers, stop lane (fake arm + dry-run panel e-stop), voice UI (fake mic stream, transcript gate, 99-utterance parser regression in `src/dobot/tests/data/`, dialog state machine, panel round trip). | none |
 
 ## Layout
 
 ```
 dobot/
   AGENTS.md  README.md  pyproject.toml  config.json
-  setup_wizard.py  demo.py  panel_web.py  main.py  check_camera.py  check_robot.py  calibrate.py  suction.py  jog.py
-  camera.py  detect.py  planner.py  robot_dobot.py  rule_parser.py  llm_agent.py  asr.py  tts.py  config.py
-  tests/           offline tests (pytest)
+  start.sh  start.command  start.bat  setup.sh  setup.command
+  src/dobot/      the package; every console script in pyproject.toml points into it
+    paths.py         config.json / assets/ / logs/ resolved from the project, not the cwd
+    launcher.py  setup_wizard.py  demo.py  panel_web.py  main.py
+    check_camera.py  check_robot.py  calibrate.py  suction.py  jog.py  zones_view.py
+    camera.py  detect.py  planner.py  robot_dobot.py  robot_magician.py
+    rule_parser.py  llm_agent.py  asr.py  tts.py  voice_front.py  config.py
+    tests/           offline tests (pytest), with data/ for the parser regression
   manual/          first-time setup manual (index.html) + img/ photo slots
   assets/          homography.json, printed markers (git-ignored)
   logs/            snapshots, JSONL run logs (git-ignored)
 ```
+
+`config.json`, `assets/` and `logs/` stay beside `pyproject.toml`, where the operator edits them;
+the code reaches them through `dobot.paths`, so a console script works from any directory.
 
 ## Model caveat
 

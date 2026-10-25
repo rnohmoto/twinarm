@@ -132,7 +132,21 @@ DEFAULT_CONFIG_DIR = CONFIG_DIR
 DEFAULT_WORK_DIR = WORK_DIR
 LEADER_ONLY = "none"
 
-MAX_RECONNECTS = 20
+MAX_RECONNECTS = (
+    100  # 安定しないまま続いた通信断の回数の上限(RECONNECT_STABLE_SEC 動けば 0 に戻る)
+)
+MAX_RECONNECT_ATTEMPTS = (
+    60  # 1 回の通信断での再接続の試行回数の上限(待ち 2 秒で約 2 分)
+)
+RECONNECT_WAIT_FIRST_SEC = (
+    0.5  # 通信断を検知してから最初の再接続まで(失敗ごとに倍、最大 2 秒)
+)
+RECONNECT_WAIT_MAX_SEC = 2.0
+RECONNECT_RAMP_SEC = 0.5  # 再接続後の合流ランプ(起動時は 1.5 秒)
+RECONNECT_STABLE_SEC = 10.0  # これだけ連続して動けば通信断の連続回数を 0 に戻す
+VOLT_LOG_EVERY = 5  # 電圧を記録する頻度(2 秒ごとの検査 × 5 = 10 秒)
+VOLT_LOW_12V = 11.0  # フォロワー機の XL430(12 V)の電圧低下とみる閾値
+VOLT_LOW_5V = 4.8  # XL330(5 V)の電圧低下とみる閾値
 TEMP_CHECK_EVERY = 60  # frames (2 s at 30 fps)
 WALL_TTL_SEC = (
     3.0  # VR ブリッジからの壁更新が途絶えたら壁を解除する秒数(固定壁は無期限)
@@ -1099,7 +1113,14 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     ff_ma = [0]
     ff_hot = [False]
     n = [0]
-    reconnects = [0]
+    reconnects = [0]  # 通信断の回数(パネルの表示)
+    streak = [0]  # 安定しないまま続いた通信断の回数(上限判定)
+    attempts = [0]  # いまの通信断での再接続の試行回数
+    reconnect_wait = [RECONNECT_WAIT_FIRST_SEC]
+    last_reconnect_n = [None]
+    in_dropout = [False]
+    volt: dict[str, float] = {}  # 最後に読めた入力電圧(V)
+    volt_tick = [0]
     vw_state = [VirtualWeightState()]
     vw_out = {j: 0 for j in VW_JOINTS}
     assist_state = {j: HandAssistState() for j in assist_joints}
@@ -1159,6 +1180,39 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 "fgrip",
                 f"⚠ {roles['F']}握力が上限 {cap}mA 付近 — 滑り・過負荷停止に注意",
             )
+
+    def read_volt(dev, joint):
+        """Input voltage of one servo in volts, or None when it cannot be read."""
+        try:
+            raw = dev.bus.read("Present_Input_Voltage", joint, normalize=False)
+        except Exception:  # noqa: BLE001 - diagnostics must never stop the loop
+            return None
+        return int(raw) / 10.0
+
+    def volt_text():
+        """The last voltages read, for the log."""
+        return " ".join(f"{k} {v:.1f}V" for k, v in volt.items()) or "未取得"
+
+    def check_voltage():
+        """Every 2 s: the follower's 12 V and 5 V branches and the leader gripper; log every 10 s, alert when low."""
+        if robot is not None and not isinstance(robot, RemoteFollower):
+            for key, joint in (("F肩", "shoulder_lift"), ("F肘", "elbow_flex")):
+                v = read_volt(robot, joint)
+                if v is not None:
+                    volt[key] = v
+        v = read_volt(teleop, "gripper")
+        if v is not None:
+            volt["L握"] = v
+        low = [
+            k
+            for k, v in volt.items()
+            if v < (VOLT_LOW_12V if (k == "F肩" and not swapped) else VOLT_LOW_5V)
+        ]
+        volt_tick[0] += 1
+        if low or volt_tick[0] % VOLT_LOG_EVERY == 0:
+            print(f"\n[volt] {volt_text()}" + (f"  ⚠ 低下 {low}" if low else ""))
+        if low:
+            raise_alert("volt", f"⚠ 電圧低下 {volt_text()} — 電源アダプタと配線を確認")
 
     def check_link_alert():
         """Warn when the wireless follower's state stream is late or on hold."""
@@ -1709,8 +1763,16 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             check_hw_alert()
         if swapped and n[0] % TEMP_CHECK_EVERY == TEMP_CHECK_EVERY * 3 // 4:
             check_follower_arm_temp()
+        if n[0] % TEMP_CHECK_EVERY == TEMP_CHECK_EVERY * 5 // 8:
+            check_voltage()
         publish(time.perf_counter() - t0, action, cur, fpos)
         n[0] += 1
+        if (
+            streak[0]
+            and last_reconnect_n[0] is not None
+            and n[0] - last_reconnect_n[0] >= int(RECONNECT_STABLE_SEC * args.fps)
+        ):
+            streak[0] = 0  # 安定して動いた: 通信断の連続回数を忘れる
         time.sleep(max(0.0, 1.0 / args.fps - (time.perf_counter() - t_frame)))
 
     def reconnect():
@@ -1722,7 +1784,6 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                     dev.disconnect()
             except Exception:  # noqa: BLE001, S110 - best effort before reconnecting
                 pass
-        time.sleep(2)
         if robot is not None and not robot.is_connected:
             connect_device(robot, roles["F"])
         if not teleop.is_connected:
@@ -1751,34 +1812,47 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             0,
             None,
         )
-        soft_resync(robot, teleop, args.fps)
-        print("[robust] 再接続成功。テレオペ継続")
+        soft_resync(robot, teleop, args.fps, seconds=RECONNECT_RAMP_SEC)
+        print(f"[robust] 再接続成功。テレオペ継続  電圧: {volt_text()}")
 
     try:
         while True:
             try:
                 frame()
             except retry_errors as e:
-                reconnects[0] += 1
-                if reconnects[0] > MAX_RECONNECTS:
+                if not in_dropout[0]:  # a new dropout episode (not a failed retry)
+                    in_dropout[0] = True
+                    reconnects[0] += 1
+                    streak[0] += 1
+                    attempts[0] = 0
+                    reconnect_wait[0] = RECONNECT_WAIT_FIRST_SEC
+                    print(f"\n[robust] 通信断を検知: {e}  直前の電圧: {volt_text()}")
+                attempts[0] += 1
+                if streak[0] > MAX_RECONNECTS or attempts[0] > MAX_RECONNECT_ATTEMPTS:
                     print(
-                        "[robust] 再接続上限に達しました。物理側(コネクタ・電源)の点検が必要です"
+                        "[robust] 通信断が続きすぎました(安定しないまま"
+                        f" {streak[0]} 回・この回の試行 {attempts[0]})。物理側(コネクタ・電源)の点検が必要です"
                     )
                     raise
                 print(
-                    f"\n[robust] 通信断を検知: {e}\n"
-                    f"[robust] 2秒後に再接続します… ({reconnects[0]}/{MAX_RECONNECTS})"
+                    f"[robust] {reconnect_wait[0]:.1f}秒後に再接続します…"
+                    f" (通算 {reconnects[0]} 回目・連続 {streak[0]}・試行 {attempts[0]})"
                 )
                 raise_alert(
-                    "link",
-                    f"⚠ 通信断 → 再接続中 ({reconnects[0]}/{MAX_RECONNECTS})",
-                    ttl=8.0,
+                    "link", f"⚠ 通信断 → 再接続中 (通算 {reconnects[0]} 回目)", ttl=8.0
                 )
+                time.sleep(reconnect_wait[0])
                 try:
                     reconnect()
+                    last_reconnect_n[0] = n[0]
+                    in_dropout[0] = False
                 except Exception as e2:  # noqa: BLE001 - retried on the next loop
-                    print(f"[robust] 再接続失敗: {e2} — 2秒後に再試行")
-                    time.sleep(2)
+                    reconnect_wait[0] = min(
+                        RECONNECT_WAIT_MAX_SEC, reconnect_wait[0] * 2
+                    )
+                    print(
+                        f"[robust] 再接続失敗: {e2} — {reconnect_wait[0]:.1f}秒後に再試行"
+                    )
     except KeyboardInterrupt:
         clean_exit = True
         print("\n終了処理中…")

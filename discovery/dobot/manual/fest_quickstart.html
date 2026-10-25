@@ -82,6 +82,37 @@ uv sync --extra voice --extra llm   # 1 回。声と Claude の分（約 150 MB�
 <p>GitHub の twinarm → Branches → <code>ms/feat/dobot-calibrate-carry-261026</code> → Code → Download ZIP。展開して <code>discovery/dobot/scripts/setup.command</code> をダブルクリック（uv・依存・音声モデル・テストまで自動）。終わったら <code>scripts/start.command</code> のエイリアスをデスクトップへ。</p>
 <div class="warn">どちらの場合も、以前の <code>assets/homography.json</code>（較正）は新しい版にも入っています（10/19・9 点・RMS 3.10 mm）。カメラとロボットを動かしていなければそのまま使えます。</div>
 
+<h2>1.5 机と壁を教える（巻尺で 3 つ・1 分）</h2>
+<p>貸与の長机は <b>1800 × 600 mm</b>（什器精査 9/24・半円構想 9/30）。右が壁で狭いときは、基部の中心から測った 3 つの距離をランチャーの設定に入れると、腕はそこから 40 mm 内側までしか行きません（較正の格子・置き場・ジョグも同じ箱）。空欄は制限なし。</p>
+<figure class="fig">
+<svg viewBox="0 0 900 300" width="100%" role="img" aria-label="長机とロボットの基部、測る 3 つの距離">
+  <rect x="80" y="60" width="760" height="200" fill="#fdf6e3" stroke="#b45309" stroke-width="2"/>
+  <text x="90" y="52" font-size="13" fill="#b45309">長机 1800 × 600（上から）</text>
+  <rect x="845" y="30" width="40" height="260" fill="#9ca3af"/><text x="852" y="170" font-size="13" fill="#fff" writing-mode="tb">壁</text>
+  <!-- base -->
+  <rect x="520" y="200" width="60" height="44" rx="6" fill="#374151"/><text x="531" y="228" font-size="12" fill="#fff">基部</text>
+  <circle cx="550" cy="222" r="3" fill="#fff"/>
+  <!-- robot forward arrow (toward front edge / visitors) -->
+  <path d="M550 200 L550 100" stroke="#2563eb" stroke-width="2" marker-end="url(#ar)"/>
+  <defs><marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker></defs>
+  <text x="560" y="112" font-size="12" fill="#2563eb">前（来場者側）</text>
+  <!-- three measures -->
+  <line x1="550" y1="222" x2="845" y2="222" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="640" y="214" font-size="13" fill="#dc2626">① 右の壁まで（例 260）</text>
+  <line x1="550" y1="222" x2="80" y2="222" stroke="#059669" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="230" y="214" font-size="13" fill="#059669">② 左の端まで（例 1540）</text>
+  <line x1="550" y1="200" x2="550" y2="60" stroke="#d97706" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="120" y="84" font-size="13" fill="#d97706">③ 手前の縁まで（例 520）</text>
+  <!-- allowed box -->
+  <rect x="440" y="75" width="365" height="110" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="3 3"/>
+  <text x="446" y="92" font-size="12" fill="#2563eb">腕が行く箱＝設定の作業域と、縁・壁から 40 mm 内側の狭い方</text>
+  <!-- homing sweep -->
+  <path d="M250 222 A300 300 0 0 1 850 222" fill="none" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="2 4"/>
+  <text x="90" y="285" font-size="12" fill="#6b7280">点線の弧＝ホーミングで J1 が左右に 90° 振れる範囲（半径 ≈ 26 cm＋腕の幅）。壁まで 30 cm 未満なら、本体キーを押す前に壁から離す</text>
+</svg>
+<figcaption>ロボットの「右」は基部から見て −y。壁か机の端の近い方を入れる。ランチャーの設定の上に「腕が行く範囲: 前・右・左」が出る。</figcaption>
+</figure>
+
 <h2>2. 較正: ブロックを 1 回置くだけ</h2>
 <p>較正が要るのは<b>カメラかロボットを動かしたときだけ</b>。迷ったら「較正を確認」（30 秒）。やり直すときは「較正をやり直す」（約 1 分）。</p>
 

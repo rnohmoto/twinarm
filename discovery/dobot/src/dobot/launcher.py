@@ -39,6 +39,9 @@ SETTINGS: list[tuple[str, str, str, tuple | None, str]] = [
     ("robot.z_safe", "退避の高さ z_safe（mm）", "number", (-40, 120), "運ぶときの高さ。箱の縁より上に"),
     ("robot.ee_settle_s", "吸着の待ち（秒）", "number", (0.0, 3.0), "吸えずに落とすなら 0.6"),
     ("robot.travel_mode", "移動の補間", "choice", ("movj", "movl"), "movj=速い（経路は曲がる）/ movl=直線"),
+    ("robot.right_limit_mm", "右の壁・机の右端まで（mm）", "optnumber", (100, 2000), "基部の中心から巻尺で。空=制限なし。吸盤はここから 40 mm 内側まで"),
+    ("robot.left_limit_mm", "左の壁・机の左端まで（mm）", "optnumber", (100, 2000), "同じく左。空=制限なし"),
+    ("robot.front_edge_mm", "机の手前の縁まで（mm）", "optnumber", (150, 1000), "基部の中心から手前の縁まで。長机 1800×600 を奥に寄せれば約 500"),
     ("demo.panel_mirror", "映像を左右反転", "bool", None, "来場者がロボットと向かい合う向き"),
     ("demo.stream_fps", "映像の fps", "number", (1, 30), ""),
     ("demo.confirm_auto_run_s", "声の確認待ち（秒）", "number", (0.0, 10.0), "聞き取りから実行までの秒数"),
@@ -65,6 +68,8 @@ def _parse(kind: str, spec, raw, current):
         if v not in spec:
             raise ValueError(f"{'/'.join(spec)} のどれか")
         return v
+    if kind == "optnumber" and str(raw).strip() == "":
+        return None
     v = float(str(raw).strip())
     lo, hi = spec
     if not (lo <= v <= hi):
@@ -264,8 +269,11 @@ class Launcher:
     def status(self) -> dict:
         cfg = self.cfg()
         hp = from_root(cfg.homography_path)
+        x_min, x_max, y_min, y_max = cfg.robot.bounds()
         return {"running": self.running(), "pid": self.proc.pid if self.running() else None,
                 "panel_url": f"http://127.0.0.1:{cfg.demo.panel_port}", "message": self.last_message,
+                "bounds": {"x_min": x_min, "x_max": x_max, "y_min": y_min, "y_max": y_max},
+                "homing_warning": cfg.robot.homing_clearance_warning(),
                 "settings": read_settings(cfg), "log": self.log_tail(), "config_path": str(self.config_path),
                 "calibrated": hp.exists(), "calibration": self.calibration_info(),
                 "robot": {"backend": cfg.robot.backend, "port": cfg.robot.port},
@@ -280,6 +288,8 @@ def _settings_form(cfg: AppConfig) -> str:
         cur = getattr(getattr(cfg, section), name)
         if kind == "bool":
             ctl = f'<input type="checkbox" name="{key}" {"checked" if cur else ""}>'
+        elif kind == "optnumber":
+            ctl = f'<input type="number" step="any" name="{key}" value="{"" if cur is None else cur}" min="{spec[0]}" max="{spec[1]}" placeholder="空=制限なし">'
         elif kind == "choice":
             opts = "".join(f'<option value="{o}" {"selected" if o == cur else ""}>{o}</option>' for o in spec)
             ctl = f'<select name="{key}">{opts}</select>'
@@ -327,6 +337,7 @@ PAGE_HEAD = """<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta 
   <img id="snap" alt="camera">
  </div>
  <div class="card"><h3>設定（保存 → 再起動で反映）</h3>
+  <div id="bounds" class="help" style="margin-bottom:8px"></div>
   <form id="settings" onsubmit="return saveSettings(event)">
 """
 PAGE_TAIL = """
@@ -356,6 +367,7 @@ async function poll(){try{const s=await (await fetch('/api/status')).json();
  document.getElementById('dry').textContent=s.dry?'（実機なしの練習モード）':'';
  const p=document.getElementById('panel');p.href=s.panel_url;p.style.opacity=s.running?1:.4;
  const c=s.calibration;document.getElementById('calinfo').textContent=c?('較正: '+c.created+'・RMS '+(c.rms_mm==null?'?':c.rms_mm+' mm')+'・'+c.points+' 点'+(c.rms_mm!=null&&c.rms_mm>3?'（3 mm 超: やり直し推奨）':'')):'較正: まだ（「較正をやり直す」で作る）';
+ const b=s.bounds;document.getElementById('bounds').textContent=b?('腕が行く範囲: 前 '+Math.round(b.x_min)+'〜'+Math.round(b.x_max)+' mm・右 '+Math.round(-b.y_min)+' mm・左 '+Math.round(b.y_max)+' mm'+(s.homing_warning?'　⚠ '+s.homing_warning:'')):'';
  document.getElementById('b-start').disabled=s.running;document.getElementById('b-stop').disabled=!s.running;
  if(s.message)document.getElementById('msg').textContent=s.message;document.getElementById('log').textContent=s.log||'-';}catch(e){}}
 setInterval(poll,2000);poll();

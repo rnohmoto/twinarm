@@ -131,6 +131,9 @@ Windows は `scripts\start.bat`（ポートは `COMn`、カメラ index は `dob
 ## 5. 既知の注意
 
 - 置き場は「中心」だけでなく置く位置（スロット）も作業域に入っている必要がある（`dobot-zones` が確認する）
+- 会場の机と壁は `robot.right_limit_mm`／`left_limit_mm`／`front_edge_mm`（基部の中心からの距離・ランチャーの設定で入れる）。
+  `RobotConfig.bounds()` が作業域の箱との狭い方を返し、ガード・ジョグ・較正の格子と退避点・置き場の確認が全部それを使う（2026-10-26。
+  本人「長机の右側が壁で、腕を伸ばし切ると当たる」）。余裕は `edge_margin_mm`=40。ホーミングの左右の振りは機械の動作で箱の外＝壁まで 30 cm 未満なら ⚠
 - 置くときの吸盤高さは物ごと（`objects[].z_place` → 置き場の `z_place` → `robot.z_place` の順）。ブロック用の −54.1 を
   ゴルフボール（高さ 43 mm）に使うと 27 mm 押し付けるので、ボールは `z_pick` −30.5／`z_place` −27.5（机 −72.2 からの
   計算値。現地で `dobot-setup --from 6` を通せば実測で上書きされ、z_place は z_pick + 3 で自動）

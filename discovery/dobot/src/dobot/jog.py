@@ -97,7 +97,8 @@ def violation(cfg: RobotConfig, x: float, y: float, z: float) -> float:
     def outside(v: float, lo: float, hi: float) -> float:
         return max(lo - v, 0.0, v - hi)
 
-    return (outside(x, cfg.x_min, cfg.x_max) + outside(y, cfg.y_min, cfg.y_max) + outside(z, cfg.z_min, cfg.z_max)
+    x_min, x_max, y_min, y_max = cfg.bounds()   # 作業域と、机の縁・壁（front_edge_mm / right_limit_mm / left_limit_mm）の狭い方
+    return (outside(x, x_min, x_max) + outside(y, y_min, y_max) + outside(z, cfg.z_min, cfg.z_max)
             + outside(math.hypot(x, y), cfg.reach_min, cfg.reach_max))
 
 

@@ -72,9 +72,10 @@ class WorkspaceGuard:
     def check(self, x: float, y: float, z: float) -> None:
         c = self.cfg
         r = math.hypot(x, y)
-        if not (c.x_min <= x <= c.x_max and c.y_min <= y <= c.y_max and c.z_min <= z <= c.z_max):
+        x_min, x_max, y_min, y_max = c.bounds()   # 作業域と、机の縁・壁（front_edge_mm / right_limit_mm / left_limit_mm）の狭い方
+        if not (x_min <= x <= x_max and y_min <= y <= y_max and c.z_min <= z <= c.z_max):
             raise OutOfWorkspace(f"({x:.1f},{y:.1f},{z:.1f}) outside AABB "
-                                 f"x[{c.x_min},{c.x_max}] y[{c.y_min},{c.y_max}] z[{c.z_min},{c.z_max}]")
+                                 f"x[{x_min},{x_max}] y[{y_min},{y_max}] z[{c.z_min},{c.z_max}]")
         if not (c.reach_min <= r <= c.reach_max):
             raise OutOfWorkspace(f"radius {r:.1f} outside [{c.reach_min},{c.reach_max}]")
 

@@ -52,9 +52,9 @@ def zone_overlay(zone: Zone, p2r: PixelToRobot) -> tuple[tuple[int, int], int, l
 
 
 def workspace_outline(robot: RobotConfig, p2r: PixelToRobot) -> list[tuple[int, int]]:
-    """腕の作業域（x_min..x_max × y_min..y_max）の四隅をピクセルで。届く距離の制限は別（click_to_zone で見る）。"""
-    corners = [(robot.x_min, robot.y_min), (robot.x_max, robot.y_min),
-               (robot.x_max, robot.y_max), (robot.x_min, robot.y_max)]
+    """腕の作業域（机の縁・壁で狭めた箱）の四隅をピクセルで。届く距離の制限は別（click_to_zone で見る）。"""
+    x_min, x_max, y_min, y_max = robot.bounds()
+    corners = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
     return [_px(p2r.to_pixel(x, y)) for x, y in corners]
 
 
@@ -65,8 +65,9 @@ def click_to_zone(zones: Sequence[Zone], index: int, u: float, v: float, p2r: Pi
     zone = zones[index]
     z = zone.z_place if zone.z_place is not None else robot.z_place
     if not WorkspaceGuard(robot).inside(x, y, z):
+        bx0, bx1, by0, by1 = robot.bounds()
         return list(zones), False, (f"{zone.name}: ({x:.0f},{y:.0f}) は腕の作業域の外です"
-                                    f"（x {robot.x_min:.0f}〜{robot.x_max:.0f}, y {robot.y_min:.0f}〜{robot.y_max:.0f},"
+                                    f"（x {bx0:.0f}〜{bx1:.0f}, y {by0:.0f}〜{by1:.0f},"
                                     f" 届く距離 {robot.reach_min:.0f}〜{robot.reach_max:.0f} mm）")
     new = place_zone(zone, x, y)
     if not zone_fits_workspace(new, robot):

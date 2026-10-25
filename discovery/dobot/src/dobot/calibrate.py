@@ -233,16 +233,18 @@ def drive_grid(robot, nx: int = 3, ny: int = 3, margin_mm: float = 25.0) -> list
     """ロボット自身が回る較正点: 作業域の内側に margin を取った nx×ny の格子のうち、届くもの。"""
     from dobot.robot_dobot import WorkspaceGuard
     guard = WorkspaceGuard(robot)
-    xs = np.linspace(robot.x_min + margin_mm, robot.x_max - margin_mm, nx)
-    ys = np.linspace(robot.y_min + margin_mm, robot.y_max - margin_mm, ny)
+    x_min, x_max, y_min, y_max = robot.bounds()   # 机の縁・壁（right_limit_mm など）があれば、その内側だけ回る
+    xs = np.linspace(x_min + margin_mm, x_max - margin_mm, nx)
+    ys = np.linspace(y_min + margin_mm, y_max - margin_mm, ny)
     pts = [(round(float(x), 1), round(float(y), 1)) for x in xs for y in ys]
     return [p for p in pts if guard.inside(p[0], p[1], robot.z_safe)]
 
 
 def park_pose(robot, y: float) -> tuple[float, float]:
     """カメラを読む前の退避点: 基部側の端で、目標と反対側。俯瞰カメラで腕が物を隠さないように。"""
-    side = robot.y_min + DRIVE_PARK_SIDE_MM if y >= 0 else robot.y_max - DRIVE_PARK_SIDE_MM
-    return (robot.x_min + DRIVE_PARK_INSET_MM, side)
+    x_min, _x_max, y_min, y_max = robot.bounds()
+    side = y_min + DRIVE_PARK_SIDE_MM if y >= 0 else y_max - DRIVE_PARK_SIDE_MM
+    return (x_min + DRIVE_PARK_INSET_MM, side)
 
 
 def drive_bias(old: PixelToRobot | None, pairs: Sequence[Pair]) -> dict | None:

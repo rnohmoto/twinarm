@@ -47,7 +47,11 @@
       0.0,
       50.0,
       0.0
-    ]
+    ],
+    "front_edge_mm": null,
+    "right_limit_mm": null,
+    "left_limit_mm": null,
+    "edge_margin_mm": 40.0
   },
   "llm": {
     "enabled": false,

@@ -65,6 +65,31 @@ class RobotConfig:
     reach_max: float = 315.0
     reach_min: float = 140.0
     home_xyzr: tuple[float, float, float, float] = (200.0, 0.0, 50.0, 0.0)
+    # 会場の机と壁（2026-10-26・本人「長机の右側が壁で狭い」）。基部の中心から巻尺で測った距離 [mm]。None なら制限なし
+    front_edge_mm: float | None = None   # 机の手前の縁まで（ロボットの前。貸与の長机は 1800×600 なので、奥の縁に寄せれば ≈ 600 − 基部の後ろ側）
+    right_limit_mm: float | None = None  # 右の壁か机の右端までの近い方（ロボットから見て右＝−y）
+    left_limit_mm: float | None = None   # 左の壁か机の左端まで（+y）
+    edge_margin_mm: float = 40.0         # 縁・壁から吸盤の中心までの余裕（吸盤 φ20 ＋ 持った物の半分 ＋ 少し）
+
+    def bounds(self) -> tuple[float, float, float, float]:
+        """実際に使う箱 (x_min, x_max, y_min, y_max)。作業域の設定と、机の縁・壁からの余裕の狭い方。"""
+        x_max = self.x_max
+        if self.front_edge_mm is not None:
+            x_max = min(x_max, self.front_edge_mm - self.edge_margin_mm)
+        y_min, y_max = self.y_min, self.y_max
+        if self.right_limit_mm is not None:
+            y_min = max(y_min, -(self.right_limit_mm - self.edge_margin_mm))
+        if self.left_limit_mm is not None:
+            y_max = min(y_max, self.left_limit_mm - self.edge_margin_mm)
+        return self.x_min, x_max, y_min, y_max
+
+    def homing_clearance_warning(self, sweep_radius_mm: float = 300.0) -> str:
+        """ホーミングは J1 が左右に 90° 振れる（半径 ≈ 26 cm の姿勢＋腕の幅）。左右の壁がそれより近ければ一言。"""
+        near = [name for name, v in (("右", self.right_limit_mm), ("左", self.left_limit_mm)) if v is not None and v < sweep_radius_mm]
+        if not near:
+            return ""
+        return ("・".join(near) + f" の壁まで {sweep_radius_mm / 10:.0f} cm 未満: ホーミング（本体キー）で J1 が左右に振れて当たる。"
+                "ホーミングのときだけロボットを壁から離すか、腕を手で壁と反対側へ向けてから押す")
 
 
 @dataclass

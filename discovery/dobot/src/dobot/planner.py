@@ -112,6 +112,19 @@ class TaskExecutor:
         spec = self.cfg.object_by_name(name) if name else None
         return spec.z_pick if (spec and spec.z_pick is not None) else self.cfg.robot.z_pick
 
+    def _z_place(self, zone: Zone, name: str | None) -> float:
+        """置くときの吸盤高さ: 置き場の z_place → 物の z_place → 既定（robot.z_place）。
+
+        物の高さが違えば置く高さも違う（ブロック 16 mm とゴルフボール 43 mm）。置き場に z_place を書くのは、
+        トレイの底が机と違う高さで、置く物の高さが全部同じときだけ（2026-10-26）。
+        """
+        if zone.z_place is not None:
+            return zone.z_place
+        spec = self.cfg.object_by_name(name) if name else None
+        if spec is not None and getattr(spec, "z_place", None) is not None:
+            return spec.z_place
+        return self.cfg.robot.z_place
+
     def detect(self, frame: np.ndarray) -> list[Detection]:
         """画像 1 枚から検出し、ロボット座標・大きさ・届くかを埋める。状態もログも触らないので表示スレッドからも呼べる。"""
         dets = detect_objects(frame, self.cfg.objects, self.cfg.min_area_px, self.cfg.max_area_px)
@@ -190,7 +203,7 @@ class TaskExecutor:
                     return Result(False, f"{label}が見つかりません。")
                 break
             others = [d for d in dets if d is not target]
-            z_place = zone.z_place if zone.z_place is not None else self.cfg.robot.z_place
+            z_place = self._z_place(zone, target.name)
             place = choose_place(zone, others, target.size_mm, self.robot.guard, z_place)
             if place is None:   # 見えている物の上に乗せない。空きが無ければ拾いにも行かない
                 self.logger({"ev": "zone_full", "zone": zone.name,
@@ -203,7 +216,7 @@ class TaskExecutor:
             try:
                 self.logger({"ev": "pick", "target": target.to_public(), "zone": zone.name, "place": [px, py]})
                 self.ctrl.pick_and_place(target.x_mm, target.y_mm, px, py, r=None,
-                                         z_place=zone.z_place, z_pick=self._z_pick(target.name))
+                                         z_place=z_place, z_pick=self._z_pick(target.name))
             except OutOfWorkspace as e:
                 self.stats["picks_fail"] += 1
                 self.logger({"ev": "error", "type": "OutOfWorkspace", "msg": str(e)})

@@ -44,17 +44,26 @@ Logi Options+（任意だが推奨）: C922 のフォーカスを「自動 OFF�
 
 `src/config.json` と `assets/homography.json` はベンチの実機値でコミットしてあります。**同じ机・同じカメラ位置なら、このまま起動できます。** カメラかロボットを動かしたら 4.1、トレイを置き直したら 4.2、机や台を変えたら 4.3。
 
-### 4.1 較正（5 分、腕が動く）
+### 4.1 較正（確認 30 秒・やり直し 1 分、腕が動く）
 
-ランチャーの「較正をやり直す」、または:
+まず確認: 青ブロックを 1 個、カメラに見える所（トレイの外）に置いて、ランチャーの「較正を確認」または:
 
 ```bash
-uv run dobot-calibrate --config src/config.json --object blue_cube --drive
+uv run dobot-calibrate --config src/config.json --object blue_cube --verify
 ```
 
-腕が 3×3 の 9 点を回り、各点でブロック上面の 8 mm 上に止まる。吸盤の真下に青ブロックを置いて Enter。
-終わると `RMS=… mm` が出る。**3 mm 以下で合格**。前の較正は `logs/homography_before_drive_*.json` に残る。
-「腕を手で当てて座標を読む」方式（`--drive` なし）は使わない（たわみで 7〜11 mm ずれた）。
+腕が拾って中心へ置き、ずれを測る。**3 mm 以下なら「使えます」＝やり直し不要。**
+
+やり直すとき: 机からトレイをどけ、青ブロックを 1 個用意して、ランチャーの「較正をやり直す」または:
+
+```bash
+uv run dobot-calibrate --config src/config.json --object blue_cube --carry
+```
+
+腕が最初の点（基部に近い右の隅）の上 8 mm で止まるので、吸盤の真下に青ブロックを置いて Enter（1 回だけ）。あとは腕が運んで
+四隅 → 中心 → 辺の中点の 9 点を回る（`--points quick` なら四隅＋中心の 5 点）。終わると `RMS=… mm` が出る。**3 mm 以下で合格**。
+前の較正は `logs/homography_before_carry_*.json` に残る。詳しくは [HANDOFF §4.1](HANDOFF.md)。
+「腕を手で当てて座標を読む」方式（フラグ無し）は使わない（たわみで 7〜11 mm ずれた）。
 
 ### 4.2 置き場（1 分、腕は動かない）
 

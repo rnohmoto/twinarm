@@ -40,7 +40,7 @@ uv run koch-quest --check     # 「✓ <番号>: 接続済み（adb 可・USB）
 ```
 卓上の Mac（D）は:
 ```bash
-cd twinarm/dobot && uv sync --extra voice --extra llm   # 約 150 MB
+cd twinarm/discovery/dobot && uv sync --extra voice --extra llm   # 約 150 MB（2026-10-21 に dobot/ → discovery/dobot/ へ移動。設定は src/config.json）
 export ANTHROPIC_API_KEY=...               # 無ければルール解析だけで動く
 ./scripts/start.sh check                   # カメラ一覧・ポート候補・オフラインのテスト
 # 声の初回は faster-whisper の small モデル（約 0.5 GB）を自動取得する。ネットのある所で一度 demo を動かしておく。macOS はターミナルにマイクの許可が要る
@@ -94,11 +94,11 @@ twinarm の discovery/koch で VR の 2 人目（フォロワー B を手で動�
 twinarm の dobot で卓上ロボット（Dobot Magician）のピック＆プレース・声の UI・俯瞰カメラを実機で立ち上げます。いま動いている PC は「卓上の Mac D」です。
 読む順: dobot/AGENTS.md → dobot/README.md → dobot/manual/index.html の §2（接続）・§3（カメラの固定。Mac は Logi Options+／Logi Tune／uvc-util・設定は起動のたびに書き直す）・§4 → docs/fest_start_prompts.md §2。
 やりたいこと: 木片・ゴルフボール・消しゴムを俯瞰カメラで見つけ、画面のボタンと声（「赤いブロックを右に置いて」）で拾って置く体験を、20 回連続で通せる状態にする。
-- 最初に git pull → cd dobot → uv sync --extra voice --extra llm → ./scripts/start.sh check を実行し、カメラ一覧・ポート候補・テストの結果を私に見せる（腕は動かない）
+- 最初に git pull → cd discovery/dobot → uv sync --extra voice --extra llm → ./scripts/start.sh check を実行し、カメラ一覧・ポート候補・テストの結果を私に見せる（腕は動かない）
 - 腕が動くコマンド（./scripts/start.sh、dobot-demo、dobot-jog、dobot-suction）は、私が明示的に頼んだときだけ。ポートは私が渡す（/dev/cu.usbserial-… を --list で選ぶ。推測しない）。実機の挙動は私の報告だけを事実にする
 - 進め方（1 つずつ）:
   M0 疎通と停止: 電源 ON → 本体キー 2 秒長押しでホーミング（LED 青点滅 → 緑）→ USB。uv run dobot-jog --port <ポート> --speed 30 で 20 mm 動かし「停止」。次に uv run dobot-demo --config src/config.json --robot magician --port <ポート> --camera-index <N> --no-llm → パネル「ホーム」→ 動作中に「非常停止」→ 止まるまでの秒数 →「再開」→「ホーム」。logs/*.jsonl の halt(estop)。吸着を 1 回（吸って置く・排気で離れるか）
-  M1・M2 カメラと較正: Logi Options+ でオートフォーカス・露出・ホワイトバランスを切って値を決める → uv run dobot-check-camera --index <N> で読み戻し（「OFF が効いています」）→ ./scripts/start.sh wizard（カメラ → ロボット → マーカー → 較正 → 置き場 → 高さ → 検出 → 試運転。wizard は pydobot で動く）
+  M1・M2 カメラと較正: Logi Options+ でオートフォーカス・露出・ホワイトバランスを切って値を決める → uv run dobot-check-camera --index <N> で読み戻し（「OFF が効いています」）→ 較正は wizard の 4 番ではなく uv run dobot-calibrate --config src/config.json --object blue_cube --verify（確認・30 秒・青ブロックを見える所に 1 個）→ 3 mm 超か拾えなければ同じコマンドを --carry で（ブロックを最初に 1 回置くだけ・腕が運んで 9 点・約 1 分）→ 置き場は dobot-zones → 高さは机が同じなら不要。順番と判断は discovery/dobot/docs/fest-checklist-261026.md
   M3 20 回: demo（--robot magician・--no-llm）でパネルのボタンと文字入力で 20 回連続。成功率・1 サイクルの秒数・アラーム・熱を JSONL から集計し、speed_pct を決める（基準: 20 回中 吸着ミス 1 回以下）
   声: uv run dobot-demo --dry-run --no-llm でマイクボタン長押し →「赤いブロックを右のトレイに置いて」が聞き取れるか・語頭が欠けないか・logs の asr（seconds・avg_logprob・no_speech_prob）。「赤じゃなくて青を右に」で「これですか？」が出て Enter で動き Esc で動かないこと。「止まって」で非常停止が掛かるまでの秒数。最後に実機で声で 1 回
   LLM: ANTHROPIC_API_KEY を入れて --no-llm を外し、同じ 3 文で返答と動作を見る（ネット断なら rule_parser に落ちる）

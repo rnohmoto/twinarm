@@ -178,23 +178,51 @@ class Launcher:
         return self.start()
 
     # --- tools (arm does not move unless the tool itself moves it)
-    def calibrate_command(self) -> str:
-        return f"cd {PROJECT_ROOT} && uv run dobot-calibrate --config {self.config_path} --object {CALIBRATE_OBJECT} --drive"
+    CALIBRATE_MODES = {
+        # mode: (フラグ, 端末を開いたときの案内)
+        "carry": ("--carry", "端末を開きました。腕が 9 点を回ります: 最初の点でだけ青ブロックを吸盤の真下に置いて Enter、あとは腕が運びます（約 1 分）"),
+        "verify": ("--verify", "端末を開きました。見えている青ブロックを拾って中心へ置き、ずれを測ります（約 30 秒）"),
+        "drive": ("--drive", "端末を開きました。腕が 9 点を回ります: 各点で青ブロックを吸盤の真下に置いて Enter"),
+    }
 
-    def open_calibration(self) -> str:
-        """実演を止めてから、端末で較正（--drive。腕が動く）を開く。Mac 以外はコマンドを返すだけ。"""
+    def calibrate_command(self, mode: str = "carry") -> str:
+        flag = self.CALIBRATE_MODES[mode][0]
+        return f"cd {PROJECT_ROOT} && uv run dobot-calibrate --config {self.config_path} --object {CALIBRATE_OBJECT} {flag}"
+
+    def verify_command(self) -> str:
+        return self.calibrate_command("verify")
+
+    def open_calibration(self, mode: str = "carry") -> str:
+        """実演を止めてから、端末で較正（carry=腕が運ぶ・verify=確認・drive=各点で人が置く。腕が動く）を開く。
+        Mac 以外はコマンドを返すだけ。"""
+        if mode not in self.CALIBRATE_MODES:
+            raise ValueError(f"unknown calibration mode {mode}")
         self.stop()
+        command = self.calibrate_command(mode)
         if platform.system() != "Darwin":
-            self.last_message = "端末で次を実行してください: " + self.calibrate_command()
-            return self.calibrate_command()
-        script = self._log_dir() / "calibrate.command"
+            self.last_message = "端末で次を実行してください: " + command
+            return command
+        script = self._log_dir() / f"calibrate_{mode}.command"
         script.parent.mkdir(parents=True, exist_ok=True)
-        script.write_text("#!/usr/bin/env bash\n" + self.calibrate_command() + "\necho; read -r -p '終わりました。Enter で閉じる'\n",
+        script.write_text("#!/usr/bin/env bash\n" + command + "\necho; read -r -p '終わりました。Enter で閉じる'\n",
                           encoding="utf-8")
         script.chmod(0o755)
         subprocess.Popen(["open", "-a", "Terminal", str(script)])
-        self.last_message = "端末を開きました。腕が 9 点を回ります: 各点で青ブロックを吸盤の真下に置いて Enter"
-        return self.calibrate_command()
+        self.last_message = self.CALIBRATE_MODES[mode][1]
+        return command
+
+    def calibration_info(self) -> dict | None:
+        """assets/homography.json の日時・RMS・点数（無ければ None）。画面の「較正: …」に出す。"""
+        hp = from_root(self.cfg().homography_path)
+        if not hp.exists():
+            return None
+        try:
+            d = json.loads(hp.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {"created": "?", "rms_mm": None, "points": 0}
+        rms = d.get("rms_error_mm")
+        return {"created": d.get("created", "?"), "rms_mm": round(float(rms), 2) if rms is not None else None,
+                "points": len(d.get("pairs") or [])}
 
     def open_zones(self) -> None:
         """実演を止めてから置き場の調整画面（zones_view.py）を開く。腕は動かない。"""
@@ -239,7 +267,8 @@ class Launcher:
         return {"running": self.running(), "pid": self.proc.pid if self.running() else None,
                 "panel_url": f"http://127.0.0.1:{cfg.demo.panel_port}", "message": self.last_message,
                 "settings": read_settings(cfg), "log": self.log_tail(), "config_path": str(self.config_path),
-                "calibrated": hp.exists(), "robot": {"backend": cfg.robot.backend, "port": cfg.robot.port},
+                "calibrated": hp.exists(), "calibration": self.calibration_info(),
+                "robot": {"backend": cfg.robot.backend, "port": cfg.robot.port},
                 "uptime_s": round(time.time() - self.started_at) if self.running() and self.started_at else 0, "dry": self.dry}
 
 
@@ -289,10 +318,12 @@ PAGE_HEAD = """<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta 
   <div class="msg" id="msg">-</div>
  </div>
  <div class="card"><h3>調整（実演は自動で止まります）</h3>
-  <button class="warn" onclick="if(confirm('腕が 9 点を回ります。机からトレイをどけ、青ブロックを 1 個用意しましたか？'))act('calibrate')">較正をやり直す（ロボットが動く・端末が開く）</button>
+  <div id="calinfo" class="help" style="margin-bottom:8px">較正: -</div>
+  <button class="warn" onclick="if(confirm('腕が動きます。青ブロックを 1 個、カメラに見える所（トレイの外）に置きましたか？\\n腕がそれを拾って中心へ置き、ずれを測ります（約 30 秒）'))act('verify')">較正を確認（30 秒・腕が動く）</button>
+  <button class="warn" onclick="if(confirm('腕が 9 点を回ります（約 1 分）。机からトレイをどけ、青ブロックを 1 個用意しましたか？\\n最初の点でだけ吸盤の真下に置いて Enter。あとは腕が運びます'))act('calibrate')">較正をやり直す（ブロック 1 個・腕が運ぶ・端末が開く）</button>
   <button onclick="act('zones')">置き場を調整（画像をクリック）</button>
   <button class="ghost" onclick="snap()">カメラ確認（1 枚撮る）</button>
-  <div class="help">較正: カメラかロボットを動かしたとき。置き場: トレイを置き直したとき。</div>
+  <div class="help">較正が要るのはカメラかロボットを動かしたときだけ。動かしていなければ不要。迷ったら「確認」→ 3 mm を超えたら「やり直す」。置き場: トレイを置き直したとき。</div>
   <img id="snap" alt="camera">
  </div>
  <div class="card"><h3>設定（保存 → 再起動で反映）</h3>
@@ -324,6 +355,7 @@ async function poll(){try{const s=await (await fetch('/api/status')).json();
  const r=document.getElementById('run');r.textContent=s.running?('動いています（'+s.uptime_s+' 秒）'):'止まっています';r.className=s.running?'on':'off';
  document.getElementById('dry').textContent=s.dry?'（実機なしの練習モード）':'';
  const p=document.getElementById('panel');p.href=s.panel_url;p.style.opacity=s.running?1:.4;
+ const c=s.calibration;document.getElementById('calinfo').textContent=c?('較正: '+c.created+'・RMS '+(c.rms_mm==null?'?':c.rms_mm+' mm')+'・'+c.points+' 点'+(c.rms_mm!=null&&c.rms_mm>3?'（3 mm 超: やり直し推奨）':'')):'較正: まだ（「較正をやり直す」で作る）';
  document.getElementById('b-start').disabled=s.running;document.getElementById('b-stop').disabled=!s.running;
  if(s.message)document.getElementById('msg').textContent=s.message;document.getElementById('log').textContent=s.log||'-';}catch(e){}}
 setInterval(poll,2000);poll();
@@ -394,7 +426,9 @@ class LauncherServer:
                         elif t == "restart":
                             ok = lc.restart()
                         elif t == "calibrate":
-                            return self._json({"ok": True, "message": lc.last_message, "command": lc.open_calibration()})
+                            return self._json({"ok": True, "message": lc.last_message, "command": lc.open_calibration("carry")})
+                        elif t == "verify":
+                            return self._json({"ok": True, "message": lc.last_message, "command": lc.open_calibration("verify")})
                         elif t == "zones":
                             lc.open_zones()
                             ok = True

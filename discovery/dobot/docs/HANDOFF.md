@@ -30,7 +30,7 @@ cd dobot && ./scripts/start.sh launcher   # Finder なら scripts/start.command 
 | 高さ | ブロック上面 z=-56.1 → `z_pick`=-57.1（4 色）。机面 z=-72.2 → `z_place`=-54.1（面＋厚み＋2）。`z_safe`=20、`z_min`=-80 |
 | 速さ | `speed_pct`=100、`travel_mode`=movj、`ee_settle_s`=0.4（§6） |
 | 置き場 | `tray_right`=(211,-125)。`tray_left`(230,110)・`box_front`(170,0)・`box_back`(280,0)・`start`(235,0) は既定 |
-| 較正 | `assets/homography.json`: `dobot-calibrate --drive` で 9 点、RMS 1.91 mm（2026-10-16 18:37）。git 管理外なので別 PC では取り直すかコピーする |
+| 較正 | `assets/homography.json`（git 管理・2026-10-19 12:38・9 点・RMS 3.10 mm）。カメラかロボットを動かしたときだけ取り直す: `--verify`（30 秒の確認）→ 3 mm 超なら `--carry`（ブロック 1 個を腕が運ぶ・約 1 分）。§4.1 |
 | 音声 | faster-whisper `small`（`~/.cache/huggingface`、初回 480 MB）。マイクは Mac 内蔵。ターミナルにマイクの許可が必要 |
 | 解析 | ルールベース（`config.json` の `llm.enabled=false`）。Claude を使うなら `true` にして `ANTHROPIC_API_KEY` |
 
@@ -58,15 +58,36 @@ uv run dobot-check-robot --config src/config.json       # つないで現在位�
 
 ### 4.1 較正（カメラ画素 → ロボット座標）— **腕が動く**
 
-机からトレイをどけ、青ブロックを 1 個用意して:
+較正が要るのは **カメラかロボットを動かしたときだけ**。同じ配置なら `assets/homography.json` をそのまま使う
+（ランチャーに日時・RMS・点数が出る）。迷ったら先に「確認」。
+
+**確認（約 30 秒）**: 青ブロックを 1 個、カメラに見える所（トレイの外・作業域の中）に置いて:
 
 ```bash
-uv run dobot-calibrate --config src/config.json --object blue_cube --drive
+uv run dobot-calibrate --config src/config.json --object blue_cube --verify
 ```
 
-腕が 3×3 の 9 点を回り、各点でブロック上面の 8 mm 上に止まる。吸盤の真下にブロックを置いて Enter、を 9 回。
-終わると RMS と前回との差が出る。**RMS 3 mm 以下なら合格。** 前の較正は `../logs/homography_before_drive_*.json` に残る。
-「腕を手で当てて座標を読む」方式（`--drive` なし）は使わない: たわみで 7〜11 mm ずれた（2026-10-16）。
+腕が今の較正でそれを拾い、中心 (225,0) に置き、置いた位置をカメラで読んで命令座標との差を出す。
+**3 mm 以下なら「使えます」＝やり直し不要。** 拾えなければ（物が動かなければ）較正がずれているか吸着不良 → やり直す。
+
+**やり直し（約 1 分・ブロックを置くのは 1 回だけ）**: 机からトレイをどけ、青ブロックを 1 個用意して:
+
+```bash
+uv run dobot-calibrate --config src/config.json --object blue_cube --carry                  # 3×3 の 9 点
+uv run dobot-calibrate --config src/config.json --object blue_cube --carry --points quick   # 中心＋四隅の 5 点（約 40 秒）
+```
+
+腕が最初の点（基部に近い右の隅 (175,−125)）の上 8 mm で止まるので、**吸盤の真下にブロックを置いて Enter（これ 1 回だけ）**。
+あとは腕がブロックを拾い、四隅 → 中心 → 辺の中点の順に、各点に置く → 脇へ退避 → カメラで読む → 拾う、を繰り返す。
+拾えていなかったときは前の点から自動で拾い直す。
+見えない・途中で落としたときはその点の上で止まり「置いて Enter」と聞いてくる（s=飛ばす・q=中断）。
+終わると RMS と前回との差が出る。**RMS 3 mm 以下で合格。** 残差 8 mm 超の点は自動で外す（5 点は残す）。
+前の較正は `../logs/homography_before_carry_*.json` に残る。
+
+点数の考え方: ホモグラフィは 4 点で決まる。5 点（quick）で足り、9 点（full）にすると余った点で当てはまりの悪さ（RMS）が
+見える。点を作業域の端（内側 25 mm）まで広く取るのは精度のためで、可動域を確かめているわけではない。
+`--drive`（各点で人が置く・Enter 9 回）は `--carry` が動かないときの予備。「腕を手で当てて座標を読む」方式（フラグ無し）は
+使わない: たわみで 7〜11 mm ずれた（2026-10-16）。
 
 ### 4.2 置き場（トレイの位置）— 腕は動かない
 
@@ -110,6 +131,9 @@ Windows は `scripts\start.bat`（ポートは `COMn`、カメラ index は `dob
 ## 5. 既知の注意
 
 - 置き場は「中心」だけでなく置く位置（スロット）も作業域に入っている必要がある（`dobot-zones` が確認する）
+- 置くときの吸盤高さは物ごと（`objects[].z_place` → 置き場の `z_place` → `robot.z_place` の順）。ブロック用の −54.1 を
+  ゴルフボール（高さ 43 mm）に使うと 27 mm 押し付けるので、ボールは `z_pick` −30.5／`z_place` −27.5（机 −72.2 からの
+  計算値。現地で `dobot-setup --from 6` を通せば実測で上書きされ、z_place は z_pick + 3 で自動）
 - 色の範囲（HSV）は `config.json` の `objects[].ranges`。照明が変わって検出が崩れたら `dobot-setup --from 7` で枠を確認
 - `./scripts/start.sh wizard` を 1 番から通すと `src/config.json` を上書きしていく。途中からは `--from N`
 - `uv run pytest` は実機の較正ファイルがあっても通る（2026-10-19 修正）。ポート 8790 を実演が使っている間はパネルのテスト 2 件が落ちる
@@ -134,7 +158,7 @@ Windows は `scripts\start.bat`（ポートは `COMn`、カメラ index は `dob
 
 ```
 twinarm-main の dobot で Dobot Magician の実演を再開します。dobot/AGENTS.md → dobot/docs/HANDOFF.md の順に読んでください。
-- 腕が動くコマンド（./scripts/start.sh、dobot-calibrate --drive、dobot-setup の y）は私がこの会話で頼んだときだけ実行する
+- 腕が動くコマンド（./scripts/start.sh、dobot-calibrate --verify / --carry / --drive、dobot-setup の y）は私がこの会話で頼んだときだけ実行する
 - ポートは src/config.json のものを使い、推測しない。実機の挙動は私が実行して報告した結果だけを事実にする
 - まず ./scripts/start.sh check の結果を見せてから、./scripts/start.sh で実演を起動する手順を案内して
 ```

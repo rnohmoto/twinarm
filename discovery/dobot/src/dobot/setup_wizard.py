@@ -89,7 +89,8 @@ def summarize(cfg: AppConfig, homography_path: Path) -> str:
              f" z_safe={cfg.robot.z_safe} z_pick(既定)={cfg.robot.z_pick} z_place={cfg.robot.z_place}",
              f"キャリブ: {'あり' if homography_path.exists() else '未'} ({homography_path})",
              "置き場: " + ", ".join(f"{z.name}=({z.x:.0f},{z.y:.0f})" for z in cfg.zones),
-             "物の高さ: " + ", ".join(f"{o.name}={o.z_pick if o.z_pick is not None else '既定'}" for o in cfg.objects)]
+             "物の高さ: " + ", ".join(f"{o.name}=拾う {o.z_pick if o.z_pick is not None else '既定'}／置く "
+                                     f"{o.z_place if getattr(o, 'z_place', None) is not None else '既定'}" for o in cfg.objects)]
     return "\n".join(lines)
 
 
@@ -272,7 +273,8 @@ class Wizard:
                 continue
             _, _, zz = self.pose_xy()
             o.z_pick = round(zz - 1.0, 1)   # 1mm 押し付け
-            print(f"    {o.name}.z_pick = {o.z_pick}")
+            o.z_place = round(o.z_pick + 3.0, 1)   # 同じ面に置く: 物の底が面の 2 mm 上で離す（物ごとに違う高さ）
+            print(f"    {o.name}.z_pick = {o.z_pick}  z_place = {o.z_place}（物をつかんだまま下げる高さ。トレイの底が机より高いなら置き場側で上書き）")
         a = ask("  退避高さ z_safe（物の一番高いところ +20mm 以上）", str(self.cfg.robot.z_safe))
         try:
             self.cfg.robot.z_safe = float(a)

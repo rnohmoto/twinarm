@@ -92,6 +92,9 @@ class ObjectSpec:
     aspect_min: float = 1.0          # 外接矩形の 長辺/短辺 の範囲（細長い物の識別）
     aspect_max: float = 99.0
     z_pick: float | None = None      # None → RobotConfig.z_pick（物の高さが違うので原則は物ごとに教える）
+    z_place: float | None = None     # 置くときの吸盤高さ（物をつかんだまま）。None → Zone.z_place → RobotConfig.z_place。
+    #                                  同じ面に置くなら z_pick + 3（物の底が面の 2 mm 上）。ブロック用の値をボールに使うと
+    #                                  高さの差の分だけ押し付けるので、物ごとに持つ（2026-10-26）
     ee: str = "suction"              # suction | gripper（記録用）
 
 
@@ -210,13 +213,15 @@ class AppConfig:
                        [[[20, 120, 100], [35, 255, 255]]], **cube),
             # 卓球ボール（橙・φ40mm・2.7g）: 橙の色相＋円形度で立方体と区別する
             ObjectSpec("ball", "ボール", ["ボール", "ぼーる", "たま", "球", "ピンポン", "卓球", "橙", "オレンジ"],
-                       [[[8, 120, 120], [22, 255, 255]]], min_circularity=0.82, aspect_min=1.0, aspect_max=1.25),
+                       [[[8, 120, 120], [22, 255, 255]]], min_circularity=0.82, aspect_min=1.0, aspect_max=1.3),
             # MONO 消しゴム: スリーブの青帯（細長い）。吸盤は帯の中心に来るので実機で pick 位置を確認（M0.5）
             ObjectSpec("eraser", "消しゴム", ["消しゴム", "けしごむ", "ケシゴム", "MONO", "モノ"],
                        [[[95, 120, 60], [130, 255, 255]]], aspect_min=2.2, aspect_max=8.0, ee="gripper"),
             # 白いボール（ゴルフ）: S 低・V 高＋円形度。ArUco の白地（正方形 ≈0.79）を円形度で弾く
             ObjectSpec("golf_ball", "ゴルフボール", ["ゴルフ", "ごるふ", "白いボール", "白い球"],
-                       [[[0, 0, 170], [179, 70, 255]]], min_circularity=0.85, aspect_min=1.0, aspect_max=1.2),
+                       [[[0, 0, 170], [179, 70, 255]]], min_circularity=0.85, aspect_min=1.0, aspect_max=1.3),
+            # 球の円形度は凸包で測る（detect.shape_features）: 縁の影やディンプルで欠けても 0.9 前後。ぼかしと開閉で角が丸まった
+            # 白い正方形（ArUco の白地）は 0.80 を超えることがあるので、下限は 0.85 のまま（2026-10-26 合成画像で確認）
         ]
         return cfg
 

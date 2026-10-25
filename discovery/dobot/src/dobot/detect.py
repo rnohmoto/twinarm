@@ -53,11 +53,17 @@ def _mask_for(hsv: np.ndarray, ranges: Sequence[Sequence[Sequence[int]]]) -> np.
 
 
 def shape_features(contour) -> tuple[float, float, float]:
-    """(面積, 円形度, 長辺/短辺)。円形度は 4πA/P²（円=1・正方形≈0.785）。"""
+    """(面積, 円形度, 長辺/短辺)。円形度は輪郭の凸包で測る 4πA/P²（円=1・正方形≈0.785）。
+
+    凸包で測るのは、ゴルフボールのディンプルや縁の影で輪郭がぎざぎざになっても「丸い物」と分かるようにするため
+    （生の輪郭だと周長が伸びて円形度が 0.85 を割る。2026-10-26）。面積は生の輪郭のまま（大きさの判定用）。
+    """
     import cv2
     area = float(cv2.contourArea(contour))
-    per = float(cv2.arcLength(contour, True))
-    circ = (4.0 * math.pi * area / (per * per)) if per > 0 else 0.0
+    hull = cv2.convexHull(contour)
+    hull_area = float(cv2.contourArea(hull))
+    per = float(cv2.arcLength(hull, True))
+    circ = (4.0 * math.pi * hull_area / (per * per)) if per > 0 else 0.0
     (_, _), (w, h), _ = cv2.minAreaRect(contour)
     lo, hi = (min(w, h), max(w, h))
     aspect = (hi / lo) if lo > 0 else 99.0

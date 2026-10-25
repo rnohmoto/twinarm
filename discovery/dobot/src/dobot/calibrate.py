@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -344,6 +345,322 @@ def drive_calibration(camera, robot, cfg, object_spec, out_path: str | Path, poi
     return p2r
 
 
+# --------------------------- ブロック 1 個をロボットが持ち運ぶ較正（--carry）と、今の較正の確認（--verify）
+CARRY_PLACE_GAP_MM = 3.0      # 置くときの吸盤高さ = z_pick + 3（物の底が面の 2 mm 上。wizard 5 番・HANDOFF 4.3 の z_place と同じ規則）
+CARRY_MOVED_MIN_PX = 12.0     # 置いたあとの検出が前の点の画素からこれ未満しか動いていなければ「拾えていなかった」
+CARRY_RESIDUAL_MAX_MM = 8.0   # 4 点そろった後、新しい点の残差がこれを超えたら「途中で落ちた・別の物を見た」として人に置き直してもらう
+VERIFY_OK_MM = 3.0            # 確認モードの合格: 置いた位置の読みと命令座標の差
+CARRY_HUMAN_TRIES = 3         # 同じ点で人に置き直してもらう回数の上限。超えたらその点を飛ばす（無限に聞かない）
+GRID_PRESETS = ("quick", "full")
+
+
+def grid_center(points: Sequence[tuple[float, float]]) -> tuple[float, float]:
+    """点の重心に最も近い格子点（3×3 なら真ん中）。--verify の置き先。"""
+    mx = sum(p[0] for p in points) / len(points)
+    my = sum(p[1] for p in points) / len(points)
+    return min(points, key=lambda p: (p[0] - mx) ** 2 + (p[1] - my) ** 2)
+
+
+def carry_points(robot, preset: str = "full") -> list[tuple[float, float]]:
+    """--carry で回る点とその順番: 四隅（回る向きに）→ 中心 → 辺の中点。quick=四隅＋中心の 5 点、full=3×3 の 9 点。
+
+    ホモグラフィは 4 点で決まるので 5 点あれば足り、9 点にすると余った点で RMS（当てはまりの悪さ）が分かる。
+    四隅を先にするのは、最初の 4 点が一直線を含まないようにするため（中心と向かい合う隅 2 つは対角線で一直線。
+    同じ辺の 3 点＋中心でも当てはめが壊れ、5 点目の残差が 46 mm になった＝2026-10-26 の合成テスト）。
+    点は drive_grid（作業域の内側 25 mm・届く所だけ）と同じ。
+    """
+    pts = drive_grid(robot)
+    if not pts:
+        return []
+    center = grid_center(pts)
+    ring = [p for p in pts if p != center]
+    xs = {p[0] for p in ring}
+    ys = {p[1] for p in ring}
+    corners = [p for p in ring if p[0] in (min(xs), max(xs)) and p[1] in (min(ys), max(ys))]
+    mids = [p for p in ring if p not in corners]
+
+    def angle(p):
+        return math.atan2(p[1] - center[1], p[0] - center[0])
+
+    order = [*sorted(corners, key=angle), center]
+    if preset != "quick":
+        order += sorted(mids, key=angle)
+    return order
+
+
+def well_conditioned(points: Sequence[tuple[float, float]], min_triangle_mm2: float = 300.0) -> bool:
+    """ホモグラフィを当てはめてよい点の並びか: 「どの 3 点も一直線に近くない 4 点」が少なくとも 1 組ある。
+
+    格子の 9 点には一直線の 3 点（行・列・対角）が当然あるが、四隅のように一般位置の 4 点があれば当てはめは決まる。
+    壊れるのは、同じ辺の 3 点＋中心のように、どの 4 点を選んでも一直線の 3 点を含むとき。
+    """
+    from itertools import combinations
+    pts = list(points)
+    if len(pts) < 4:
+        return False
+
+    def area(a, b, c) -> float:
+        return abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) / 2.0
+
+    for quad in combinations(pts, 4):
+        if all(area(*tri) >= min_triangle_mm2 for tri in combinations(quad, 3)):
+            return True
+    return False
+
+
+def object_heights(rc, object_spec, hover_gap_mm: float = DRIVE_HOVER_GAP_MM) -> tuple[float, float, float]:
+    """物の定義から (z_pick, z_hover, z_place)。z_place は物の定義に無ければ z_pick + 3（同じ面に置く前提）。"""
+    z_pick = object_spec.z_pick if object_spec.z_pick is not None else rc.z_pick
+    z_place = getattr(object_spec, "z_place", None)
+    if z_place is None:
+        z_place = z_pick + CARRY_PLACE_GAP_MM
+    return z_pick, z_pick + hover_gap_mm, z_place
+
+
+def fit_dropping_outliers(pairs: Sequence[Pair], image_size: tuple[int, int] | None = None,
+                          max_mm: float = CARRY_RESIDUAL_MAX_MM, min_keep: int = 5
+                          ) -> tuple[PixelToRobot, list[Pair], list[Pair]]:
+    """全点で当てはめ、残差が max_mm を超える最悪の点を 1 つずつ外して当てはめ直す（min_keep 点までは外す）。"""
+    kept = list(pairs)
+    dropped: list[Pair] = []
+    while True:
+        p2r = PixelToRobot.fit(kept, image_size)
+        worst, worst_pair = -1.0, None
+        for p in kept:
+            x, y = p2r.to_robot(p.u, p.v)
+            e = math.hypot(x - p.x, y - p.y)
+            if e > worst:
+                worst, worst_pair = e, p
+        if worst <= max_mm or len(kept) <= min_keep or worst_pair is None:
+            return p2r, kept, dropped
+        rest = [p for p in kept if p is not worst_pair]
+        if not well_conditioned([(p.x, p.y) for p in rest]):     # 外すと一直線に近づくなら、外さずに終える
+            return p2r, kept, dropped
+        kept = rest
+        dropped.append(worst_pair)
+
+
+def residual_mm(pairs: Sequence[Pair], pixel: tuple[float, float], xy: tuple[float, float],
+                image_size: tuple[int, int] | None = None) -> float:
+    """すでに記録した点で当てはめたホモグラフィで pixel を読んだときの、命令座標 xy とのずれ。
+    4 点未満、または点が一直線に近くて当てはめが信用できないときは 0（検査しない）。"""
+    if len(pairs) < 4 or not well_conditioned([(p.x, p.y) for p in pairs]):
+        return 0.0
+    p2r = PixelToRobot.fit(pairs, image_size)
+    x, y = p2r.to_robot(*pixel)
+    return math.hypot(x - xy[0], y - xy[1])
+
+
+class Carrier:
+    """腕の基本動作（拾う・置く・退避して見る・物の上で止まる）。carry_calibration と verify_calibration が共有する。
+
+    物へ下りる区間だけ直線（linear=True）、ほかは cfg.travel_mode（planner の PickPlaceController と同じ）。
+    """
+
+    def __init__(self, camera, robot, cfg, object_spec, z_pick: float, z_place: float):
+        self.camera, self.robot, self.cfg, self.spec = camera, robot, cfg, object_spec
+        self.rc = cfg.robot
+        self.z_pick, self.z_place = z_pick, z_place
+
+    def pick(self, x: float, y: float) -> None:
+        self.robot.move_to(x, y, self.rc.z_safe)
+        self.robot.move_to(x, y, self.z_pick, linear=True)
+        self.robot.ee_on()
+        self.robot.move_to(x, y, self.rc.z_safe)
+
+    def place(self, x: float, y: float) -> None:
+        self.robot.move_to(x, y, self.rc.z_safe)
+        self.robot.move_to(x, y, self.z_place, linear=True)
+        self.robot.ee_off()
+        self.robot.move_to(x, y, self.rc.z_safe)
+
+    def hover(self, x: float, y: float, z_hover: float) -> None:
+        self.robot.move_to(x, y, self.rc.z_safe)
+        self.robot.move_to(x, y, z_hover, linear=True)
+
+    def look(self, y_side: float, expect: tuple[float, float] | None = None
+             ) -> tuple[np.ndarray, tuple[float, float] | None]:
+        """目標と反対側へ退避してから撮り、物の中心画素を返す（複数見えれば expect に近いもの）。"""
+        from dobot.detect import detect_objects
+        px, py = park_pose(self.rc, y_side)
+        self.robot.move_to(px, py, self.rc.z_safe)
+        frame = read_settled(self.camera)
+        dets = detect_objects(frame, [self.spec], self.cfg.min_area_px, self.cfg.max_area_px)
+        return frame, pick_target([(d.cx, d.cy) for d in dets], expect)
+
+
+def _moved(target: tuple[float, float] | None, last: tuple[float, float] | None) -> bool:
+    if target is None:
+        return False
+    if last is None:
+        return True
+    return math.hypot(target[0] - last[0], target[1] - last[1]) >= CARRY_MOVED_MIN_PX
+
+
+def carry_calibration(camera, robot, cfg, object_spec, out_path: str | Path, points=None, preset: str = "full",
+                      hover_gap_mm: float = DRIVE_HOVER_GAP_MM, ask=input, say=print) -> PixelToRobot:
+    """ブロックを最初に 1 個置くだけ。あとはロボットが自分で持ち運び、各点で置いて退避し、カメラが読む。**腕が動く。**
+
+    --drive（各点で人が置く）との違いは、人の手が要るのが最初の 1 回だけなこと。対応点の意味は同じで
+    「命令した座標 → 吸盤が実際に置いた場所」。各点: 置く(z_place) → 退避 → 撮って検出 → 記録 → 拾う(z_pick) → 次へ。
+    - 拾えていなかった（置いたはずの物が前の点の画素から動いていない）→ 前の点から拾い直して続ける（自動・1 回）
+    - 見えない／4 点そろった後の残差が大きい（途中で落ちた・別の物を見た）→ その点の上で止まり、人に置き直してもらう
+      （Enter。s=その点を飛ばす・q=中断＝ホームへ戻り、4 点以上あれば保存）
+    終わりに、残差が CARRY_RESIDUAL_MAX_MM を超える点を外して当てはめ直す（5 点は残す）。最後の点に物を置いたまま home。
+    Ctrl+C はその場で止める（ホームへ戻さない）。
+    """
+    from dobot.robot_dobot import EmergencyStop
+    rc = cfg.robot
+    points = list(points or carry_points(rc, preset))
+    if len(points) < 4:
+        raise RuntimeError(f"較正点が {len(points)} 点しかありません（作業域 x/y/reach の設定を確認）")
+    z_pick, z_hover, z_place = object_heights(rc, object_spec, hover_gap_mm)
+    out_path = Path(out_path)
+    old = PixelToRobot.load(out_path) if out_path.exists() else None
+    sidecar = pairs_sidecar(out_path)
+    c = Carrier(camera, robot, cfg, object_spec, z_pick, z_place)
+    pairs: list[Pair] = []
+    frame = None
+    last_pixel: tuple[float, float] | None = None
+    prev_point: tuple[float, float] | None = None
+    holding = False
+    skipped: list[tuple[float, float]] = []
+    n = len(points)
+    say(f"{n} 点を回ります（{object_spec.name} は腕が持ち運びます。吸盤は物の上面 −1 mm の z={z_pick:.1f} で吸い、"
+        f"z={z_place:.1f} で離します）。最初の点でだけ、吸盤の真下に置いて Enter。腕が動きます: 手を退けてください")
+    try:
+        robot.home()
+        x0, y0 = points[0]
+        c.hover(x0, y0, z_hover)
+        first = ask(f"[1/{n}] ({x0:.0f},{y0:.0f}) {object_spec.name} を吸盤の真下（中心）に置いて Enter / q=中断: ")
+        robot.move_to(x0, y0, rc.z_safe)
+        if first.strip().lower() == "q":
+            robot.home()
+            raise RuntimeError("中断しました（記録なし）")
+        aborted = False
+        for i, (x, y) in enumerate(points):
+            retried = False
+            human_tries = 0
+            while True:
+                if holding:
+                    c.place(x, y)
+                    holding = False
+                frame, target = c.look(y, old.to_pixel(x, y) if old is not None else None)
+                size = (frame.shape[1], frame.shape[0])
+                moved = _moved(target, last_pixel)
+                res = residual_mm(pairs, target, (x, y), size) if moved else 0.0
+                if moved and res <= CARRY_RESIDUAL_MAX_MM:
+                    pairs = record_pair(pairs, target, (x, y), sidecar)
+                    last_pixel = target
+                    say(f"  [{i + 1}/{n}] pixel=({target[0]:.0f},{target[1]:.0f}) -> ({x:.0f},{y:.0f})"
+                        + (f"  残差 {res:.1f} mm" if len(pairs) > 4 else ""))
+                    break
+                if target is not None and not moved and prev_point is not None and not retried:
+                    say(f"  [{i + 1}/{n}] 前の点から動いていません（拾えていなかった）。前の点から拾い直します")
+                    retried = True
+                    c.pick(*prev_point)
+                    holding = True
+                    continue
+                why = ("見えません" if target is None else
+                       "前の点から動いていません" if not moved else
+                       f"残差 {res:.1f} mm で合いません（途中で落ちた・別の物を見た？）")
+                if human_tries >= CARRY_HUMAN_TRIES:
+                    skipped.append((x, y))
+                    say(f"  [{i + 1}/{n}] {why}。{CARRY_HUMAN_TRIES} 回置き直しても読めないので、この点は飛ばします")
+                    break
+                human_tries += 1
+                c.hover(x, y, z_hover)
+                a = ask(f"  [{i + 1}/{n}] {object_spec.name} が{why}。吸盤の真下（中心）に置いて Enter / "
+                        "s=この点を飛ばす / q=中断: ").strip().lower()
+                robot.move_to(x, y, rc.z_safe)
+                if a == "q":
+                    aborted = True
+                    break
+                if a == "s":
+                    skipped.append((x, y))
+                    say("  飛ばします（物は今の点に置かれている前提で次へ運びます）")
+                    break
+                retried = True       # 人が置いたので、次の「動いていない」は拾い直しでなく人に聞く
+                last_pixel = None    # 置き直したので「動いた」判定の基準も捨てる
+            if aborted:
+                break
+            if i + 1 < n:            # 次の点へ運ぶために拾う。最後の点には置いたままにする
+                c.pick(x, y)
+                holding = True
+                prev_point = (x, y)
+        robot.home()
+    except (KeyboardInterrupt, EmergencyStop):
+        say(f"中断: 腕はその場で止めます（ホームへは戻しません）。記録済み {len(pairs)} 点は {sidecar} にあります")
+        raise
+    if len(pairs) < 4:
+        raise RuntimeError(f"only {len(pairs)} pairs; need >= 4 (they are kept in {sidecar})")
+    if not well_conditioned([(p.x, p.y) for p in pairs]):
+        raise RuntimeError(f"記録した {len(pairs)} 点が一直線に近く、較正できません（{sidecar} に残しました）。"
+                           "飛ばした点を減らしてやり直してください")
+    h, w = frame.shape[:2]
+    p2r, kept, dropped = fit_dropping_outliers(pairs, (w, h))
+    if old is not None:
+        bak = from_root(cfg.log_dir) / f"homography_before_carry_{time.strftime('%Y%m%d_%H%M%S')}.json"
+        bak.parent.mkdir(parents=True, exist_ok=True)
+        bak.write_text(out_path.read_text(encoding="utf-8"), encoding="utf-8")
+        say(f"前の較正を {bak} に退避しました")
+    p2r.save(out_path, kept)
+    save_pairs(sidecar, kept)
+    rms = p2r.rms_error_mm(kept)
+    say(f"saved {out_path}  {len(kept)} 点  RMS={rms:.2f} mm  scale={p2r.mm_per_px(w / 2, h / 2):.3f} mm/px"
+        + ("  → 合格（3 mm 以下）" if rms <= VERIFY_OK_MM else "  → 3 mm を超えています: カメラの固定・物の置き方を見てやり直し"))
+    if dropped:
+        say(f"  残差 {CARRY_RESIDUAL_MAX_MM:g} mm 超で外した点: " + ", ".join(f"({p.x:.0f},{p.y:.0f})" for p in dropped))
+    if skipped:
+        say("  飛ばした点: " + ", ".join(f"({x:.0f},{y:.0f})" for x, y in skipped))
+    b = drive_bias(old, kept)
+    if b is not None:
+        side = "外側" if b["mean_radial"] > 0 else "内側"
+        say(f"前の較正の狙いのずれ: 平均 dx={b['mean_dx']:+.1f} dy={b['mean_dy']:+.1f} mm、基部から見て{side}に "
+            f"{abs(b['mean_radial']):.1f} mm、RMS {b['rms']:.1f} mm、最大 {b['max']:.1f} mm")
+    return p2r
+
+
+def verify_calibration(camera, robot, cfg, object_spec, p2r: PixelToRobot, target_xy=None,
+                       hover_gap_mm: float = DRIVE_HOVER_GAP_MM, say=print) -> dict:
+    """今の較正の確認（--verify・約 30 秒）: 見えている物を今の較正で拾い、中心の点に置き、置いた位置の読みと
+    命令座標の差を測る。**腕が動く。** 人は物を作業域のどこかに置いておくだけ。
+
+    拾えなかった（物の画素が動かない）＝較正がずれているか吸着不良。
+    戻り値: ok（VERIFY_OK_MM 以下）・error_mm・dx・dy・picked_at・placed_at・reason。
+    """
+    rc = cfg.robot
+    z_pick, _, z_place = object_heights(rc, object_spec, hover_gap_mm)
+    c = Carrier(camera, robot, cfg, object_spec, z_pick, z_place)
+    tx, ty = target_xy or grid_center(drive_grid(rc))
+    robot.home()
+    frame, start = c.look(ty)
+    if start is None:                                   # 退避した腕の陰かもしれないので反対側からもう一度
+        frame, start = c.look(-1.0 if ty >= 0 else 1.0)
+    if start is None:
+        robot.home()
+        return {"ok": False, "reason": f"{object_spec.name} が見えません（作業域に 1 個置いてください）"}
+    x1, y1 = p2r.to_robot(*start)
+    if not robot.guard.inside(x1, y1, z_pick):
+        robot.home()
+        return {"ok": False, "reason": f"見えている位置 ({x1:.0f},{y1:.0f}) は作業域の外です（ロボット側へ寄せてください）",
+                "seen_at": [x1, y1]}
+    say(f"  ({x1:.0f},{y1:.0f}) で拾って ({tx:.0f},{ty:.0f}) へ置きます")
+    c.pick(x1, y1)
+    c.place(tx, ty)
+    frame, after = c.look(ty, p2r.to_pixel(tx, ty))
+    robot.home()
+    if not _moved(after, start):
+        return {"ok": False, "reason": "拾えませんでした（較正のずれか吸着不良）。較正をやり直してください",
+                "picked_at": [x1, y1], "placed_at": [tx, ty]}
+    ex, ey = p2r.to_robot(*after)
+    dx, dy = ex - tx, ey - ty
+    err = math.hypot(dx, dy)
+    ok = err <= VERIFY_OK_MM
+    return {"ok": ok, "error_mm": err, "dx": dx, "dy": dy, "picked_at": [x1, y1], "placed_at": [tx, ty],
+            "reason": "" if ok else f"ずれ {err:.1f} mm（合格は {VERIFY_OK_MM:g} mm 以下）。較正をやり直してください"}
+
+
 def interactive_calibration(camera, robot, out_path: str | Path, use_aruco: bool = True,
                             object_spec=None, min_area: int = 400, max_area: int = 60000,
                             resume: bool = True) -> PixelToRobot:
@@ -479,9 +796,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-robot", action="store_true", help="ロボット未接続: XY を手入力")
     ap.add_argument("--fresh", action="store_true", help="前回途中まで記録した対応点（*.pairs.json）を捨てて最初から")
     ap.add_argument("--drive", action="store_true",
-                    help="ロボット自身が格子状に動き、その真下に置いた --object の物をカメラで読んで較正する（腕が動く）")
+                    help="ロボット自身が格子状に動き、各点でその真下に人が置いた --object の物をカメラで読んで較正する（腕が動く）")
+    ap.add_argument("--carry", action="store_true",
+                    help="推奨: --object の物を最初に 1 個置くだけ。ロボットが自分で持ち運んで格子を回り較正する（腕が動く）")
+    ap.add_argument("--verify", action="store_true",
+                    help="今の較正の確認（約 30 秒・腕が動く）: 見えている --object の物を拾って中心へ置き、ずれを測る")
+    ap.add_argument("--points", choices=GRID_PRESETS, default="full",
+                    help="--carry の点数: quick=5 点（中心＋四隅・約 40 秒）/ full=9 点（3×3・約 1 分）")
     ap.add_argument("--make-markers", default=None, help="印刷用 ArUco PNG を出力するフォルダ")
     args = ap.parse_args(argv)
+    if (args.carry or args.verify) and not args.object:
+        args.object = "blue_cube"
     if args.make_markers:
         make_aruco_sheet(args.make_markers)
         print("markers written to", args.make_markers)
@@ -501,8 +826,10 @@ def main(argv: list[str] | None = None) -> int:
         if spec is None:
             raise SystemExit(f"--object {args.object}: 物体定義がありません")
     out = args.out or cfg.homography_path
-    if args.drive and (robot is None or spec is None):
-        raise SystemExit("--drive には --object と実機接続（--no-robot 無し）が必要です")
+    if (args.drive or args.carry or args.verify) and (robot is None or spec is None):
+        raise SystemExit("--drive / --carry / --verify には --object と実機接続（--no-robot 無し）が必要です")
+    if args.verify and not Path(out).exists():
+        raise SystemExit(f"較正ファイルがありません（{out}）。先に --carry で較正してください")
     # 落ちたときの手がかり: Python の例外も、OpenCV 側の致命シグナル（faulthandler）も logs/ に残す
     import faulthandler
     import sys
@@ -513,7 +840,16 @@ def main(argv: list[str] | None = None) -> int:
     faulthandler.enable(file=crash_log)
     try:
         with make_camera(cfg.camera) as cam:
-            if args.drive:
+            if args.verify:
+                r = verify_calibration(cam, robot, cfg, spec, PixelToRobot.load(out))
+                if r["ok"]:
+                    print(f"較正は使えます: ずれ {r['error_mm']:.1f} mm（dx {r['dx']:+.1f} / dy {r['dy']:+.1f}）。やり直しは不要です")
+                    return 0
+                print("較正の確認: " + r["reason"])
+                return 1
+            if args.carry:
+                carry_calibration(cam, robot, cfg, spec, out, preset=args.points)
+            elif args.drive:
                 drive_calibration(cam, robot, cfg, spec, out)
             else:
                 interactive_calibration(cam, robot, out, use_aruco=not args.manual, object_spec=spec,

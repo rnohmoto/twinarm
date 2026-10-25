@@ -26,6 +26,7 @@ Koch には lerobot 公式の bimanual 設定が無い（v0.6.1 に bi_koch な�
   uv run koch-launch --doctor      # 準備状況(握手/VR/2 人で足りないもの)。腕には触れない
   uv run koch-launch --ff gripper                # 2ペア同時(既定)
   uv run koch-launch --pair A --ff gripper       # ペアA単独(段階テスト)
+  uv run koch-launch --pair A --ff gripper --swap-roles  # 役割入替: 操作者がフォロワー機を持ち、リーダー機が追従(握手・有線)
   uv run koch-launch --pair B --vr B --vw        # VR は別枠: ペアBだけ仮想反力＋重さ
   uv run koch-launch --pair B --vr B --vw --follower none  # VR 1 人: リーダーだけ(フォロワーは繋がなくてよい)
   uv run koch-launch --pair B --vr B --vw --vr2  # 2 人: ペアBのフォロワー機も手で握る入力装置に
@@ -62,6 +63,9 @@ PORTS = {  # ペアごとの通信ポート割り当て(vrviz=ブリッジ専用
 # --vr2 の 2 人目(VR ペアのフォロワー機を手で動かす teleop)。VR ペアは同時に 1 つなので 1 組
 HAND_PORTS = {"viz": 8771, "ctl": 8772, "vrviz": 8773}
 HAND_LABEL = "F"
+# --swap-roles のペアのパネル表示名(どちらの機体がどの役か)。カンマはパネルの区切りなので使わない
+SWAP_LABEL = "{pair}（役割入替: 操作側=フォロワー機／相手側=リーダー機）"
+SWAP_FLAGS = ["--leader-type", "koch_follower", "--follower-type", "koch_leader"]
 
 CONFIG_TEMPLATE = {
     "pairs": {
@@ -162,6 +166,52 @@ def spawn(cmd, log_path, dry_run):
     return subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT), f
 
 
+def pair_label(pair, swapped):
+    """The pair's name on the panel; a swapped pair says which machine plays which role."""
+    return SWAP_LABEL.format(pair=pair) if swapped else pair
+
+
+def swap_refusal(pair, args, follower_port):
+    """Why --swap-roles cannot apply to this pair (None when it can): wired handshake only."""
+    if not args.swap_roles:
+        return None
+    if args.vr == pair:
+        return f"[{pair}] ✗ --swap-roles は VR のペアには使えません(握手の有線ペアだけ)"
+    if is_leader_only(follower_port):
+        return f"[{pair}] ✗ --swap-roles には追従させる腕(config の follower_port)が要ります"
+    if str(follower_port).startswith("udp://"):
+        return (
+            f"[{pair}] ✗ --swap-roles は有線だけです(無線フォロワーは不可。"
+            "--follower wired で USB のポートに戻す)"
+        )
+    return None
+
+
+def teleop_roles(pair, cfg, leader_port, follower_port, swapped):
+    """Ports, calibration ids and machine flags of the teleop, swapped when asked.
+
+    Swapped, the follower machine (its port, its calibration) is the input device and
+    the leader machine follows; the flags tell the teleop which machine is which.
+    """
+    lid = cfg.get("leader_id", f"koch_leader_{pair}")
+    fid = cfg.get("follower_id", f"koch_follower_{pair}")
+    if not swapped:
+        return {
+            "leader_port": leader_port,
+            "leader_id": lid,
+            "follower_port": follower_port,
+            "follower_id": fid,
+            "flags": [],
+        }
+    return {
+        "leader_port": follower_port,
+        "leader_id": fid,
+        "follower_port": leader_port,
+        "follower_id": lid,
+        "flags": list(SWAP_FLAGS),
+    }
+
+
 def is_leader_only(port):
     """True when a follower port is the literal 'none'."""
     return str(port).lower() == LEADER_ONLY
@@ -221,19 +271,30 @@ def pair_commands(pair, cfg, args, log_dir):
     if is_leader_only(fp_) and ff in ("gripper", "arm"):
         print(f"[{pair}] ⚠ follower_port=none なので --ff {ff} は使えません → off")
         ff = "off"
+    refusal = swap_refusal(pair, args, fp_)
+    if refusal:
+        print(refusal)
+        return []
+    roles = teleop_roles(pair, cfg, lp_, fp_, args.swap_roles)
+    if args.swap_roles:
+        print(
+            f"[{pair}] 役割入替: 操作する腕=フォロワー機 {roles['leader_port']} / "
+            f"追従する腕=リーダー機 {roles['follower_port']}"
+        )
     viz = f"{ports['viz']},{ports['vrviz']}" if args.vr == pair else str(ports["viz"])
     cmd = [
         sys.executable,
         "-m",
         "koch.teleop",
         "--leader-port",
-        lp_,
+        roles["leader_port"],
         "--follower-port",
-        str(fp_),
+        str(roles["follower_port"]),
         "--leader-id",
-        cfg.get("leader_id", f"koch_leader_{pair}"),
+        roles["leader_id"],
         "--follower-id",
-        cfg.get("follower_id", f"koch_follower_{pair}"),
+        roles["follower_id"],
+        *roles["flags"],
         "--config-dir",
         str(args.config_dir),
         "--work-dir",
@@ -338,7 +399,7 @@ def panel_command(pairs, config, args):
         "--ctl-port",
         ",".join([str(PORTS[p]["ctl"]) for p in pairs] + hand_ctl),
         "--labels",
-        ",".join(pairs + hand_lbl),
+        ",".join([pair_label(p, args.swap_roles) for p in pairs] + hand_lbl),
     ]
     cams = [
         c
@@ -427,6 +488,12 @@ def build_parser():
         default="wireless",
         help="config に follower_host があれば無線(既定)。wired=USB のフォロワーポートを使う(バックアップ)。"
         "none=フォロワーを使わずリーダーだけ(VR 1 人。フォロワーは繋がなくてよい)",
+    )
+    ap.add_argument(
+        "--swap-roles",
+        action="store_true",
+        help="リーダーとフォロワーの機体を入れ替える(握手: 操作者が XL430/M288 のフォロワー機を持ち、"
+        "M077 のリーダー機が追従して相手側になる)。有線のペアだけ。VR のペアには使えない",
     )
     ap.add_argument(
         "--doctor",

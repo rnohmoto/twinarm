@@ -14,6 +14,13 @@ MOTORS = [
     "gripper",
 ]
 XL430_JOINTS = {"shoulder_pan", "shoulder_lift"}  # フォロワーの XL430（負荷 0.1%/unit）
+FOLLOWER_TYPES = (
+    "koch_follower",
+    "koch_leader",
+)  # 追従する腕の機種(koch_leader=役割入替)
+# 役の名前。役割入替(操作者がフォロワー機を持ち、リーダー機が追従)では機体も名乗る
+ROLE_NAMES = {"L": "リーダー", "F": "フォロワー"}
+SWAPPED_ROLE_NAMES = {"L": "リーダー役(フォロワー機)", "F": "フォロワー役(リーダー機)"}
 ARM_FF_JOINTS = ["elbow_flex", "wrist_flex", "wrist_roll"]  # 電流が読める XL330 の腕3軸
 VW_JOINTS = [
     "shoulder_lift",
@@ -93,6 +100,16 @@ HW_ERROR_BITS = {
     4: "電気ショック",
     5: "過負荷",
 }
+
+
+def role_names(swapped: bool) -> dict[str, str]:
+    """Operator-facing names of the two roles; the machine is named once the roles are swapped."""
+    return dict(SWAPPED_ROLE_NAMES if swapped else ROLE_NAMES)
+
+
+def xl430_joints(device: str) -> frozenset[str]:
+    """Joints whose ``Present_Current`` is really the XL430 load (0.1 %/unit) on this machine."""
+    return frozenset(XL430_JOINTS) if device == "koch_follower" else frozenset()
 
 
 def to_signed16(v):

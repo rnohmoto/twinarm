@@ -70,6 +70,7 @@ twinarm の discovery/koch で VR を実機と Quest Pro で立ち上げます�
 | 分身の見せ方 G（実体／半透明／指先だけ・AR のとき）・一人称プレビュー V（モニタ用・既定）・観客ページ `?spectator=1` | ✅ | Chrome | — |
 | アラート（上限・過負荷停止・温度・重さ上限・通信断・壁解除・未接続→VR 赤帯／パネル赤チップ。2 本のときは `[B]` `[F]` 付き） | ✅ | sim で赤帯目視 | 実機で各条件 |
 | 腕 3 軸反力 `--ff arm` | ✅（旧実装） | — | 実機未検証（フェスでは使わない） |
+| **握手の役割入替**（10/25・枝 `rn/feat/koch-handshake-swap-roles`）: リーダー機 M077 の握り返しが電流上限で弱い（ユーザー 10/25）→ 操作者がフォロワー機 A（gripper は XL330-M288: 同じ mA で約 2.4 倍）を持ち、リーダー機 A が位置制御で追従して来場者側になる。`launch.py --swap-roles`（有線だけ・VR 不可）→ `teleop.py --leader-type koch_follower --follower-type koch_leader`（`DrivenLeader`: lerobot の KochLeader を接続後に腕トルク ON・Goal_Position を書く）。`koch.sh handshake` は既定で入替（`SWAP=0` で従来・`FF_SIGN=-1` で握り返しの向き反転・`GRIP_MA`）。パネルは触らず、ペア名（`--labels`）に「役割入替: 操作側=フォロワー機／相手側=リーダー機」を載せる | ✅（10/25） | ruff・ty・pytest（新テスト 20 件）・通し稽古 `swap` | TEST 2c: 握り返しの向き・手で動かすフォロワー機の重さ・M077 の追従と握力・温度 |
 
 Mac 側から来た分（branch `rn/feat/koch4-vr-objects`・9/20 以降）: A/B 両ペアの較正 JSON（`config/calibration/`）、当てはめ済みの分身設定（`config/twin.json`＝10/4 に v2 形式へ移行済み・B の関節オフセットはそのまま）、物体の順序＝軽→重。
 
@@ -143,7 +144,7 @@ uv run koch-launch --init       # config/config.json を作って記入
 握手用 Mac: フォロワーを USB で挿し `./scripts/start.sh host A <port>`（B は `host B <port>`）。起動時に、操作者側の設定に書く宛先（IP と 9101／9102）を表示する。
 操作者側 Mac: config の `follower_host` に `udp://<IP>:9101` → `uv run koch-launch --ff gripper`。有線に戻す＝`--follower wired`。
 Mac でダブルクリック起動: `scripts/` の `.command`（最初の確認／全部起動／握手 A／VR 1 人目／VR 2 人目／Quest 再接続／動作確認／全部停止）。中身は `./scripts/koch.sh <名前>`。**10/19 から VR の正本は `koch.sh vr-leader`／`vr-follower`**: uv sync・設定（無ければ `config.fest.json` から）・ポートのシリアル解決・ブリッジ・teleop・Mac の操作ページ・Quest の許可待ち→reverse→ページを開く→USB の見張り、まで自動。フェスは MacBook Pro 1＝リーダー B＋Quest #1、MacBook Pro 2＝フォロワー B＋Quest #2（Mac 同士の通信なし）。握手は差分反射式（`--ff-style error`・フリーなら戻らない。10/5 にユーザーが戻りバネ式を「フリーなのに戻るのはおかしい」と指摘）。
-握手: `./scripts/start.sh handshake`（ペア A だけなら `--pair A` を足す）。VR（USB・1 人）: `./scripts/start.sh vr`（＝`launch.py --pair B --vr B --vw --vr-http --no-panel --follower none`＋12 秒後に `quest_usb.py --port 8444`）。
+握手: `./scripts/koch.sh handshake`（10/25 から既定で**役割入替**: 操作者がフォロワー機 A を持ち、リーダー機 A が追従。接続直後にフォロワー機の腕の力が抜けるので支えてから Enter。`SWAP=0` で従来、`FF_SIGN=-1` で握り返しの向きを反転。枝 `rn/feat/koch-handshake-swap-roles`、`git switch main` で丸ごと戻る）。従来の入口 `./scripts/start.sh handshake`（ペア A だけなら `--pair A` を足す。入替は `--swap-roles` を足す）。VR（USB・1 人）: `./scripts/start.sh vr`（＝`launch.py --pair B --vr B --vw --vr-http --no-panel --follower none`＋12 秒後に `quest_usb.py --port 8444`）。
 VR（2 人）: `./scripts/start.sh vr2`（`--vr2` を足す。フォロワー機は接続直後にトルクが抜けるので手で支える）。初回の重さは `./scripts/start.sh vr2 --extra "--vw-cap 60 --vw-pwm-cap 80"` で。
 `git pull` が `twin.json` の手元の変更で止まったら `git stash` → `git pull`（旧形式の内容は新形式に読み込める）。
 

@@ -62,3 +62,16 @@ def test_hw_error_names_lists_the_set_bits() -> None:
     assert motors.hw_error_names(1 << 5) == "過負荷"
     assert motors.hw_error_names((1 << 2) | (1 << 5)) == "過熱/過負荷"
     assert motors.hw_error_names(0) == ""
+
+
+@pytest.mark.unit
+def test_role_names_name_the_machine_only_when_swapped() -> None:
+    assert motors.role_names(False) == {"L": "リーダー", "F": "フォロワー"}
+    swapped = motors.role_names(True)
+    assert "フォロワー機" in swapped["L"] and "リーダー機" in swapped["F"]
+
+
+@pytest.mark.unit
+def test_xl430_joints_belong_to_the_follower_machine_only() -> None:
+    assert motors.xl430_joints("koch_follower") == frozenset(motors.XL430_JOINTS)
+    assert motors.xl430_joints("koch_leader") == frozenset()

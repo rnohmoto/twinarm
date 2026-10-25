@@ -6,10 +6,10 @@ Dynamixel bus in this folder (``dynamixel_sdk/``) and checks what they did: fram
 feedback commands, register write order, refused EEPROM writes, torque at exit.
 
   uv run python src/koch/simbus/rehearse.py            # every scenario
-  uv run python src/koch/simbus/rehearse.py vr2        # one: handshake | vr | vr2 | wireless | mismatch | dropout | fest
+  uv run python src/koch/simbus/rehearse.py vr2        # one: handshake | swap | vr | vr2 | wireless | mismatch | dropout | fest
   uv run python src/koch/simbus/rehearse.py --list
 
-仮想のサーボで握手・VR・2 人・無線・較正不一致・通信断を通し、起動から終了までのソフトの
+仮想のサーボで握手・握手の役割入替・VR・2 人・無線・較正不一致・通信断を通し、起動から終了までのソフトの
 経路を確かめる。**実機の挙動は分からない**（力・摩擦・発熱・実時間は模擬していない）。
 固定ポート（8765〜8773・8444・8780・9101）を使うので、実機のセッションと同時には動かさない。
 Risk class: none (network on localhost only; the fake ports are plain files under work/).
@@ -268,6 +268,27 @@ def grip_range(frames, key):
     return (min(values), max(values)) if values else (None, None)
 
 
+def panel_stream(r, seconds):
+    """Telemetry frames per pair label, read from the panel's event stream for a while."""
+    pairs = {}
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8780/stream", timeout=5) as resp:
+            end = time.monotonic() + seconds
+            while time.monotonic() < end:
+                line = resp.readline().decode("utf-8", errors="replace")
+                if not line.startswith("data:"):
+                    continue
+                event = json.loads(line[5:])
+                for label, frame in zip(
+                    event.get("labels", []), event.get("pairs", [])
+                ):
+                    if frame:
+                        pairs.setdefault(label, []).append(frame)
+    except Exception as e:  # noqa: BLE001 - reported as a failed check
+        r.check("パネルの配信を読めた", False, e)
+    return pairs
+
+
 def squeeze(port, arm, seconds):
     """Post the iron block as the contact of one arm, like the page does while touching."""
     seen = []
@@ -290,22 +311,7 @@ def handshake(r):
     up = wait_http(8780, "/")
     r.check("パネルが応答", up)
     time.sleep(9.0)
-    pairs = {}
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:8780/stream", timeout=5) as resp:
-            end = time.monotonic() + 7.0
-            while time.monotonic() < end:
-                line = resp.readline().decode("utf-8", errors="replace")
-                if not line.startswith("data:"):
-                    continue
-                event = json.loads(line[5:])
-                for label, frame in zip(
-                    event.get("labels", []), event.get("pairs", [])
-                ):
-                    if frame:
-                        pairs.setdefault(label, []).append(frame)
-    except Exception as e:  # noqa: BLE001 - reported as a failed check
-        r.check("パネルの配信を読めた", False, e)
+    pairs = panel_stream(r, 7.0)
     for label in "AB":
         frames = pairs.get(label, [])
         ff = [f.get("ff", 0) for f in frames]
@@ -348,6 +354,91 @@ def handshake(r):
     r.check(
         "リーダー gripper の P ゲイン 800 をモード書込みの後に書いた",
         {x["port"] for x in gains} >= {"LA", "LB"},
+    )
+
+
+def swap(r):
+    """The handshake with the machines exchanged (pair A): follower machine held, leader machine follows."""
+    r.change("FA", hand=True, object=None)  # the operator holds the follower machine
+    r.change(
+        "LA", hand=False, object=0.5
+    )  # the leader machine follows and closes on a hand
+    r.write()
+    r.launch(
+        "--pair",
+        "A",
+        "--ff",
+        "gripper",
+        "--grip-ma",
+        "500",
+        "--swap-roles",
+        "--no-browser",
+        "--extra",
+        "--ff-style error --max-rel 20 --ff-ke 15 --ff-cap 500 --ff-sign 1",
+    )
+    r.check("パネルが応答", wait_http(8780, "/"))
+    time.sleep(9.0)
+    pairs = panel_stream(r, 7.0)
+    label = next((lb for lb in pairs if lb.startswith("A")), "")
+    r.check(
+        "パネルのペア名に役割入替（どの機体がどの役か）が出る",
+        "フォロワー機" in label and "リーダー機" in label,
+        label,
+    )
+    frames = pairs.get(label, [])
+    ff = [f.get("ff", 0) for f in frames]
+    r.check("テレメトリがパネルに届く", len(frames) >= 5, len(frames))
+    r.check(
+        "握り返し（差分反射）が出た", bool(ff) and max(ff) > 100, max(ff, default=0)
+    )
+    r.check(
+        "握り返しが上限 500 mA 以内",
+        bool(ff) and max(abs(x) for x in ff) <= 500,
+        max(ff, default=0),
+    )
+    device = frames[-1].get("device") if frames else None
+    r.check("入力装置の機種はフォロワー機", device == "koch_follower", device)
+    code = r.finish([8766])
+    r.check("ランチャが正常終了", code == 0, code)
+    log = r.log("work/logs/dual_A_teleop.log")
+    r.check(
+        "teleop のログに毎フレームのクランプ警告が出ない",
+        "clamped to be safe" not in log,
+    )
+    r.check("teleop が役割入替を告げた", "[swap]" in log)
+    recs, _ = r.bus_checks(["LA", "FA"])
+
+    def writes(port, motor, reg):
+        return [
+            x["value"]
+            for x in recs
+            if x.get("port") == port and x.get("motor") == motor and x.get("reg") == reg
+        ]
+
+    r.check(
+        "追従するリーダー機の gripper に握力上限 500 mA を書いた",
+        500 in writes("LA", "gripper", "Goal_Current"),
+    )
+    r.check(
+        "リーダー機の腕にトルクを入れた（追従する）",
+        1 in writes("LA", "shoulder_lift", "Torque_Enable"),
+    )
+    r.check(
+        "操作するフォロワー機の腕のトルクを抜いた（手で動かす）",
+        0 in writes("FA", "shoulder_lift", "Torque_Enable"),
+    )
+    r.check(
+        "フォロワー機の gripper は電流モード（差分反射）",
+        0 in writes("FA", "gripper", "Operating_Mode"),
+    )
+    goals = {x["port"]: x["goal_position_writes"] for x in recs if "dump" in x}
+    r.check(
+        "リーダー機が目標位置を受けて追従した", goals.get("LA", 0) > 30, goals.get("LA")
+    )
+    r.check(
+        "操作側のフォロワー機には目標位置を書いていない",
+        goals.get("FA", 0) == 0,
+        goals.get("FA"),
     )
 
 
@@ -683,6 +774,7 @@ def fest(r):
 
 SCENARIOS = {
     "handshake": handshake,
+    "swap": swap,
     "vr": vr,
     "vr2": vr2,
     "wireless": wireless,

@@ -13,6 +13,10 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
     腕 5 軸のトルクを抜き、gripper だけ Mode 5 の壁にする。重さは肘（XL330-M288・電流制御）と
     肩（XL430-W250・電流制御が無いので PWM＝電圧制御モード。握っている間だけトルク ON）。
     Kt と握りの上限は M288 用に自動で換算。`--vw-pwm-cap 0` で肩の PWM を使わない
+  * `--follower-type koch_leader`: 役割入替（握手・10/25）。`--leader-type koch_follower` と組で、
+    操作者が持つ入力装置はフォロワー機（腕トルク抜き・gripper は M288 なので同じ mA で約 2.4 倍の
+    握り返し）、リーダー機（M077）が位置制御で追従して相手側になる。有線のみ。ランチャは
+    `--swap-roles`、`koch.sh handshake` は既定で入替（`SWAP=0` で従来）
   * `--assist elbow_flex,wrist_flex`: 上の入力装置の摩擦アシスト。減速比 288:1 の軸は力を
     出していなくても重いので、動かしている向きへ小さな電流を足す（速度×`--assist-gain`・
     上限 `--assist-cap` mA・不感帯・速すぎるときは切る）。向きが逆なら重くなるだけなので
@@ -67,6 +71,7 @@ from koch.control import (
     twin_map_from_message,
     wall_from_message,
 )
+from koch.driven_leader import DrivenLeader
 from koch.feedback import (
     JOINT_SPAN_DEG,
     ErrorReflectionLaw,
@@ -98,15 +103,17 @@ from koch.motors import (
     FF_CAP_MAX_MA,
     FF_CAP_WARN_MA,
     FF_GRIPPER_P_GAIN,
+    FOLLOWER_TYPES,
     MODE_EXTENDED_POSITION,
     MODE_PWM,
     PWM_CAP_MAX,
     PWM_LIMIT_DEFAULT,
     VW_JOINTS,
-    XL430_JOINTS,
     gripper_ticks,
     hw_error_names,
+    role_names,
     to_signed16,
+    xl430_joints,
 )
 from koch.paths import CONFIG_DIR, WORK_DIR, calibration_dir
 from koch.remote_follower import RemoteFollower
@@ -410,11 +417,37 @@ def connect_device(dev, label):
     )
 
 
-def connect_pair(robot, teleop):
+def role_error(leader_type, follower_type, follower_port):
+    """Why this combination of machines and ports cannot run (None when it can).
+
+    The usual pair is a leader machine driving a follower machine (wired or over UDP).
+    A follower machine as the input device needs either no follower at all (the
+    hand-moved second player) or, for the swapped handshake, a leader machine to
+    drive over a wire. Two machines of the same kind are not a configuration we own.
+    """
+    port = str(follower_port).lower()
+    leader_only, wireless = port == LEADER_ONLY, port.startswith("udp://")
+    swapped = follower_type == "koch_leader"
+    if swapped and leader_only:
+        return "--follower-type koch_leader には追従させるリーダー機のポート(--follower-port)が要ります"
+    if swapped and wireless:
+        return "--follower-type koch_leader は有線のフォロワーポートでだけ使えます(無線 udp:// は不可)"
+    if swapped and leader_type != "koch_follower":
+        return "--follower-type koch_leader は --leader-type koch_follower(役割入替)と組で使います"
+    if leader_type != "koch_leader" and not leader_only and not swapped:
+        return (
+            "--leader-type koch_follower は --follower-port none(手で動かす入力装置)か、"
+            "--follower-type koch_leader(役割入替)と組でだけ使えます"
+        )
+    return None
+
+
+def connect_pair(robot, teleop, roles=None):
     """Connect the follower, then the leader; a refused start leaves nothing connected."""
+    roles = roles or role_names(False)
     connected = []
     try:
-        for dev, label in ((robot, "フォロワー"), (teleop, "リーダー")):
+        for dev, label in ((robot, roles["F"]), (teleop, roles["L"])):
             if dev is not None:
                 connect_device(dev, label)
                 connected.append(dev)
@@ -488,7 +521,15 @@ def build_parser():
         "--leader-type",
         choices=list(DEVICE_MODELS),
         default="koch_leader",
-        help="入力装置の機種。koch_follower=フォロワー機を手で動かす(2 人目・--follower-port none 必須)",
+        help="入力装置の機種。koch_follower=フォロワー機を手で動かす"
+        "(2 人目は --follower-port none と、役割入替は --follower-type koch_leader と組)",
+    )
+    ap.add_argument(
+        "--follower-type",
+        choices=list(FOLLOWER_TYPES),
+        default="koch_follower",
+        help="追従する腕の機種。koch_leader=リーダー機を位置制御で追従させる"
+        "(役割入替: --leader-type koch_follower と組・有線のみ)",
     )
     ap.add_argument(
         "--arm-label",
@@ -710,10 +751,12 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     if leader_only and args.ff in ("gripper", "arm"):
         sys.exit("--follower-port none のとき使える --ff は off / vwall だけです")
     model = DEVICE_MODELS[args.leader_type]
-    if args.leader_type != "koch_leader" and not leader_only:
-        sys.exit(
-            "--leader-type koch_follower は --follower-port none(手で動かす入力装置)でだけ使えます"
-        )
+    why = role_error(args.leader_type, args.follower_type, args.follower_port)
+    if why:
+        sys.exit(why)
+    swapped = args.follower_type == "koch_leader"  # 役割入替: リーダー機が追従する
+    roles = role_names(swapped)
+    f_xl430 = xl430_joints(args.follower_type)  # 追従する腕の XL430(電流は負荷 %)
     wall_scale = (
         model["wall_scale"]
         if args.wall_scale is None
@@ -787,6 +830,15 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         print(
             f"[link] フォロワー無線: {args.follower_port}（相手側で koch-host を先に起動）"
         )
+    elif swapped:
+        robot = DrivenLeader(
+            KochLeader(
+                KochLeaderConfig(
+                    port=args.follower_port, id=args.follower_id, calibration_dir=cal_l
+                )
+            ),
+            float(args.max_rel) if args.max_rel > 0 else None,
+        )
     elif not leader_only:
         robot = KochFollower(
             KochFollowerConfig(
@@ -805,20 +857,27 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             ),
             model["hand_joints"],
         )
-        print(
-            "[hand] ⚠ 入力装置=フォロワー機: 接続直後に腕のトルクが抜ける(腕を手で支えて起動)。"
-            f" 重さ=電流 {cur_joints}＋PWM {list(pwm_spec)}・壁の電流上限 ×{wall_scale}・Kt={vw_kt}"
-        )
+        if swapped:
+            print(
+                "[swap] ⚠ 役割入替: 操作する腕=フォロワー機(XL430/M288。接続直後に腕のトルクが抜ける→"
+                "手で支えて起動)、追従する腕=リーダー機(M077・位置制御)。"
+                "握り返しの gripper は M288 なので同じ mA で約 2.4 倍の力"
+            )
+        else:
+            print(
+                "[hand] ⚠ 入力装置=フォロワー機: 接続直後に腕のトルクが抜ける(腕を手で支えて起動)。"
+                f" 重さ=電流 {cur_joints}＋PWM {list(pwm_spec)}・壁の電流上限 ×{wall_scale}・Kt={vw_kt}"
+            )
     else:
         teleop = KochLeader(
             KochLeaderConfig(
                 port=args.leader_port, id=args.leader_id, calibration_dir=cal_l
             )
         )
-    connect_pair(robot, teleop)
+    connect_pair(robot, teleop, roles)
     if robot is not None:
-        check_hw_errors(robot, "フォロワー")
-    check_hw_errors(teleop, "リーダー")
+        check_hw_errors(robot, roles["F"])
+    check_hw_errors(teleop, roles["L"])
     apply_follower_grip_cap(robot, args.follower_grip_ma)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) if viz_ports else None
@@ -926,7 +985,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             )
         except Exception:  # noqa: BLE001 - diagnostics must never stop the loop
             return
-        for label, key in (("リーダー", "L"), ("フォロワー", "F")):
+        for label, key in ((roles["L"], "L"), (roles["F"], "F")):
             bits = hw_bits[key]
             if bits:
                 names = hw_error_names(bits)
@@ -945,7 +1004,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         fgrip_frames[0] = fgrip_frames[0] + 1 if near else 0
         if fgrip_frames[0] >= int(args.fps):
             raise_alert(
-                "fgrip", f"⚠ フォロワー握力が上限 {cap}mA 付近 — 滑り・過負荷停止に注意"
+                "fgrip",
+                f"⚠ {roles['F']}握力が上限 {cap}mA 付近 — 滑り・過負荷停止に注意",
             )
 
     def check_link_alert():
@@ -1176,10 +1236,11 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 )
                 if ftemp >= guard.derate_c:
                     print(
-                        f"\n[hw] ⚠ フォロワーgripper {ftemp}°C — 物を掴んだまま放置しない"
+                        f"\n[hw] ⚠ {roles['F']}gripper {ftemp}°C — 物を掴んだまま放置しない"
                     )
                     raise_alert(
-                        "ftemp", f"⚠ フォロワーgripper {ftemp}°C — 掴んだまま放置しない"
+                        "ftemp",
+                        f"⚠ {roles['F']}gripper {ftemp}°C — 掴んだまま放置しない",
                     )
             arm_max = max((abs(x) for x in arm_out.values()), default=0)
             print(
@@ -1197,7 +1258,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 derated = args.ff_gain
             if stop:
                 print(
-                    f"\n[ff] リーダーgripper {temp}°C — FBを停止します(冷えたら再起動)"
+                    f"\n[ff] {roles['L']}gripper {temp}°C — FBを停止します(冷えたら再起動)"
                 )
                 teleop.bus.write(  # error 式は Mode 0 なので床電流ではなく 0(フリー)
                     "Goal_Current",
@@ -1207,11 +1268,13 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 )
                 ff_on = False
                 raise_alert(
-                    "ltemp", f"⛔ リーダーgripper {temp}°C — 力覚FBを停止", ttl=10.0
+                    "ltemp", f"⛔ {roles['L']}gripper {temp}°C — 力覚FBを停止", ttl=10.0
                 )
             elif temp >= guard.derate_c:
-                print(f"\n[ff] リーダーgripper {temp}°C — ゲインを{derated:.2f}に減衰")
-                raise_alert("ltemp", f"⚠ リーダーgripper {temp}°C — ゲイン減衰中")
+                print(
+                    f"\n[ff] {roles['L']}gripper {temp}°C — ゲインを{derated:.2f}に減衰"
+                )
+                raise_alert("ltemp", f"⚠ {roles['L']}gripper {temp}°C — ゲイン減衰中")
 
     def wall_feedback(action):
         """One frame of virtual-wall feedback (VR / fixed wall)."""
@@ -1244,15 +1307,15 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             _, stop = thermal_derate(guard, temp, 1.0)
             if stop:
                 print(
-                    f"\n[vwall] リーダーgripper {temp}°C — 壁を無効化します(冷えたら再起動)"
+                    f"\n[vwall] {roles['L']}gripper {temp}°C — 壁を無効化します(冷えたら再起動)"
                 )
                 teleop.bus.write("Goal_Current", "gripper", 0, normalize=False)
                 vwall_on = False
                 raise_alert(
-                    "ltemp", f"⛔ リーダーgripper {temp}°C — 仮想壁を停止", ttl=10.0
+                    "ltemp", f"⛔ {roles['L']}gripper {temp}°C — 仮想壁を停止", ttl=10.0
                 )
             elif temp >= guard.derate_c:
-                raise_alert("ltemp", f"⚠ リーダーgripper {temp}°C — 発熱注意")
+                raise_alert("ltemp", f"⚠ {roles['L']}gripper {temp}°C — 発熱注意")
 
     def weight_feedback(action, engaged):
         """One frame of virtual weight: grasped mass × tip lever → lift/elbow current."""
@@ -1411,7 +1474,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             robot.send_action(action)
             cur_raw = robot.bus.sync_read("Present_Current", normalize=False)
             cur = {
-                m: to_signed16(int(v)) * (0.1 if m in XL430_JOINTS else 1.0)
+                m: to_signed16(int(v)) * (0.1 if m in f_xl430 else 1.0)
                 for m, v in cur_raw.items()
             }
             fpos = robot.bus.sync_read("Present_Position")
@@ -1443,12 +1506,12 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 pass
         time.sleep(2)
         if robot is not None and not robot.is_connected:
-            connect_device(robot, "フォロワー")
+            connect_device(robot, roles["F"])
         if not teleop.is_connected:
-            connect_device(teleop, "リーダー")
+            connect_device(teleop, roles["L"])
         if robot is not None:
-            check_hw_errors(robot, "フォロワー")
-        check_hw_errors(teleop, "リーダー")
+            check_hw_errors(robot, roles["F"])
+        check_hw_errors(teleop, roles["L"])
         if args.ff in ("gripper", "arm", "vwall"):
             ff_anchor[0] = arm_gripper_ff(teleop, args, anchor=ff_anchor[0])
             ff_on = args.ff in ("gripper", "arm")

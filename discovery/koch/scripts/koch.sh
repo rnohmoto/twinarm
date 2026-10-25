@@ -2,12 +2,13 @@
 # Koch 4 本: 握手（ペア A）と VR（どちらのペアでも、2 本を別々の人が手で動かす）を Mac で起動する。これが起動の正本。
 #   ./scripts/koch.sh              使い方を表示
 #   ./scripts/koch.sh handshake    握手: ペア A・差分反射式（フリーなら戻らない）・握力上限 500 mA・追従リミッタ 20・握り返し 差分ゲイン 15／上限 500 mA（10/19 仮設定）
+#                                  役割入替が既定（10/25: 操作者はフォロワー機 A を持ち、リーダー機 A が追従して来場者側。SWAP=0 で従来の向き）
 #   ./scripts/koch.sh vr-leader    VR 1 人目: リーダーを手で。ペア B=http://localhost:8444/  ペア A=http://localhost:8445/
 #   ./scripts/koch.sh vr-follower  VR 2 人目: フォロワーを手で（別の空間）。ペア B=http://localhost:8443/  ペア A=http://localhost:8446/
 #   ./scripts/koch.sh quest        Quest を繋ぎ直す: 動いているブリッジの口に adb reverse を張り、ゴーグルのブラウザでページを開く
 #   ./scripts/koch.sh all          握手 A と VR（ペア B の 2 本）を、ターミナルの窓 3 枚で起動する（Mac 1 台で全部やるとき）
 #   ./scripts/koch.sh status       動いているもの・Quest の接続・reverse を表示
-#   ./scripts/koch.sh stop         全部止める（握手を止めるとフォロワー A の力が抜ける。先に支える）
+#   ./scripts/koch.sh stop         全部止める（握手を止めると追従していた腕の力が抜ける。入替ではリーダー機 A。先に支える）
 # 同じフォルダの .command をダブルクリックしても同じ。止めるのは各窓で Ctrl+C。
 # VR のペアは PAIR=A|B（既定 B）。例: PAIR=A ./scripts/koch.sh vr-leader。ペア A の握手と VR は同時には動かせない（同じ腕）。
 # フェスの形: MacBook Pro 1 = vr-leader（リーダー B＋Quest Pro #1）、MacBook Pro 2 = vr-follower（フォロワー B＋Quest Pro #2）。Mac 同士の通信は無い。
@@ -20,6 +21,7 @@
 #           MAX_REL=握手の追従リミッタ（既定 20。小さいほどフォロワーが遅れる）  KOCH_YES=1 で vr-follower の Enter 待ちを省く
 #           FF_KE=握手の握り返しの差分ゲイン mA/unit（既定 15＝10/19 仮設定。硬さ。上げても発熱は増えない）
 #           FF_CAP=握り返しの電流上限 mA（既定 500・最大 900。握っている間の最大電流＝発熱。TEST 5 の 30 分で温度を見てから上げる）
+#           SWAP=1 で握手の役割入替（既定）・0 で従来  FF_SIGN=握り返しの向き（入替で握ると引き込まれるなら -1）  GRIP_MA=追従する腕の握力上限 mA（既定 500）
 #           VW_INVERT=重さの向きを反転する関節（既定は分身の設定から決める: 向きが「反転」の肩・肘）
 #           QUEST=0 で Quest の接続を扉せず Mac のブラウザだけ（ゴーグル無しの確認）  QUEST_WAIT=許可を待つ秒数（既定 900）
 set -e
@@ -33,6 +35,9 @@ ASSIST_CAP="${ASSIST_CAP:-25}"
 MAX_REL="${MAX_REL:-20}"
 FF_KE="${FF_KE:-15}"                         # 握り返しの差分ゲイン（10/19 仮設定。launcher の素の既定は 9）
 FF_CAP="${FF_CAP:-500}"                      # 握り返しの電流上限 mA（同上。素の既定は 450）
+SWAP="${SWAP:-1}"                            # 1=役割入替（10/25: 操作者はフォロワー機を持ち、リーダー機が追従）0=従来
+FF_SIGN="${FF_SIGN:-1}"                      # 握り返しの向き。入替で逆向き（握ると引き込まれる）なら -1
+GRIP_MA="${GRIP_MA:-500}"                    # 追従する腕の gripper 電流上限 mA（入替では M077: 同じ mA で力は約 1/2.4）
 PAIR="${PAIR:-B}"
 QUEST="${QUEST:-1}"
 QUEST_WAIT="${QUEST_WAIT:-900}"
@@ -172,7 +177,7 @@ run_hand() {  # run_hand <名前> <機種> <腕の役> <ブリッジ HTTP> <テ�
   kill "$bridge" $quest 2>/dev/null || true
 }
 
-usage() { sed -n '2,24p' "$here/koch.sh" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,26p' "$here/koch.sh" | sed 's/^# \{0,1\}//'; }
 
 mode="${1:-help}"
 [ $# -gt 0 ] && shift
@@ -180,10 +185,25 @@ case "$mode" in
   handshake)
     prepare
     has_arg --dry-run "$@" || ports_free "握手" 8765 8766 -- 8780
-    echo "握手（ペア A・差分反射式）。起動時にフォロワー A がリーダー A の姿勢へ 1.5 秒で動きます。パネル http://127.0.0.1:8780"
-    echo "握り返し: 差分ゲイン ${FF_KE}・電流上限 ${FF_CAP} mA（10/19 仮設定。FF_KE／FF_CAP で変更。パネルのスライダでも動かせる）"
-    exec "$PY" -m koch.launch --pair A --ff gripper --grip-ma 500 \
-      --extra "--ff-style error --max-rel $MAX_REL --ff-ke $FF_KE --ff-cap $FF_CAP" "$@"
+    swap=()
+    if [ "$SWAP" = "1" ]; then
+      swap=(--swap-roles)
+      echo "握手（ペア A・差分反射式・役割入替）: 操作者が持つ腕=フォロワー機 A（XL430/M288: 同じ mA で約 2.4 倍の握り返し）、来場者側=リーダー機 A（M077）が追従。パネル http://127.0.0.1:8780"
+      echo "  起動時にリーダー機 A がフォロワー機 A の姿勢へ 1.5 秒で動きます。従来の向きに戻す: SWAP=0 ./scripts/koch.sh handshake（コードごと戻すなら git switch main）"
+      if ! has_arg --dry-run "$@"; then
+        if [ "${KOCH_YES:-0}" = "1" ]; then
+          echo "⚠ 接続直後と終了時にフォロワー機 A の腕の力が抜けます（KOCH_YES=1: 確認なしで起動）"
+        else
+          echo "⚠ 接続直後と終了時にフォロワー機 A の腕の力が抜けます。腕を手で支えてから Enter"
+          read -r _
+        fi
+      fi
+    else
+      echo "握手（ペア A・差分反射式）。起動時にフォロワー A がリーダー A の姿勢へ 1.5 秒で動きます。パネル http://127.0.0.1:8780"
+    fi
+    echo "握り返し: 差分ゲイン ${FF_KE}・電流上限 ${FF_CAP} mA・向き ${FF_SIGN}・追従する腕の握力上限 ${GRIP_MA} mA（FF_KE／FF_CAP／FF_SIGN／GRIP_MA で変更。ゲインと上限はパネルのスライダでも動かせる）"
+    exec "$PY" -m koch.launch --pair A --ff gripper --grip-ma "$GRIP_MA" ${swap[@]+"${swap[@]}"} \
+      --extra "--ff-style error --max-rel $MAX_REL --ff-ke $FF_KE --ff-cap $FF_CAP --ff-sign $FF_SIGN" "$@"
     ;;
   vr-leader)
     prepare vr

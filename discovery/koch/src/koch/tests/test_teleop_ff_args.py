@@ -67,21 +67,18 @@ def test_control_messages_change_the_response_knobs_within_bounds() -> None:
 
 
 @pytest.mark.unit
-def test_follow_wall_keeps_the_goal_at_the_hand_until_the_follower_is_left_behind() -> (
-    None
-):
-    ticks = (2000, 2800)  # closed, open
-    assert teleop.follow_wall(50.0, 50.0, ticks, 500, 6.0) == (2400, 0)
-    # free motion: the follower lags 3 units, the goal is the hand's own position, no force
-    assert teleop.follow_wall(47.0, 50.0, ticks, 500, 6.0) == (2376, 0)
-    # squeezed 30 units past a stopped follower: the wall stands 6 units past it, force on
-    assert teleop.follow_wall(20.0, 50.0, ticks, 500, 6.0) == (2352, 500)
-    assert teleop.follow_wall(60.0, 50.0, ticks, 500, 6.0) == (
-        2448,
-        500,
-    )  # opening side
-    assert teleop.follow_wall(0.0, 0.0, ticks, 500, 6.0)[0] == 2000
-    assert teleop.follow_wall(100.0, 100.0, ticks, 500, 6.0)[0] == 2800
+def test_follow_wall_is_free_until_the_hand_squeezes_past_the_follower() -> None:
+    ticks = (2000, 2800)  # closed, open; free 6, ramp 100 mA per unit, cap 500
+    assert teleop.follow_wall(50.0, 50.0, ticks, 500, 6.0, 100) == (2400, 0)
+    # the follower lags 3 units: the goal is the hand's own position and the limit is zero
+    assert teleop.follow_wall(47.0, 50.0, ticks, 500, 6.0, 100) == (2376, 0)
+    # squeezed 10 units past a stopped follower: the wall stands 6 units past it, 4 units deep
+    assert teleop.follow_wall(40.0, 50.0, ticks, 500, 6.0, 100) == (2352, 400)
+    assert teleop.follow_wall(20.0, 50.0, ticks, 500, 6.0, 100) == (2352, 500)  # capped
+    # the opening side is always free
+    assert teleop.follow_wall(60.0, 50.0, ticks, 500, 6.0, 100) == (2480, 0)
+    assert teleop.follow_wall(0.0, 0.0, ticks, 500, 6.0, 100) == (2000, 0)
+    assert teleop.follow_wall(100.0, 100.0, ticks, 500, 6.0, 100)[0] == 2800
 
 
 @pytest.mark.unit
@@ -104,3 +101,11 @@ def test_the_free_space_tolerance_has_a_default_and_is_live() -> None:
     assert args.ff_free == 8.0
     teleop.apply_ff_response(args, {"ff_free": -1})
     assert args.ff_free == 0.0
+
+
+@pytest.mark.unit
+def test_the_force_ramp_has_a_default_and_is_live() -> None:
+    args = teleop.build_parser().parse_args([])
+    assert args.ff_ramp == 100
+    teleop.apply_ff_response(args, {"ff_ramp": 5000})
+    assert args.ff_ramp == 900

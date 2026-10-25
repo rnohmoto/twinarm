@@ -199,24 +199,26 @@ def setup_gripper_ff_error(leader, cap_ma):
         print("[ff] ⚠ モード/トルクが未反映 — 握り返しは効きません(この行をClaudeへ)")
 
 
-def follow_wall(leader_cmd, follower_pos, ticks, cap_ma, free):
-    """The follow-wall style for one frame: the leader's goal tick and the force to report.
+def follow_wall(leader_cmd, follower_pos, ticks, cap_ma, free, ramp_ma_per_unit):
+    """The follow-wall style for one frame: the leader's goal tick and its force limit.
 
-    The goal is the operator's own gripper position clamped to within ``free``
-    normalized units of the follower's: while the follower merely lags (free motion)
-    the goal is where the hand already is and the servo exerts nothing, and once the
-    leader is pushed more than ``free`` past a stopped follower the goal stays at
-    follower ± free, where the servo's position loop renders the wall. The mapping
-    onto the leader's own tick range (closed, open) is continuous, so nothing
-    switches. The reported current is the cap while the wall is pushed, zero
-    otherwise (the servo decides the real current). Bench 10/25: with the goal at the
-    follower itself the wall felt right but free motion dragged.
+    Closing direction only (smaller normalized value = more closed). The goal is the
+    operator's own gripper position, bounded below by ``follower - free``: while the
+    follower merely lags, the goal is where the hand already is. The force limit
+    (``Goal_Current`` in mode 5) is zero in free space, so the servo exerts nothing
+    there even though it holds a goal, and grows with the squeeze past the follower
+    beyond the free zone: ``ramp_ma_per_unit`` per normalized unit, up to ``cap_ma``.
+    Both are continuous in the positions, so nothing switches; the servo's own loop
+    pushes back toward the wall and, unlike a current command, the gripper settles at
+    the wall instead of flying open when the finger yields. Bench 10/25: a goal held
+    with full stiffness in free space felt heavy and locked up during bus dropouts.
     """
     leader, follower = float(leader_cmd), float(follower_pos)
-    target = min(max(leader, follower - free), follower + free)
-    goal = wall_tick(target, ticks[0], ticks[1])
-    engaged = abs(leader - follower) > free
-    return goal, (int(cap_ma) if engaged else 0)
+    wall = follower - free
+    goal = wall_tick(max(leader, wall), ticks[0], ticks[1])
+    depth = max(0.0, wall - leader)
+    limit = int(min(int(cap_ma), round(ramp_ma_per_unit * depth)))
+    return goal, limit
 
 
 def arm_gripper_ff(leader, args, anchor=None):
@@ -228,12 +230,11 @@ def arm_gripper_ff(leader, args, anchor=None):
     if args.ff_style == "follow":
         bus = leader.bus
         here = int(bus.read("Present_Position", "gripper", normalize=False))
-        setup_gripper_ff(
-            leader, args.ff_cap, here, floor_ma=args.ff_cap, p_gain=args.ff_pgain
-        )
+        setup_gripper_ff(leader, args.ff_cap, here, floor_ma=0, p_gain=args.ff_pgain)
         print(
-            f"[ff] 追従壁式: 目標=フォロワーの実位置(毎フレーム)・硬さ P={args.ff_pgain}・上限 {args.ff_cap}mA"
-            "(壁はサーボ内部ループ。ホスト側の判定・平滑化なし)"
+            f"[ff] 追従壁式: 自由空間は力 0(完全フリー)・フォロワーより {args.ff_free} unit 以上握り込むと壁、"
+            f"力の上限は握り込み 1 unit あたり {args.ff_ramp}mA ずつ上がり最大 {args.ff_cap}mA・硬さ P={args.ff_pgain}"
+            "(壁はサーボ内部ループ。握る方向だけ)"
         )
         return None
     if args.ff_style == "error":
@@ -554,6 +555,7 @@ FF_RESPONSE_BOUNDS = {  # the control port may change these while running
         16383,
     ),  # the follow wall's stiffness (and spring / vwall on re-arm)
     "ff_free": (0.0, 50.0),  # the follow wall's free-space tolerance
+    "ff_ramp": (1, FF_CAP_MAX_MA),  # the follow wall's force ramp, mA per unit
 }
 
 
@@ -579,7 +581,9 @@ def apply_ff_response(args, cmd):
             setattr(
                 args,
                 key,
-                int(value) if key in ("ff_slew", "ff_stall", "ff_pgain") else value,
+                int(value)
+                if key in ("ff_slew", "ff_stall", "ff_pgain", "ff_ramp")
+                else value,
             )
 
 
@@ -735,6 +739,12 @@ def build_parser():
         default=6.0,
         help="follow: 自由空間の許容幅[unit]。フォロワーの遅れがこの幅以内なら目標=自分の位置で反力ゼロ、"
         "これを超えて握り込むと壁(大きいほど軽いが壁が遠い)",
+    )
+    ap.add_argument(
+        "--ff-ramp",
+        type=int,
+        default=100,
+        help="follow: 壁の力の上限の立ち上がり[mA/unit]。許容幅を超えた握り込み 1 unit ごとに上がり --ff-cap で頭打ち",
     )
     ap.add_argument(
         "--ff-gain",
@@ -1366,22 +1376,25 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     follow_scale = [1.0]  # 追従壁式の温度ディレート(上限に掛ける)
 
     def follow_feedback(action, fpos):
-        """One frame of the follow-wall style: the leader's goal moves to where the follower is."""
+        """One frame of the follow-wall style: goal at the hand or the wall, force limit by depth."""
         cap = int(args.ff_cap * follow_scale[0])
-        goal, ff_ma[0] = follow_wall(
+        goal, limit = follow_wall(
             action.get("gripper.pos", 0.0),
             fpos.get("gripper", action.get("gripper.pos", 0.0)),
             ticks,
             cap,
             args.ff_free,
+            args.ff_ramp,
         )
+        ff_ma[0] = limit
         bus = teleop.bus
         if follow_last["tick"] is None or abs(goal - follow_last["tick"]) >= 1:
             bus.write("Goal_Position", "gripper", goal, normalize=False)
             follow_last["tick"] = goal
-        if cap != follow_last["cap"]:
-            bus.write("Goal_Current", "gripper", cap, normalize=False)
-            follow_last["cap"] = cap
+        last = follow_last["cap"]
+        if last is None or abs(limit - last) >= 5 or (limit == 0 and last != 0):
+            bus.write("Goal_Current", "gripper", limit, normalize=False)
+            follow_last["cap"] = limit
         if int(args.ff_pgain) != follow_last["pgain"]:
             bus.write("Position_P_Gain", "gripper", int(args.ff_pgain), normalize=False)
             follow_last["pgain"] = int(args.ff_pgain)
@@ -1605,6 +1618,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 "ff_move_eps": args.ff_move_eps,
                 "ff_pgain": args.ff_pgain,
                 "ff_free": args.ff_free,
+                "ff_ramp": args.ff_ramp,
                 "arm_gain": args.ff_arm_gain,
                 "arm_cap": args.ff_arm_cap,
                 "vw_scale": args.vw_scale,

@@ -127,6 +127,28 @@ def describe_alarms(codes: list[int]) -> str:
     return "、".join(f"{ALARM_NAMES.get(c, '不明')}（0x{c:02X}）" for c in codes)
 
 
+LOSE_STEP_ALARMS = frozenset(range(0x50, 0x54))
+OVERSPEED_ALARMS = frozenset(range(0x30, 0x34))
+
+
+def alarm_remedy(codes: list[int]) -> str:
+    """アラーム番号から、説明員がその場でやることを 1 文で。
+
+    Dobot Magician ALARM 説明文書（V1.0.0）の復帰条件: 脱調（0x50〜0x53）は「回零」＝ホーミングだけ。パネルの「ホーム」は
+    座標へ動くだけで基準を取り直さないので、本体キーでホーミングし直す。超速（0x30〜0x33）の措置は速度比を下げる。
+    限位・計画・運動の範囲系は目標を作業域の内側へ戻せば解除できる（コードが 1 回自動で解除する）。
+    """
+    codes = list(codes)
+    if any(c in LOSE_STEP_ALARMS for c in codes):
+        return ("脱調です: 腕の周りを空けて本体キーを 2 秒長押し（ホーミング・J1 が左右に振れる・LED が緑になるまで）→ "
+                "停止解除 → ホーム。繰り返すなら速さを 70 に")
+    if any(c in OVERSPEED_ALARMS for c in codes):
+        return "速度超過です: 速さ（speed_pct）を下げてから 停止解除 → ホーム"
+    if codes and all(c in RANGE_ALARMS for c in codes):
+        return "届かない・限界の位置です: 物や置き場を作業域の内側（ロボットから 15〜30 cm）へ → 停止解除 → ホーム"
+    return "停止解除 → ホーム。消えなければ電源を入れ直してホーミング"
+
+
 def joint_angles(x: float, y: float, z: float, tool_x: float = DEFAULT_TOOL_X_MM) -> dict[str, float] | None:
     """手先位置 → 関節角（度）。腕の長さでは届かない位置なら None。"""
     wrist_r = math.hypot(x, y) - tool_x

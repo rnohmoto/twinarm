@@ -33,6 +33,10 @@
 - 文書: HANDOFF 4.1・導入手順 4.1・操作マニュアル 0／6.3・要件 F2.1／F3.1／F6.1・現地チェックリスト
   `docs/fest-checklist-261026.md`・Magician の仕様と作法 `docs/magician-best-practices.md`・root の fest_start_prompts。
 - 実機は未確認（この PC に腕は無い）。現地の順: 「較正を確認」→ 3 mm 超なら「やり直す」→ 置き場 → 1 回動かす。
+- 一次情報の調査（robotics `web_research/magician_spec_2610/`・136 件＝★101／☆25／▲10）を受けて `magician-best-practices.md` に出典を付けた。
+  効いた事実: 公式ページの関節範囲は J1 ±120°（初代期の文献は ±90°・コードは狭い方）、velocityRatio の単位・範囲は公式に無い（100 を上限に）、
+  脱調アラーム 0x50〜53 の公式の復帰条件は回零（ホーミング）＝パネルの「ホーム」では直らない → 操作マニュアル §7・チェックリスト §7・
+  アラームの文言に「本体キー 2 秒長押し」を足した。Dobot 純正の Vision Kit は 3 点較正で「9 点」は Cognex の作法。
 
 ### 2026-10-05
 - Magician を Mac に初接続。CH9102 の USB シリアルとして認識。吸着コマンドの応答を確認。

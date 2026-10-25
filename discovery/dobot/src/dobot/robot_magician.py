@@ -31,6 +31,7 @@ from dobot.jog import (
     PTP_MOVL_XYZ,
     RANGE_ALARMS,
     MagicianArm,
+    alarm_remedy,
     describe_alarms,
 )
 from dobot.robot_dobot import (
@@ -56,7 +57,7 @@ class MotionAlarm(MotionError):
 
     def __init__(self, codes: list[int], when: str):
         self.codes = list(codes)
-        super().__init__(f"アラーム（{when}）: {describe_alarms(self.codes)}")
+        super().__init__(f"アラーム（{when}）: {describe_alarms(self.codes)} → {alarm_remedy(self.codes)}")
 
 
 class IndexedArm(MagicianArm):

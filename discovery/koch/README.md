@@ -84,10 +84,11 @@ Finder: `handshake` / `vr-leader` / `vr-follower` / `quest` / `all` / `status` /
 `PAIR=A|B` (default B). It creates `config/config.json` from `config/config.fest.json` when missing,
 resolves ports by USB serial, opens the Mac operator page (`?spectator=1&info=1`), waits for the
 headset's USB-debugging allow and keeps the `adb reverse` alive. The HTML manuals in
-[`docs/manual/`](docs/manual/index.html) walk through each with diagrams. Since 2026-10-25 `handshake`
-runs with the **roles swapped** by default (the operator holds the follower machine, the leader machine
-follows; `SWAP=0` restores the usual direction): see
-[Swapped roles](#swapped-roles-the-handshake-held-by-the-follower-machine).
+[`docs/manual/`](docs/manual/index.html) walk through each with diagrams. On 2026-10-25 the handshake
+was tried with the machines swapped (`SWAP=1`, see
+[Swapped roles](#swapped-roles-the-handshake-held-by-the-follower-machine)); the M077 elbow could not
+lift, so the usual direction stays the default and the grip feedback's **response knobs** were exposed
+instead (`FF_SLEW` / `FF_ALPHA` / `FF_STALL` / `FF_MOVE_EPS`, and `koch.sh tune key=value` while running).
 
 ## Script inventory and hardware risk
 
@@ -97,7 +98,7 @@ Risk classes are the ones defined in [`../README.md`](../README.md).
 | ------ | ------- | ------------- | --------- |
 | `koch-teleop` | One pair. `--ff gripper --ff-style spring` (default; the 2026-09-04 fixes) / `--ff-style error` / `--ff arm` (untested on hardware) / `--ff vwall` (virtual wall, follower optional: `--follower-port none`) / `--vw` (virtual weight on `shoulder_lift` + `elbow_flex`, only while an object is grasped; `--vw-scale`, `--vw-cap` 120 mA, `--vw-invert`) / `--follower-grip-ma` (Goal_Current cap on the follower gripper against overload shutdowns). `--leader-type koch_follower` uses a Koch follower *moved by hand* as the input device (second player: arm joints torque-free, gripper wall only, weight on the elbow by current and on the XL430 shoulder by PWM mode with `--vw-pwm-scale` / `--vw-pwm-cap`, M288 current scaling, `--arm-label`). `--selftest` runs the laws with no hardware. | moves motors; force feedback and `--vw` put leader joints into current control; `vwall` holds the leader gripper in current-based position mode | UDP telemetry out (`--viz-port`, comma list), control in (`--ctl-port`), CSV in `work/csv/` |
 | `koch-launch` | `--list` ports+serials (read-only), `--init` config template, `--doctor` readiness report (config, port names present, calibration files, VR asset → what can start; opens nothing), `--follower wireless` / `wired` / `none` (`none` = leader only, the follower need not be plugged in: one-player VR), `--pair both` (default) / `A` / `B`, `--vr A|B` (+`--vw`) adds the bridge and forces that pair to `vwall`, `--vr2` also starts that pair's follower as a hand-moved second input (ports 8771/8772/8773) and gives the bridge both arms, `--swap-roles` exchanges the machines of a wired pair (the follower machine is the input device, the leader machine follows; the panel's pair name says so), `--grip-ma`, `--dry-run`. Ports: A 8765/8766 (+8769/8443), B 8767/8768 (+8770/8444), panel 8780. | launches `koch-teleop` → moves motors | logs in `work/logs/dual_*.log` |
-| `scripts/koch.sh` and `scripts/*.command` | Mac launchers and the launcher of record for VR (the `.command` files start from Finder with a double click): `handshake` (pair A, `--ff-style error`; roles swapped by default since 10/25, `SWAP=0` for the usual direction, `FF_SIGN=-1` flips the grip feedback, `GRIP_MA` caps the following gripper), `vr-leader` (leader by hand, page on 8444/8445), `vr-follower` (follower by hand in its own scene, page on 8443/8446, twin config in `config/solo_F/`), `quest` (re-add the reverse and reopen the page), `all`, `status`, `stop`. `PAIR=A|B`. Creates `config/config.json` from `config/config.fest.json` when missing, resolves ports by USB serial, opens the Mac operator page (`?spectator=1&info=1`), waits for the headset's USB-debugging allow, adds the reverse and reopens it whenever the USB link re-enumerates (10/19). | moves motors, torque off (`vr-follower` at start and stop, `stop`) | serial, UDP, HTTP |
+| `scripts/koch.sh` and `scripts/*.command` | Mac launchers and the launcher of record for VR (the `.command` files start from Finder with a double click): `handshake` (pair A, `--ff-style error`, ke 25 / cap 500 and the response knobs slew 250 / α 0.5 / stall 1 / move-eps 1.0 since 10/25 via `FF_KE` `FF_CAP` `FF_SLEW` `FF_ALPHA` `FF_STALL` `FF_MOVE_EPS`; `SWAP=1` swaps the machines, an experiment not adopted; `FF_SIGN=-1` flips the grip feedback; `GRIP_MA` caps the following gripper), `tune key=value ...` (sends the same keys to the running pair through `koch.tools.ctl`), `vr-leader` (leader by hand, page on 8444/8445), `vr-follower` (follower by hand in its own scene, page on 8443/8446, twin config in `config/solo_F/`), `quest` (re-add the reverse and reopen the page), `all`, `status`, `stop`. `PAIR=A|B`. Creates `config/config.json` from `config/config.fest.json` when missing, resolves ports by USB serial, opens the Mac operator page (`?spectator=1&info=1`), waits for the headset's USB-debugging allow, adds the reverse and reopens it whenever the USB link re-enumerates (10/19). | moves motors, torque off (`vr-follower` at start and stop, `stop`) | serial, UDP, HTTP |
 | `koch-panel` | One page for all launched pairs: status chips and 4 graphs per pair, one row of sliders and mode buttons (OFF / gripper / arm / vwall) that go to every pair. | network only, but it commands live teleop sessions | HTTP `--http`, UDP in `--telemetry` (list), out `--ctl-port` (list) |
 | `koch-plot` | matplotlib telemetry viewer. | network only | UDP in |
 | `koch-calib` | Torque off both arms, hold the same pose by hand, print raw ticks and normalized % per joint with the JSON fix to apply. Reads `config/calibration/`. | torque off (both arms) | reads calibration JSON |
@@ -107,7 +108,7 @@ Risk classes are the ones defined in [`../README.md`](../README.md).
 | `koch-scan` | Broadcast-ping an assembled arm at 1 Mbps and 57600 bps (a motor fresh out of the box answers only there); prints ID, model and firmware. `--loop SECONDS` reads positions in a loop and counts failures (comms stability test). | read-only | — |
 | `koch-set-id` | `<port> <current-id> <new-id>`: change one motor's ID; refuses unless exactly that motor is on the bus. `--setup --port <port> [--id] [--type]`: lerobot's `setup_motors()` (IDs and baud, interactively). | writes motor config | — |
 | `koch-current` | Real-time current/load plots for one or two arms straight from the bus, with per-axis statistics on exit and a CSV under `work/csv/`. Cannot share a port with a running teleop. | **torque off** on every listed ID at start and at exit; `--torque on` energizes instead | CSV out |
-| `python -m koch.tools.<name>` | Bench diagnostics promoted from the old `work/tools/`: `preflight` (read-only go/no-go), `register_snapshot`, `reg_diff`, `pos_trace` (read-only), `match_leader` and `fit_twin` (rewrite calibration / twin JSON; no motor writes), `watchdog` (network only), `spawn_detached`, `torque_off` (**torque off**, cleanup after a crash). | read-only except `torque_off` | serial, files |
+| `python -m koch.tools.<name>` | Bench diagnostics promoted from the old `work/tools/`: `preflight` (read-only go/no-go), `register_snapshot` (now also gains, PWM / velocity limits and the motion profile), `reg_diff`, `pos_trace` (read-only), `match_leader` and `fit_twin` (rewrite calibration / twin JSON; no motor writes), `watchdog` (network only), `ctl` (network only: one control message, `ff_slew=300 ff_ke=30`, to running teleops; it changes a live pair's feedback at once), `spawn_detached`, `torque_off` (**torque off**, cleanup after a crash). | read-only except `torque_off`; `ctl` commands a live teleop | serial, files, UDP |
 | `src/webxr/setup_assets.py` | Downloads `three.module.js` (r160) once; the file is git-ignored. `scripts/start.sh check` runs it. | none | network (once) |
 | `src/koch/simbus/rehearse.py` | Runs the launcher, teleop, bridge, panel and follower host against simulated servos (`src/koch/simbus/dynamixel_sdk`, a stand-in for the SDK that lerobot loads from `PYTHONPATH`) and checks frame rate, feedback commands, register write order, refused EEPROM writes and torque at exit. Scenarios: `handshake` `swap` `vr` `vr2` `wireless` `mismatch` `dropout` `fest`. See [`src/koch/simbus/README.md`](src/koch/simbus/README.md). | none (no port is opened; fixed localhost ports, so not next to a live session) | logs in `work/rehearsal/` |
 
@@ -155,7 +156,7 @@ asked. The full procedure with pass criteria and record fields is in
 | `--ff` | Servo mode | Law | Where it comes from |
 | --- | --- | --- | --- |
 | `gripper` + `spring` | 5 (current-based position), `Goal_Position` = calibrated open end, `Position_P_Gain` 800 | `Goal_Current = floor + gain × EMA(|I_follower| − deadband)`, capped | mock/v0 + branch `rn/fix/gripper-force-feedback` (measured on hardware 2026-09-04) |
-| `gripper` + `error` | 0 (current) | current ∝ (leader command − follower position) beyond a deadband, only after the follower has stalled, slew-limited | robotics 2026-08-04 (hardware session S23) |
+| `gripper` + `error` | 0 (current) | current ∝ (leader command − follower position) beyond a deadband, only after the follower has stalled, slew-limited. Response knobs (10/25): `--ff-slew` mA per frame (90), `--ff-alpha` smoothing (0.3), `--ff-stall` frames before the follower counts as stalled (3), `--ff-move-eps` units per frame above which it counts as still following (0.4); the same keys work on the control port while running. With the defaults a raised cap only took longer to reach, which is what felt like delay on the bench; `koch.sh handshake` uses 250 / 0.5 / 1 / 1.0 | robotics 2026-08-04 (hardware session S23); knobs this folder |
 | `arm` | 0 on elbow/wrist joints | `−gain × EMA(I_follower)` per joint | FACTR-style; not yet verified on hardware |
 | `vwall` | 5, `Goal_Position` = wall tick, `Goal_Current` = 0 outside / cap inside, `Position_P_Gain` = object stiffness | host only decides *engaged* (opening ≤ width, with hysteresis); the servo's own loop renders the wall | this folder; robotics `TacitCapture/94_` |
 | `vwall --vw` | 0 on `shoulder_lift` + `elbow_flex` | `I = scale × (m·g·lever) / Kt`, lever from the twin's planar FK, capped, EMA; zero unless an object is grasped | this folder; direction must be checked on hardware (CHECKLIST V-w) |
@@ -193,14 +194,13 @@ calibration ids keep their names; the launcher exchanges them), and the panel is
 name on it becomes `A（役割入替: 操作側=フォロワー機／相手側=リーダー機）` through the existing
 `--labels` option, and the teleop's alerts name the machine (`リーダー役(フォロワー機)`). The panel's
 current graph still multiplies the two shoulder traces by 10 (XL430 load %), which over-reads the M077
-shoulders of a swapped pair; the gripper trace is unaffected. **On the arms** (10/25 18:50, first
-run): both machines connected and the M077 arm followed, but with the servo's default gains it
-lagged as described above; the gains are the fix under test. Still to confirm on the arms
-(CHECKLIST TEST 2c): the tracking error and any oscillation or heating with the gains, the direction
-of the grip feedback on the M288 (`FF_SIGN=-1` if the gripper is pulled closed instead of pushed
-open), and the heaviness of the hand-moved follower machine. A wrist roll that reads −100 on the
-panel sits past its one-turn calibration (the shoulder-pan phenomenon in HANDOFF): turn it back one
-turn. `./scripts/start.sh rehearse swap` covers the software path. `git switch main` removes all of it.
+shoulders of a swapped pair; the gripper trace is unaffected. **Outcome on the arms (10/25, two runs)**:
+both machines connected and the M077 arm followed; with the servo's default gains it lagged as
+described above, and with P 1500 / D 600 its elbow still could not lift the forearm (the M077's
+0.2 N·m is the limit, not the loop). **Not adopted**: `koch.sh handshake` runs the usual direction
+again and `SWAP=1` keeps the experiment available. Also seen: a wrist roll that reads −100 on the
+panel sits past its one-turn calibration (the shoulder-pan phenomenon in HANDOFF); turn it back one
+turn. `./scripts/start.sh rehearse swap` still covers the software path.
 
 The laws are pure functions in `src/koch/feedback.py`, a verbatim mirror of
 [`twinarm/src/twinarm/domain/gripper_feedback.py`](../../twinarm/src/twinarm/domain/gripper_feedback.py)

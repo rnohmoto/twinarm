@@ -33,7 +33,10 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
       9/4 修正: Position_P_Gain=800（既定のままでは Goal_Current を上げても押し返さない・実測）
       / 再接続時は初回の基準を引き継ぐ / 基準=較正済みの開端（range_max）
   --ff gripper --ff-style error   差分反射式（robotics 8/04）。L指令−F実位置を反力に。
-      フォロワー停止時のみ・不感帯・スルーレート制限。自由空間は完全フリー
+      フォロワー停止時のみ・不感帯・スルーレート制限。自由空間は完全フリー。
+      応答のつまみ（10/25: 上限を上げても遅く感じる原因はここ）: `--ff-slew`（1 フレームの電流変化の
+      上限）・`--ff-alpha`（平滑化）・`--ff-stall`（停止判定のフレーム数）・`--ff-move-eps`（追従中と見る
+      速さ）。走行中は制御ポートへ同名のキー（`python -m koch.tools.ctl ff_slew=300`）で変えられる
   --ff arm                        上に腕3軸反力（FACTR 式）を足す。実機未検証（67_ §3-3）
   --ff vwall                      仮想物体。フォロワー不要。壁= {name,width,p_gain,cap_ma,release}
 
@@ -506,6 +509,36 @@ def soft_resync(robot, teleop, fps=30, seconds=1.5):
         print(f"[sync] 合流ランプ失敗(そのまま続行): {e}")
 
 
+FF_RESPONSE_BOUNDS = {  # the control port may change these while running
+    "ff_slew": (1, FF_CAP_MAX_MA),
+    "ff_alpha": (0.05, 1.0),
+    "ff_stall": (0, 30),
+    "ff_move_eps": (0.0, 20.0),
+}
+
+
+def error_law_from(args):
+    """The error-reflection law with the gain, cap and response knobs of the command line."""
+    return ErrorReflectionLaw(
+        args.ff_ke,
+        args.ff_edb,
+        args.ff_sign,
+        args.ff_cap,
+        slew_ma=int(args.ff_slew),
+        move_eps=float(args.ff_move_eps),
+        stall_frames=int(args.ff_stall),
+        alpha=float(args.ff_alpha),
+    )
+
+
+def apply_ff_response(args, cmd):
+    """Take the response knobs of a control message (bounded); other keys are ignored."""
+    for key, (lo, hi) in FF_RESPONSE_BOUNDS.items():
+        if key in cmd:
+            value = min(max(float(cmd[key]), lo), hi)
+            setattr(args, key, int(value) if key in ("ff_slew", "ff_stall") else value)
+
+
 def build_parser():
     """Define the command line."""
     ap = argparse.ArgumentParser(
@@ -625,6 +658,30 @@ def build_parser():
     )
     ap.add_argument(
         "--ff-sign", type=int, choices=[1, -1], default=1, help="差分反射の向き"
+    )
+    ap.add_argument(
+        "--ff-slew",
+        type=int,
+        default=ErrorReflectionLaw.slew_ma,
+        help="差分反射: 1 フレームの電流変化の上限[mA](立ち上がりの速さ。90 だと上限 500 まで 6 フレーム≈0.2 秒)",
+    )
+    ap.add_argument(
+        "--ff-alpha",
+        type=float,
+        default=ErrorReflectionLaw.alpha,
+        help="差分反射: 目標電流の平滑化係数 0.05-1(1 で平滑化なし)",
+    )
+    ap.add_argument(
+        "--ff-stall",
+        type=int,
+        default=ErrorReflectionLaw.stall_frames,
+        help="差分反射: フォロワーが止まったと見るまでのフレーム数(0 で待たない)",
+    )
+    ap.add_argument(
+        "--ff-move-eps",
+        type=float,
+        default=ErrorReflectionLaw.move_eps,
+        help="差分反射: これ以上動くフォロワーは追従中と見て反力を出さない[unit/フレーム]",
     )
     ap.add_argument(
         "--ff-gain",
@@ -1090,7 +1147,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         return SpringLaw(args.ff_gain, args.ff_floor, args.ff_cap, args.ff_deadband)
 
     def error_law():
-        return ErrorReflectionLaw(args.ff_ke, args.ff_edb, args.ff_sign, args.ff_cap)
+        return error_law_from(args)
 
     def apply_wall(cmd):
         """Write only the virtual-wall registers that changed."""
@@ -1218,6 +1275,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 args.ff_cap = int(min(max(float(cmd["ff_cap"]), 0), FF_CAP_MAX_MA))
             if "ff_floor" in cmd:
                 args.ff_floor = int(min(max(float(cmd["ff_floor"]), 0), 120))
+            apply_ff_response(args, cmd)
             if "arm_gain" in cmd:
                 args.ff_arm_gain = float(cmd["arm_gain"])
             if "arm_cap" in cmd:
@@ -1452,6 +1510,10 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 "ff_ke": args.ff_ke,
                 "ff_cap": args.ff_cap,
                 "ff_floor": args.ff_floor,
+                "ff_slew": args.ff_slew,
+                "ff_alpha": args.ff_alpha,
+                "ff_stall": args.ff_stall,
+                "ff_move_eps": args.ff_move_eps,
                 "arm_gain": args.ff_arm_gain,
                 "arm_cap": args.ff_arm_cap,
                 "vw_scale": args.vw_scale,

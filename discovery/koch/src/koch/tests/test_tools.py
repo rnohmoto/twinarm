@@ -6,6 +6,7 @@ import sys
 import pytest
 
 TOOLS = [
+    "ctl",
     "fit_twin",
     "match_leader",
     "pos_trace",
@@ -39,3 +40,16 @@ def test_every_tool_answers_help(name: str) -> None:
         text=True,
     )
     assert "usage" in out.stdout.lower()
+
+
+@pytest.mark.unit
+def test_ctl_parses_key_value_pairs_into_numbers_and_text() -> None:
+    from koch.tools.ctl import parse_pairs
+
+    assert parse_pairs(["ff_slew=300", "ff_alpha=0.5", "mode=gripper"]) == {
+        "ff_slew": 300,
+        "ff_alpha": 0.5,
+        "mode": "gripper",
+    }
+    with pytest.raises(SystemExit):
+        parse_pairs(["ff_slew"])

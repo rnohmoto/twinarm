@@ -58,7 +58,7 @@ twinarm の discovery/koch で握手（ペア A だけ）を実機で立ち上�
 - config/config.json のペア A のポートは私が渡す（--list の結果から私が選ぶ。推測しない。リーダーとフォロワーは入替不可）
 - 腕が動くコマンド（./scripts/koch.sh handshake。中身は launch.py --pair A --ff gripper --grip-ma 500 --extra "--ff-style error --max-rel 20 --ff-ke 15 --ff-cap 500"。ゲインと上限は 10/19 の仮設定）は、私がこの会話で明示的に頼んだときだけ実行する。実機の挙動は私の報告だけを事実にする
 - 進め方: S0 → TEST 2（ペア A 単独の回帰）→ 2b（フォロワー握力の上限 500 mA で過負荷停止と滑りの境）→ 5（30 分の連続稼働）→ 6（握手ハンド装着後の体験リハ）を 1 つずつ。各テストの記録欄を埋める
-- 握りの硬さや上限を変えるときは環境変数で: FF_KE=20 FF_CAP=600 ./scripts/koch.sh handshake（ke＝差分ゲイン mA/unit＝硬さ、cap＝握っている間の最大電流）。10/19 の仮設定は ke 15・cap 500（launcher の素の既定は ke 9・cap 450）。パネルのスライダ「(error)差分ゲイン」「握り上限mA」で動かしながらも変えられる。cap を上げるほど握っている間の発熱が速い（450→900 で 4 倍）。60 ℃で ke 半減・65 ℃で握り返し停止（停止後は冷えてから再起動）。cap を上げる前に TEST 5（30 分）で温度の曲線を取る
+- 握りの硬さや上限を変えるときは環境変数で: FF_KE=30 FF_CAP=600 ./scripts/koch.sh handshake（ke＝差分ゲイン mA/unit＝硬さ、cap＝握っている間の最大電流）。10/25 の既定は ke 25・cap 500、応答は slew 250／α 0.5／停止判定 1／追従中判定 1.0（FF_SLEW／FF_ALPHA／FF_STALL／FF_MOVE_EPS。10/19 は ke 15・slew 90・α 0.3・3・0.4）。走行中は別の端末で ./scripts/koch.sh tune ff_slew=300 ff_ke=30。パネルのスライダ「(error)差分ゲイン」「握り上限mA」で動かしながらも変えられる。役割入替（SWAP=1）は 10/25 に不採用（リーダー機 M077 の肘が持ち上がらない）。cap を上げるほど握っている間の発熱が速い（450→900 で 4 倍）。60 ℃で ke 半減・65 ℃で握り返し停止（停止後は冷えてから再起動）。cap を上げる前に TEST 5（30 分）で温度の曲線を取る
 - 終わったら実機ログ md を書く（docs/fest_start_prompts.md §5）
 ```
 

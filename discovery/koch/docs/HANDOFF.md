@@ -149,6 +149,15 @@ Mac でダブルクリック起動: `scripts/` の `.command`（最初の確認�
 VR（2 人）: `./scripts/start.sh vr2`（`--vr2` を足す。フォロワー機は接続直後にトルクが抜けるので手で支える）。初回の重さは `./scripts/start.sh vr2 --extra "--vw-cap 60 --vw-pwm-cap 80"` で。
 `git pull` が `twin.json` の手元の変更で止まったら `git stash` → `git pull`（旧形式の内容は新形式に読み込める）。
 
+## 6b. 10/25 夜の握手の状態と、明日の朝にやること
+
+- 握手は Desktop の「握手_起動」（＝`scripts/2_握手A.command` → `koch.sh handshake`）で起動。握り返しは **なめらか壁**（`FF_STYLE=follow`: 自由空間は力 0、
+  フォロワーより 15 unit 握り込むと壁、力は 1 unit 100 mA ずつ上限 500 mA、硬さ P 1200）、追従リミッタ 40。ユーザー評価「いい感じ」。Ctrl+C 1 回で後片付け後に窓が閉じる。
+- 残っている問題はフォロワー A の **USB 側の通信断**（20〜30 秒ごとに 6 軸一斉無応答。電源電圧は直前も正常 12.4 V／5.1 V）。復帰は 0.5 秒で自動、
+  握手は止まらない。**朝: フォロワーの USB ケーブルを別の物に替え、ハブを通さず Mac に直挿し**して通信断が消えるか見る（ログの `[robust]` 行の数）。
+- 不採用: 役割入替（`SWAP=1`・M077 の肘が持ち上がらない）、差分反射式の上限 900／応答調整（かちかち）。操作側 gripper の力は M077 の天井（指先 2〜4 N）。
+- 枝 `rn/feat/koch-handshake-swap-roles`（origin に push 済み・main 未マージ）。`git switch main` で 10/19 の状態。
+
 ## 7. 根拠が要るときの正本（robotics リポジトリ・user-m-s/robotics）
 
 - `TacitCapture/110_Koch_VR一人称化と2人化_Quest接続_Magicianカメラ_判断材料_v1.md`（10/4: 一人称・投げる・2 人の設計、Quest 接続の判定表、Magician カメラの代替）

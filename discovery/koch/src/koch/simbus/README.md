@@ -3,7 +3,7 @@
 `dynamixel_sdk/` is a stand-in for the Dynamixel SDK. With this folder first on `PYTHONPATH`,
 lerobot's `DynamixelMotorsBus` talks to simulated Koch servos, so the launcher, the teleop, the
 VR bridge, the panel and the follower host run end to end with no arms attached. `rehearse.py`
-drives them through eight scenarios and checks what they did.
+drives them through nine scenarios and checks what they did.
 
 ```bash
 ./scripts/start.sh rehearse            # every scenario, about 3 minutes
@@ -22,6 +22,7 @@ live session first. Logs and the register trace of each scenario stay in
 | --- | --- | --- |
 | `handshake` | launcher, two wired pairs, the panel | both pairs reach the panel; the grip feedback rises above its floor and stays under the cap; the follower grip cap and the leader P gain are written; torque off at exit |
 | `swap` | launcher `--pair A --swap-roles` with the handshake's error-style arguments, the panel | the follower machine is the input device (arm torque dropped, gripper in current mode) and the leader machine follows (arm torque on, grip cap 500 mA written, goal positions received); the panel's pair name says which machine plays which role; the grip feedback rises above 100 mA and stays within 500 mA; torque off at exit |
+| `follow` | launcher `--pair A` with `--ff-style follow` (the servo-rendered wall) | the leader gripper is in mode 5 with the stiffness and cap written after the mode, its goal position is updated every frame, the reported force is the cap while squeezed and zero when released; torque off at exit |
 | `vr` | launcher `--vr B --vw --follower none`, bridge | starts with the follower unplugged; the page is served; squeezing engages the wall; weight currents on shoulder and elbow within the cap; nothing is written to the follower |
 | `vr2` | the same with `--vr2` | two twins; the hand-moved follower's shoulder runs in PWM mode: zero duty right after the mode change and before every torque-on, duty within the cap, position mode and the PWM limit restored at exit; wall cap scaled by 0.45 |
 | `wireless` | `koch-host` plus a leader-side teleop over UDP | 25 fps or more; link statistics in the telemetry; the host holds the pose when targets stop; no per-frame clamp warning in the host log |

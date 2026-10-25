@@ -157,7 +157,13 @@ FOLLOW_P=2000 FOLLOW_D=800 ./scripts/koch.sh handshake  # 追従が緩ければ�
 ./scripts/koch.sh tune ff_slew=500 ff_alpha=1.0 ff_stall=0   # 別の端末で、走行中に即応型へ（チャタリングが出たら戻す）
 ./scripts/koch.sh tune ff_ke=35 ff_cap=700                   # 壁を硬く・強く（cap は発熱: 60 ℃でゲイン半減・65 ℃で停止）
 FF_SLEW=90 FF_ALPHA=0.3 FF_STALL=3 FF_MOVE_EPS=0.4 ./scripts/koch.sh handshake   # 10/19 の応答に戻す
+FF_STYLE=follow ./scripts/koch.sh handshake                  # 追従壁式: 壁をサーボ内部ループに（判定・平滑化なし＝遅れ 1 フレーム・かちかち無し）。硬さ FF_PGAIN=1200
+./scripts/koch.sh tune ff_pgain=2000 ff_cap=700              # follow の硬さと最大を走行中に
 ```
+- 実機（10/25 19:26〜・差分反射式・ke 25）: 握り返しは出る（上限 500 mA まで立つ）が「かちかち」（停止判定の二値が毎フレーム切替）と
+  「速度が遅い」（ユーザー）。→ `tune ff_stall=0 ff_alpha=1.0 ff_slew=900` で判定・平滑化を外す／追従壁式へ
+- 力の上限は操作側 gripper の XL330-M077 で決まる（上限 500 mA で約 0.07 N·m・指先で約 2 N、900 mA で約 0.13 N·m）。
+  握手の握りには 1 桁足りない。ソフトで良くなるのは立ち上がりと硬さの感触まで。強くするなら gripper のサーボを M288（2.4 倍）に
 - 見るもの: 握った瞬間から押し返しが立ち上がるまでの遅れ／壁の硬さ（ke）／最大の強さ（cap）／握ったまま静止したときの
   チャタリング（指先の微振動。出たら slew・α を下げるか move_eps を上げる）／自由空間で勝手に力が出ないこと
 - 発熱: パネルの温度チップ（操作側 gripper）。cap 700 以上は TEST 5 の 30 分を別に取る

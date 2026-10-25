@@ -3,7 +3,7 @@
 #   ./scripts/koch.sh              使い方を表示
 #   ./scripts/koch.sh handshake    握手: ペア A・差分反射式（フリーなら戻らない）・握力上限 500 mA・追従リミッタ 20・握り返し 差分ゲイン 25／上限 500 mA
 #                                  応答 slew 250 mA/フレーム・α 0.5・停止判定 1 フレーム・追従中判定 1.0（10/25 チューニング。従来は 90・0.3・3・0.4）
-#   ./scripts/koch.sh tune k=v ... 走行中の握手の握り返しを変える（例: tune ff_slew=300 ff_ke=30。ペア B も: tune --ctl-port 8766,8768 ff_cap=600）
+#   ./scripts/koch.sh tune k=v ... 走行中の握手の握り返しを変える（例: tune ff_slew=300 ff_ke=30 / tune ff_pgain=2000。ペア B も: tune --ctl-port 8766,8768 ff_cap=600）
 #   ./scripts/koch.sh vr-leader    VR 1 人目: リーダーを手で。ペア B=http://localhost:8444/  ペア A=http://localhost:8445/
 #   ./scripts/koch.sh vr-follower  VR 2 人目: フォロワーを手で（別の空間）。ペア B=http://localhost:8443/  ペア A=http://localhost:8446/
 #   ./scripts/koch.sh quest        Quest を繋ぎ直す: 動いているブリッジの口に adb reverse を張り、ゴーグルのブラウザでページを開く
@@ -22,7 +22,8 @@
 #           MAX_REL=握手の追従リミッタ（既定 20。小さいほどフォロワーが遅れる）  KOCH_YES=1 で vr-follower の Enter 待ちを省く
 #           FF_KE=握手の握り返しの差分ゲイン mA/unit（既定 25＝10/25。硬さ。上げても発熱は増えない。10/19 は 15）
 #           FF_CAP=握り返しの電流上限 mA（既定 500・最大 900。握っている間の最大電流＝発熱。TEST 5 の 30 分で温度を見てから上げる）
-#           FF_SLEW／FF_ALPHA／FF_STALL／FF_MOVE_EPS=握り返しの応答（既定 250／0.5／1／1.0。上限を上げても遅く感じるときはここ。走行中は tune で）
+#           FF_SLEW／FF_ALPHA／FF_STALL／FF_MOVE_EPS=差分反射式の応答（既定 250／0.5／1／1.0。上限を上げても遅く感じるときはここ。走行中は tune で）
+#           FF_STYLE=握り返しの方式（既定 error＝差分反射式 / follow＝追従壁式: 目標=フォロワー実位置・壁はサーボ内部ループ・10/25 実機未検証 / spring）  FF_PGAIN=follow の壁の硬さ（既定 1200）
 #           SWAP=1 で握手の役割入替（既定 0。10/25: リーダー機 M077 の肘が前腕を持ち上げられず不採用・実験用に残す）  FF_SIGN=握り返しの向き（逆なら -1）  GRIP_MA=追従する腕の握力上限 mA（既定 500）
 #           FOLLOW_P／FOLLOW_I／FOLLOW_D=入替で追従するリーダー機の腕 5 軸の位置ゲイン（既定 1500/0/600＝lerobot がフォロワー機の肘に使う値。負で書かない）
 #           VW_INVERT=重さの向きを反転する関節（既定は分身の設定から決める: 向きが「反転」の肩・肘）
@@ -42,6 +43,8 @@ FF_SLEW="${FF_SLEW:-250}"                    # 握り返しの立ち上がり: 1
 FF_ALPHA="${FF_ALPHA:-0.5}"                  # 握り返しの平滑化係数（素の既定 0.3。1 で平滑化なし）
 FF_STALL="${FF_STALL:-1}"                    # フォロワーが止まったと見るまでのフレーム数（素の既定 3。0 で待たない）
 FF_MOVE_EPS="${FF_MOVE_EPS:-1.0}"            # これ以上動くフォロワーは追従中と見て反力を出さない unit/フレーム（素の既定 0.4）
+FF_STYLE="${FF_STYLE:-error}"                # error=差分反射式 / follow=追従壁式（目標=フォロワー実位置。壁はサーボ内部ループ。10/25 実機未検証）/ spring
+FF_PGAIN="${FF_PGAIN:-1200}"                 # follow の壁の硬さ Position_P_Gain（vwall の物体は 250 スポンジ／900 ボール／2000 鉄）
 SWAP="${SWAP:-0}"                            # 1=役割入替の実験（10/25: リーダー機 M077 の肘が前腕を持ち上げられず不採用）0=従来
 FF_SIGN="${FF_SIGN:-1}"                      # 握り返しの向き。入替で逆向き（握ると引き込まれる）なら -1
 GRIP_MA="${GRIP_MA:-500}"                    # 追従する腕の gripper 電流上限 mA（入替では M077: 同じ mA で力は約 1/2.4）
@@ -187,7 +190,7 @@ run_hand() {  # run_hand <名前> <機種> <腕の役> <ブリッジ HTTP> <テ�
   kill "$bridge" $quest 2>/dev/null || true
 }
 
-usage() { sed -n '2,29p' "$here/koch.sh" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,30p' "$here/koch.sh" | sed 's/^# \{0,1\}//'; }
 
 mode="${1:-help}"
 [ $# -gt 0 ] && shift
@@ -214,10 +217,10 @@ case "$mode" in
     else
       echo "握手（ペア A・差分反射式）。起動時にフォロワー A がリーダー A の姿勢へ 1.5 秒で動きます。パネル http://127.0.0.1:8780"
     fi
-    echo "握り返し: 差分ゲイン ${FF_KE} mA/unit・電流上限 ${FF_CAP} mA・向き ${FF_SIGN}・応答 slew ${FF_SLEW} mA/フレーム／α ${FF_ALPHA}／停止判定 ${FF_STALL} フレーム／追従中判定 ${FF_MOVE_EPS}・追従する腕の握力上限 ${GRIP_MA} mA"
-    echo "  変更: 環境変数 FF_KE／FF_CAP／FF_SIGN／FF_SLEW／FF_ALPHA／FF_STALL／FF_MOVE_EPS／GRIP_MA。走行中は別の端末で ./scripts/koch.sh tune ff_slew=300 ff_ke=30（ゲインと上限はパネルのスライダでも）"
+    echo "握り返し: 方式 ${FF_STYLE}・差分ゲイン ${FF_KE} mA/unit・電流上限 ${FF_CAP} mA・向き ${FF_SIGN}・応答 slew ${FF_SLEW} mA/フレーム／α ${FF_ALPHA}／停止判定 ${FF_STALL} フレーム／追従中判定 ${FF_MOVE_EPS}・follow の硬さ P=${FF_PGAIN}・追従する腕の握力上限 ${GRIP_MA} mA"
+    echo "  変更: 環境変数 FF_STYLE／FF_KE／FF_CAP／FF_SIGN／FF_SLEW／FF_ALPHA／FF_STALL／FF_MOVE_EPS／FF_PGAIN／GRIP_MA。走行中は別の端末で ./scripts/koch.sh tune ff_slew=300 ff_ke=30 ff_pgain=2000（ゲインと上限はパネルのスライダでも）"
     exec "$PY" -m koch.launch --pair A --ff gripper --grip-ma "$GRIP_MA" ${swap[@]+"${swap[@]}"} \
-      --extra "--ff-style error --max-rel $MAX_REL --ff-ke $FF_KE --ff-cap $FF_CAP --ff-sign $FF_SIGN --ff-slew $FF_SLEW --ff-alpha $FF_ALPHA --ff-stall $FF_STALL --ff-move-eps $FF_MOVE_EPS$swap_extra" "$@"
+      --extra "--ff-style $FF_STYLE --ff-pgain $FF_PGAIN --max-rel $MAX_REL --ff-ke $FF_KE --ff-cap $FF_CAP --ff-sign $FF_SIGN --ff-slew $FF_SLEW --ff-alpha $FF_ALPHA --ff-stall $FF_STALL --ff-move-eps $FF_MOVE_EPS$swap_extra" "$@"
     ;;
   vr-leader)
     prepare vr
@@ -241,7 +244,7 @@ case "$mode" in
       --vw-pwm-cap 80 ${assist[@]+"${assist[@]}"} "$@"
     ;;
   tune)
-    [ $# -gt 0 ] || { echo "使い方: ./scripts/koch.sh tune key=value ...（例: tune ff_slew=300 ff_ke=30。キー: ff_ke ff_cap ff_slew ff_alpha ff_stall ff_move_eps max_rel mode）"; exit 1; }
+    [ $# -gt 0 ] || { echo "使い方: ./scripts/koch.sh tune key=value ...（例: tune ff_slew=300 ff_ke=30。キー: ff_ke ff_cap ff_slew ff_alpha ff_stall ff_move_eps ff_pgain max_rel mode）"; exit 1; }
     exec "$PY" -m koch.tools.ctl "$@"
     ;;
   quest)

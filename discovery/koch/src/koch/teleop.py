@@ -37,6 +37,9 @@ rn/fix/gripper-force-feedback（2026-09-04: 実機レジスタ計測で確認し
       応答のつまみ（10/25: 上限を上げても遅く感じる原因はここ）: `--ff-slew`（1 フレームの電流変化の
       上限）・`--ff-alpha`（平滑化）・`--ff-stall`（停止判定のフレーム数）・`--ff-move-eps`（追従中と見る
       速さ）。走行中は制御ポートへ同名のキー（`python -m koch.tools.ctl ff_slew=300`）で変えられる
+  --ff gripper --ff-style follow  追従壁式（10/25）。リーダー gripper を Mode 5（電流制限付き位置）にし、目標位置＝
+      フォロワーの実位置を毎フレーム渡す。壁はサーボ内部の位置ループが即時に出す（硬さ=--ff-pgain・最大=--ff-cap）。
+      ホスト側の停止判定・平滑化・スルー制限が無いので遅れもかちかちも構造的に出ない。自由空間は追従の遅れ分の軽い粘り
   --ff arm                        上に腕3軸反力（FACTR 式）を足す。実機未検証（67_ §3-3）
   --ff vwall                      仮想物体。フォロワー不要。壁= {name,width,p_gain,cap_ma,release}
 
@@ -97,6 +100,7 @@ from koch.feedback import (
     tip_levers,
     virtual_wall_step,
     virtual_weight_step,
+    wall_tick,
 )
 from koch.lerobot_compat import load_lerobot
 from koch.motors import (
@@ -195,12 +199,36 @@ def setup_gripper_ff_error(leader, cap_ma):
         print("[ff] ⚠ モード/トルクが未反映 — 握り返しは効きません(この行をClaudeへ)")
 
 
+def follow_wall(leader_cmd, follower_pos, ticks, cap_ma, deadband):
+    """The follow-wall style for one frame: the leader's goal tick and the force to report.
+
+    The goal is the follower's normalized gripper position on the leader's own tick
+    range (closed, open), so the servo's position loop renders the wall where the
+    follower actually is; the reported current is the cap while the leader is pushed
+    beyond the deadband, zero otherwise (the servo decides the real current).
+    """
+    goal = wall_tick(float(follower_pos), ticks[0], ticks[1])
+    engaged = abs(float(leader_cmd) - float(follower_pos)) > deadband
+    return goal, (int(cap_ma) if engaged else 0)
+
+
 def arm_gripper_ff(leader, args, anchor=None):
     """Set up the gripper for the selected style; returns the anchor tick or None."""
     if args.ff == "vwall":
         return setup_gripper_ff(
             leader, args.ff_cap, anchor, floor_ma=0, p_gain=args.ff_pgain
         )
+    if args.ff_style == "follow":
+        bus = leader.bus
+        here = int(bus.read("Present_Position", "gripper", normalize=False))
+        setup_gripper_ff(
+            leader, args.ff_cap, here, floor_ma=args.ff_cap, p_gain=args.ff_pgain
+        )
+        print(
+            f"[ff] 追従壁式: 目標=フォロワーの実位置(毎フレーム)・硬さ P={args.ff_pgain}・上限 {args.ff_cap}mA"
+            "(壁はサーボ内部ループ。ホスト側の判定・平滑化なし)"
+        )
+        return None
     if args.ff_style == "error":
         setup_gripper_ff_error(leader, args.ff_cap)
         return None
@@ -514,6 +542,10 @@ FF_RESPONSE_BOUNDS = {  # the control port may change these while running
     "ff_alpha": (0.05, 1.0),
     "ff_stall": (0, 30),
     "ff_move_eps": (0.0, 20.0),
+    "ff_pgain": (
+        0,
+        16383,
+    ),  # the follow wall's stiffness (and spring / vwall on re-arm)
 }
 
 
@@ -536,7 +568,11 @@ def apply_ff_response(args, cmd):
     for key, (lo, hi) in FF_RESPONSE_BOUNDS.items():
         if key in cmd:
             value = min(max(float(cmd[key]), lo), hi)
-            setattr(args, key, int(value) if key in ("ff_slew", "ff_stall") else value)
+            setattr(
+                args,
+                key,
+                int(value) if key in ("ff_slew", "ff_stall", "ff_pgain") else value,
+            )
 
 
 def build_parser():
@@ -640,15 +676,17 @@ def build_parser():
     )
     ap.add_argument(
         "--ff-style",
-        choices=["spring", "error"],
+        choices=["spring", "error", "follow"],
         default="spring",
-        help="spring=戻りバネ式(9/4 実機修正済み・既定) / error=差分反射式(8/04)",
+        help="spring=戻りバネ式(9/4 実機修正済み・既定) / error=差分反射式(8/04) / "
+        "follow=追従壁式(10/25): gripper を電流制限付き位置モードにし目標=フォロワー実位置。"
+        "壁はサーボ内部ループ(硬さ --ff-pgain・最大 --ff-cap)",
     )
     ap.add_argument(
         "--ff-pgain",
         type=int,
         default=FF_GRIPPER_P_GAIN,
-        help="mode5 の Position_P_Gain",
+        help="mode5 の Position_P_Gain(spring・vwall・follow の壁の硬さ。制御ポートの ff_pgain でも)",
     )
     ap.add_argument(
         "--ff-ke", type=float, default=9.0, help="差分反射の強さ[mA/正規化unit]"
@@ -985,6 +1023,11 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     ff_on = args.ff in ("gripper", "arm")
     ff_arm = args.ff == "arm"
     vwall_on = args.ff == "vwall"
+    if args.ff_style == "follow" and gripper_ticks(teleop.bus) is None:
+        print(
+            "[ff] ⚠ リーダーgripperの較正がありません — 追従壁式は使えないので差分反射式にします"
+        )
+        args.ff_style = "error"
     ff_anchor = [None]  # 初回の保持目標。再接続で引き継ぐ
     if ff_on or vwall_on:
         ff_anchor[0] = arm_gripper_ff(teleop, args)
@@ -1304,10 +1347,36 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             if cmd.get("stop"):
                 stop_req[0] = True
 
+    follow_last = {"tick": None, "cap": None, "pgain": None}  # 追従壁式: 最後に書いた値
+    follow_scale = [1.0]  # 追従壁式の温度ディレート(上限に掛ける)
+
+    def follow_feedback(action, fpos):
+        """One frame of the follow-wall style: the leader's goal moves to where the follower is."""
+        cap = int(args.ff_cap * follow_scale[0])
+        goal, ff_ma[0] = follow_wall(
+            action.get("gripper.pos", 0.0),
+            fpos.get("gripper", action.get("gripper.pos", 0.0)),
+            ticks,
+            cap,
+            args.ff_edb,
+        )
+        bus = teleop.bus
+        if follow_last["tick"] is None or abs(goal - follow_last["tick"]) >= 1:
+            bus.write("Goal_Position", "gripper", goal, normalize=False)
+            follow_last["tick"] = goal
+        if cap != follow_last["cap"]:
+            bus.write("Goal_Current", "gripper", cap, normalize=False)
+            follow_last["cap"] = cap
+        if int(args.ff_pgain) != follow_last["pgain"]:
+            bus.write("Position_P_Gain", "gripper", int(args.ff_pgain), normalize=False)
+            follow_last["pgain"] = int(args.ff_pgain)
+
     def gripper_feedback(action, cur, fpos):
-        """One frame of gripper feedback (spring or error style)."""
+        """One frame of gripper feedback (spring, error or follow style)."""
         nonlocal ff_on
-        if args.ff_style == "error":
+        if args.ff_style == "follow":
+            follow_feedback(action, fpos)
+        elif args.ff_style == "error":
             erefl[0] = error_reflection_step(
                 error_law(),
                 erefl[0],
@@ -1315,15 +1384,17 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 float(fpos.get("gripper", 0.0)),
             )
             ff_ma[0] = erefl[0].command_ma
+            teleop.bus.write("Goal_Current", "gripper", ff_ma[0], normalize=False)
         else:
             spring[0] = spring_step(spring_law(), spring[0], cur.get("gripper", 0.0))
             ff_ma[0] = spring[0].command_ma
-        teleop.bus.write("Goal_Current", "gripper", ff_ma[0], normalize=False)
-        cap_frames[0] = cap_frames[0] + 1 if abs(ff_ma[0]) >= args.ff_cap else 0
+            teleop.bus.write("Goal_Current", "gripper", ff_ma[0], normalize=False)
+        saturated = abs(ff_ma[0]) >= args.ff_cap and args.ff_style != "follow"
+        cap_frames[0] = cap_frames[0] + 1 if saturated else 0
         if cap_frames[0] >= int(args.fps):
             raise_alert("cap", f"⚠ 握り反力が上限 {args.ff_cap}mA に張り付いています")
-        th_on = 120 if args.ff_style == "error" else args.ff_floor + 80
-        th_off = 60 if args.ff_style == "error" else args.ff_floor + 40
+        th_on = 120 if args.ff_style in ("error", "follow") else args.ff_floor + 80
+        th_off = 60 if args.ff_style in ("error", "follow") else args.ff_floor + 40
         now = time.monotonic()
         if not ff_hot[0] and abs(ff_ma[0]) >= th_on and now - last_notify[0] > 3.0:
             ff_hot[0], last_notify[0] = True, now
@@ -1356,8 +1427,11 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 end="",
                 flush=True,
             )
-            # 減衰させるゲインは方式ごと: spring=ff_gain / error=ff_ke(差分ゲイン)
-            if args.ff_style == "error":
+            # 減衰させるゲインは方式ごと: spring=ff_gain / error=ff_ke(差分ゲイン) / follow=上限の倍率
+            if args.ff_style == "follow":
+                follow_scale[0], stop = thermal_derate(guard, temp, follow_scale[0])
+                derated = follow_scale[0]
+            elif args.ff_style == "error":
                 args.ff_ke, stop = thermal_derate(guard, temp, args.ff_ke)
                 derated = args.ff_ke
             else:
@@ -1370,7 +1444,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 teleop.bus.write(  # error 式は Mode 0 なので床電流ではなく 0(フリー)
                     "Goal_Current",
                     "gripper",
-                    0 if args.ff_style == "error" else args.ff_floor,
+                    0 if args.ff_style in ("error", "follow") else args.ff_floor,
                     normalize=False,
                 )
                 ff_on = False
@@ -1514,6 +1588,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 "ff_alpha": args.ff_alpha,
                 "ff_stall": args.ff_stall,
                 "ff_move_eps": args.ff_move_eps,
+                "ff_pgain": args.ff_pgain,
                 "arm_gain": args.ff_arm_gain,
                 "arm_cap": args.ff_arm_cap,
                 "vw_scale": args.vw_scale,
@@ -1627,6 +1702,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
         check_hw_errors(teleop, roles["L"])
         if args.ff in ("gripper", "arm", "vwall"):
             ff_anchor[0] = arm_gripper_ff(teleop, args, anchor=ff_anchor[0])
+            follow_last.update(tick=None, cap=None, pgain=None)
             ff_on = args.ff in ("gripper", "arm")
         if args.ff == "arm":
             setup_arm_ff(teleop, ARM_FF_JOINTS)

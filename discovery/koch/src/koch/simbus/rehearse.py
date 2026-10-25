@@ -6,7 +6,7 @@ Dynamixel bus in this folder (``dynamixel_sdk/``) and checks what they did: fram
 feedback commands, register write order, refused EEPROM writes, torque at exit.
 
   uv run python src/koch/simbus/rehearse.py            # every scenario
-  uv run python src/koch/simbus/rehearse.py vr2        # one: handshake | swap | vr | vr2 | wireless | mismatch | dropout | fest
+  uv run python src/koch/simbus/rehearse.py vr2        # one: handshake | swap | follow | vr | vr2 | wireless | mismatch | dropout | fest
   uv run python src/koch/simbus/rehearse.py --list
 
 仮想のサーボで握手・握手の役割入替・VR・2 人・無線・較正不一致・通信断を通し、起動から終了までのソフトの
@@ -473,6 +473,59 @@ def swap(r):
     )
 
 
+def follow(r):
+    """Pair A with the follow-wall grip feedback: the leader gripper's goal is the follower's position."""
+    r.write()
+    r.launch(
+        "--pair",
+        "A",
+        "--ff",
+        "gripper",
+        "--grip-ma",
+        "500",
+        "--no-panel",
+        "--extra",
+        "--ff-style follow --ff-pgain 1200 --ff-cap 500 --max-rel 20",
+    )
+    time.sleep(8.0)
+    frames = listen([8765], 7.0)[8765]
+    ff = [f.get("ff", 0) for f in frames]
+    r.check("テレメトリが届く", len(frames) >= 100, len(frames))
+    r.check("握ると壁（上限 500 mA）が立つ", 500 in ff, sorted(set(ff)))
+    r.check("離すと 0 に戻る", 0 in ff, sorted(set(ff)))
+    code = r.finish([8766])
+    r.check("ランチャが正常終了", code == 0, code)
+    log = r.log("work/logs/dual_A_teleop.log")
+    r.check("teleop が追従壁式を告げた", "追従壁式" in log)
+    recs, _ = r.bus_checks(["LA", "FA"])
+    grip = [
+        (x["reg"], x["value"])
+        for x in recs
+        if x["port"] == "LA" and x.get("motor") == "gripper" and "reg" in x
+    ]
+    modes = [i for i, x in enumerate(grip) if x[0] == "Operating_Mode"]
+    after = modes[-1] if modes else -1
+    r.check(
+        "リーダー gripper は Mode 5（電流制限付き位置）",
+        after >= 0 and grip[after] == ("Operating_Mode", 5),
+        grip[after] if after >= 0 else None,
+    )
+    r.check(
+        "壁の硬さ P 1200 をモード設定の後に書いた",
+        ("Position_P_Gain", 1200) in grip[after + 1 :],
+    )
+    r.check(
+        "上限 500 mA を Goal_Current に書いた",
+        ("Goal_Current", 500) in grip[after + 1 :],
+    )
+    goals = {x["port"]: x["goal_position_writes"] for x in recs if "dump" in x}
+    r.check(
+        "リーダー gripper の目標位置を毎フレーム更新した",
+        goals.get("LA", 0) > 60,
+        goals.get("LA"),
+    )
+
+
 def vr(r):
     """One player: leader B only (the follower is not used and need not be connected)."""
     Path(r.port("FB")).unlink()  # the follower is not plugged in
@@ -806,6 +859,7 @@ def fest(r):
 SCENARIOS = {
     "handshake": handshake,
     "swap": swap,
+    "follow": follow,
     "vr": vr,
     "vr2": vr2,
     "wireless": wireless,

@@ -199,16 +199,23 @@ def setup_gripper_ff_error(leader, cap_ma):
         print("[ff] ⚠ モード/トルクが未反映 — 握り返しは効きません(この行をClaudeへ)")
 
 
-def follow_wall(leader_cmd, follower_pos, ticks, cap_ma, deadband):
+def follow_wall(leader_cmd, follower_pos, ticks, cap_ma, free):
     """The follow-wall style for one frame: the leader's goal tick and the force to report.
 
-    The goal is the follower's normalized gripper position on the leader's own tick
-    range (closed, open), so the servo's position loop renders the wall where the
-    follower actually is; the reported current is the cap while the leader is pushed
-    beyond the deadband, zero otherwise (the servo decides the real current).
+    The goal is the operator's own gripper position clamped to within ``free``
+    normalized units of the follower's: while the follower merely lags (free motion)
+    the goal is where the hand already is and the servo exerts nothing, and once the
+    leader is pushed more than ``free`` past a stopped follower the goal stays at
+    follower ± free, where the servo's position loop renders the wall. The mapping
+    onto the leader's own tick range (closed, open) is continuous, so nothing
+    switches. The reported current is the cap while the wall is pushed, zero
+    otherwise (the servo decides the real current). Bench 10/25: with the goal at the
+    follower itself the wall felt right but free motion dragged.
     """
-    goal = wall_tick(float(follower_pos), ticks[0], ticks[1])
-    engaged = abs(float(leader_cmd) - float(follower_pos)) > deadband
+    leader, follower = float(leader_cmd), float(follower_pos)
+    target = min(max(leader, follower - free), follower + free)
+    goal = wall_tick(target, ticks[0], ticks[1])
+    engaged = abs(leader - follower) > free
     return goal, (int(cap_ma) if engaged else 0)
 
 
@@ -546,6 +553,7 @@ FF_RESPONSE_BOUNDS = {  # the control port may change these while running
         0,
         16383,
     ),  # the follow wall's stiffness (and spring / vwall on re-arm)
+    "ff_free": (0.0, 50.0),  # the follow wall's free-space tolerance
 }
 
 
@@ -720,6 +728,13 @@ def build_parser():
         type=float,
         default=ErrorReflectionLaw.move_eps,
         help="差分反射: これ以上動くフォロワーは追従中と見て反力を出さない[unit/フレーム]",
+    )
+    ap.add_argument(
+        "--ff-free",
+        type=float,
+        default=6.0,
+        help="follow: 自由空間の許容幅[unit]。フォロワーの遅れがこの幅以内なら目標=自分の位置で反力ゼロ、"
+        "これを超えて握り込むと壁(大きいほど軽いが壁が遠い)",
     )
     ap.add_argument(
         "--ff-gain",
@@ -1358,7 +1373,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             fpos.get("gripper", action.get("gripper.pos", 0.0)),
             ticks,
             cap,
-            args.ff_edb,
+            args.ff_free,
         )
         bus = teleop.bus
         if follow_last["tick"] is None or abs(goal - follow_last["tick"]) >= 1:
@@ -1589,6 +1604,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 "ff_stall": args.ff_stall,
                 "ff_move_eps": args.ff_move_eps,
                 "ff_pgain": args.ff_pgain,
+                "ff_free": args.ff_free,
                 "arm_gain": args.ff_arm_gain,
                 "arm_cap": args.ff_arm_cap,
                 "vw_scale": args.vw_scale,

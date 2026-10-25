@@ -71,7 +71,9 @@ from koch.control import (
     twin_map_from_message,
     wall_from_message,
 )
-from koch.driven_leader import DrivenLeader
+from koch.driven_leader import ARM_GAINS as DRIVEN_ARM_GAINS
+from koch.driven_leader import ARM_JOINTS as DRIVEN_ARM_JOINTS
+from koch.driven_leader import DrivenLeader, arm_gains
 from koch.feedback import (
     JOINT_SPAN_DEG,
     ErrorReflectionLaw,
@@ -532,6 +534,25 @@ def build_parser():
         "(役割入替: --leader-type koch_follower と組・有線のみ)",
     )
     ap.add_argument(
+        "--follower-pgain",
+        type=int,
+        default=DRIVEN_ARM_GAINS["Position_P_Gain"],
+        help="役割入替で追従するリーダー機の腕 5 軸の Position_P_Gain"
+        "(サーボ既定では重力と摩擦に負けて差が残る。負=書かずサーボ既定のまま)",
+    )
+    ap.add_argument(
+        "--follower-igain",
+        type=int,
+        default=DRIVEN_ARM_GAINS["Position_I_Gain"],
+        help="同 Position_I_Gain(負=書かない)",
+    )
+    ap.add_argument(
+        "--follower-dgain",
+        type=int,
+        default=DRIVEN_ARM_GAINS["Position_D_Gain"],
+        help="同 Position_D_Gain(負=書かない)",
+    )
+    ap.add_argument(
         "--arm-label",
         default="",
         help="テレメトリに載せる腕の名前(VR ページの表示と /contact の宛先。例 B / F)",
@@ -838,6 +859,9 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 )
             ),
             float(args.max_rel) if args.max_rel > 0 else None,
+            gains=arm_gains(
+                args.follower_pgain, args.follower_igain, args.follower_dgain
+            ),
         )
     elif not leader_only:
         robot = KochFollower(
@@ -861,7 +885,9 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             print(
                 "[swap] ⚠ 役割入替: 操作する腕=フォロワー機(XL430/M288。接続直後に腕のトルクが抜ける→"
                 "手で支えて起動)、追従する腕=リーダー機(M077・位置制御)。"
-                "握り返しの gripper は M288 なので同じ mA で約 2.4 倍の力"
+                "握り返しの gripper は M288 なので同じ mA で約 2.4 倍の力。"
+                f" 追従側の腕ゲイン P/I/D={args.follower_pgain}/{args.follower_igain}/{args.follower_dgain}"
+                "(負=サーボ既定)・腕の温度は 2 秒ごとに 1 軸ずつ監視"
             )
         else:
             print(
@@ -941,6 +967,7 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
     ema_arm = {j: 0.0 for j in ARM_FF_JOINTS}
     arm_out = {j: 0 for j in ARM_FF_JOINTS}
     arm_rr = [0]
+    farm_rr = [0]  # 役割入替: 追従するリーダー機の腕の温度を読む関節の巡回
     last_temp = [0]
     stop_req = [False]
     last_notify = [0.0]
@@ -1019,6 +1046,28 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
                 f"⚠ フォロワー無線 遅延 {stats['age_ms']}ms"
                 f"（往復 {stats['rtt_ms']}ms・欠落 {stats['loss'] * 100:.0f}%）",
             )
+
+    def check_follower_arm_temp():
+        """Every 2 s, one arm joint of the driven leader machine: the M077 works near its limit."""
+        if robot is None:
+            return
+        j = DRIVEN_ARM_JOINTS[farm_rr[0] % len(DRIVEN_ARM_JOINTS)]
+        farm_rr[0] += 1
+        try:
+            at = int(robot.bus.read("Present_Temperature", j, normalize=False))
+        except Exception:  # noqa: BLE001 - diagnostics must never stop the loop
+            return
+        _, stop = thermal_derate(guard, at, 1.0)
+        if stop:
+            print(
+                f"\n[swap] ⛔ {roles['F']} {j} {at}°C — 止めて冷ます"
+                "(サーボは 70°C で自ら止まり、腕が落ちる)"
+            )
+            raise_alert(
+                "farmtemp", f"⛔ {roles['F']} {j} {at}°C — 過熱。止めて冷ます", ttl=10.0
+            )
+        elif at >= guard.derate_c:
+            raise_alert("farmtemp", f"⚠ {roles['F']} {j} {at}°C — 発熱注意")
 
     shoulder_pwm = pwm_spec.get("shoulder_lift")
 
@@ -1491,6 +1540,8 @@ def main():  # the frame loop keeps the hardware-tested shape of mock/v0 on purp
             arm_feedback(cur)
         if n[0] % TEMP_CHECK_EVERY == TEMP_CHECK_EVERY // 4:
             check_hw_alert()
+        if swapped and n[0] % TEMP_CHECK_EVERY == TEMP_CHECK_EVERY * 3 // 4:
+            check_follower_arm_temp()
         publish(time.perf_counter() - t0, action, cur, fpos)
         n[0] += 1
         time.sleep(max(0.0, 1.0 / args.fps - (time.perf_counter() - t_frame)))

@@ -42,3 +42,19 @@ def test_the_parser_defaults_to_the_follower_machine_as_the_follower() -> None:
         ["--leader-type", "koch_follower", "--follower-type", "koch_leader"]
     )
     assert (args.leader_type, args.follower_type) == ("koch_follower", "koch_leader")
+
+
+@pytest.mark.unit
+def test_the_driven_arm_gains_default_to_lerobots_values_and_can_be_left_alone() -> (
+    None
+):
+    args = teleop.build_parser().parse_args([])
+    assert (args.follower_pgain, args.follower_igain, args.follower_dgain) == (
+        1500,
+        0,
+        600,
+    )
+    args = teleop.build_parser().parse_args(
+        ["--follower-pgain", "-1", "--follower-dgain", "800"]
+    )
+    assert (args.follower_pgain, args.follower_dgain) == (-1, 800)

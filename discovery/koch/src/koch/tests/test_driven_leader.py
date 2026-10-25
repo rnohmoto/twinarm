@@ -2,7 +2,13 @@
 
 import pytest
 
-from koch.driven_leader import ARM_JOINTS, DrivenLeader, clamp_goals
+from koch.driven_leader import (
+    ARM_GAINS,
+    ARM_JOINTS,
+    DrivenLeader,
+    arm_gains,
+    clamp_goals,
+)
 
 PRESENT = {
     "shoulder_pan": 0.0,
@@ -18,9 +24,17 @@ class FakeBus:
     def __init__(self, present):
         self.present = present
         self.calls = []
+        self.reg = {}
 
     def enable_torque(self, motors=None):
         self.calls.append(("enable_torque", list(motors) if motors else None))
+
+    def write(self, data_name, motor, value, *, normalize=True):
+        self.reg[(data_name, motor)] = int(value)
+        self.calls.append(("write", data_name, motor, int(value)))
+
+    def read(self, data_name, motor, *, normalize=True):
+        return self.reg.get((data_name, motor), 0)
 
     def sync_read(self, data_name, motors=None, *, normalize=True):
         self.calls.append(("sync_read", data_name))
@@ -50,7 +64,7 @@ class FakeLeader:
 @pytest.fixture
 def driven() -> tuple[FakeLeader, DrivenLeader]:
     leader = FakeLeader(PRESENT)
-    return leader, DrivenLeader(leader, 20.0)
+    return leader, DrivenLeader(leader, 20.0, gains={})
 
 
 @pytest.mark.unit
@@ -138,3 +152,59 @@ def test_clamp_goals_is_pure_and_keeps_motors_without_a_present_value() -> None:
     assert clamp_goals({"a": -50.0}, present, 20.0) == {"a": -20.0}
     assert clamp_goals(goal, present, None) == goal
     assert goal == {"a": 50.0, "b": 7.0} and present == {"a": 0.0}
+
+
+@pytest.mark.unit
+def test_default_gains_are_lerobots_follower_elbow_values() -> None:
+    assert ARM_GAINS == {
+        "Position_P_Gain": 1500,
+        "Position_I_Gain": 0,
+        "Position_D_Gain": 600,
+    }
+
+
+@pytest.mark.unit
+def test_arm_gains_drops_negative_values_and_clamps_to_the_register_range() -> None:
+    assert arm_gains(1500, 0, 600) == ARM_GAINS
+    assert arm_gains(-1, 0, 600) == {"Position_I_Gain": 0, "Position_D_Gain": 600}
+    assert arm_gains(-1, -1, -1) == {}
+    assert arm_gains(99999, 0, 0)["Position_P_Gain"] == 16383
+
+
+@pytest.mark.unit
+def test_connect_writes_the_gains_on_every_arm_joint_before_torque_goes_on() -> None:
+    leader = FakeLeader(PRESENT)
+    robot = DrivenLeader(
+        leader, 20.0, gains={"Position_P_Gain": 1500, "Position_D_Gain": 600}
+    )
+    robot.connect()
+    writes = [c for c in leader.bus.calls if c[0] == "write"]
+    assert {c[2] for c in writes} == set(ARM_JOINTS)  # never the gripper
+    assert {(c[1], c[3]) for c in writes} == {
+        ("Position_P_Gain", 1500),
+        ("Position_D_Gain", 600),
+    }
+    assert leader.bus.calls.index(("enable_torque", ARM_JOINTS)) > max(
+        i for i, c in enumerate(leader.bus.calls) if c[0] == "write"
+    )
+    assert robot.gains_ok
+
+
+@pytest.mark.unit
+def test_connect_with_no_gains_leaves_the_servo_defaults(driven) -> None:
+    leader, robot = driven
+    robot.connect()
+    assert leader.bus.calls == [("enable_torque", ARM_JOINTS)]
+    assert robot.gains_ok
+
+
+@pytest.mark.unit
+def test_a_gain_that_does_not_read_back_is_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    leader = FakeLeader(PRESENT)
+    monkeypatch.setattr(leader.bus, "read", lambda name, motor, *, normalize=True: 400)
+    robot = DrivenLeader(leader, 20.0, gains={"Position_P_Gain": 1500})
+    robot.connect()
+    assert not robot.gains_ok
+    assert robot.is_connected  # the arm still follows, with the servo's own gain

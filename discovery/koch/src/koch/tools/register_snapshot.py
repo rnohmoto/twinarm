@@ -2,6 +2,8 @@
 
 Only read1/2/4ByteTxRx are used. Compares Homing_Offset / Min / Max / Drive_Mode with
 lerobot calibration JSON files the same way DynamixelMotorsBus.is_calibrated does.
+Also shows what bounds a position-controlled joint: the P/I/D gains, PWM_Limit,
+Velocity_Limit and the Profile_Acceleration / Profile_Velocity (0 = no profile).
 """
 
 import argparse
@@ -54,6 +56,12 @@ def main():
                 "torque": rd(packet, port, i, 64, 1),
                 "hw_err": rd(packet, port, i, 70, 1),
                 "p_gain": rd(packet, port, i, 84, 2),
+                "i_gain": rd(packet, port, i, 82, 2),
+                "d_gain": rd(packet, port, i, 80, 2),
+                "pwm_limit": rd(packet, port, i, 36, 2),
+                "vel_limit": rd(packet, port, i, 44, 4),
+                "prof_acc": rd(packet, port, i, 108, 4),
+                "prof_vel": rd(packet, port, i, 112, 4),
                 "pos": s32(rd(packet, port, i, 132, 4)),
                 "volt": rd(packet, port, i, 144, 2),
                 "temp": rd(packet, port, i, 146, 1),
@@ -67,7 +75,7 @@ def main():
         port.closePort()
 
     print(f"port {args.port}")
-    hdr = f"{'ID':>2} {'joint':<13} {'model':<11} {'drv':>3} {'mode':>4} {'homing':>7} {'min':>5} {'max':>5} {'torq':>4} {'hwerr':>5} {'Pgain':>5} {'pos':>6} {'V':>5} {'degC':>4} {'Ilim':>5} {'Igoal':>5} {'I':>4}"
+    hdr = f"{'ID':>2} {'joint':<13} {'model':<11} {'drv':>3} {'mode':>4} {'homing':>7} {'min':>5} {'max':>5} {'torq':>4} {'hwerr':>5} {'Pgain':>5} {'Igain':>5} {'Dgain':>5} {'PWMlim':>6} {'Vlim':>5} {'ProfA':>5} {'ProfV':>5} {'pos':>6} {'V':>5} {'degC':>4} {'Ilim':>5} {'Igoal':>5} {'I':>4}"
     print(hdr)
     for i, r in rows.items():
         j = JOINTS[i - 1]
@@ -76,7 +84,8 @@ def main():
             continue
         print(
             f"{i:>2} {j:<13} {r['model']:<11} {r['drive_mode']:>3} {r['op_mode']:>4} {r['homing']:>7} {r['min']:>5} {r['max']:>5} "
-            f"{r['torque']:>4} {r['hw_err']:>5} {r['p_gain']:>5} {r['pos']:>6} {int(r['volt']) / 10:>5.1f} {r['temp']:>4} "
+            f"{r['torque']:>4} {r['hw_err']:>5} {r['p_gain']!s:>5} {r['i_gain']!s:>5} {r['d_gain']!s:>5} "
+            f"{r['pwm_limit']!s:>6} {r['vel_limit']!s:>5} {r['prof_acc']!s:>5} {r['prof_vel']!s:>5} {r['pos']:>6} {int(r['volt']) / 10:>5.1f} {r['temp']:>4} "
             f"{r.get('cur_limit', '-')!s:>5} {r.get('goal_cur', '-')!s:>5} {r.get('cur', '-')!s:>4}"
         )
     errs = {i: r["hw_err"] for i, r in rows.items() if r and r["hw_err"]}

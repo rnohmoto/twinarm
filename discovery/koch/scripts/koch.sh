@@ -22,6 +22,7 @@
 #           FF_KE=握手の握り返しの差分ゲイン mA/unit（既定 15＝10/19 仮設定。硬さ。上げても発熱は増えない）
 #           FF_CAP=握り返しの電流上限 mA（既定 500・最大 900。握っている間の最大電流＝発熱。TEST 5 の 30 分で温度を見てから上げる）
 #           SWAP=1 で握手の役割入替（既定）・0 で従来  FF_SIGN=握り返しの向き（入替で握ると引き込まれるなら -1）  GRIP_MA=追従する腕の握力上限 mA（既定 500）
+#           FOLLOW_P／FOLLOW_I／FOLLOW_D=入替で追従するリーダー機の腕 5 軸の位置ゲイン（既定 1500/0/600＝lerobot がフォロワー機の肘に使う値。負で書かない）
 #           VW_INVERT=重さの向きを反転する関節（既定は分身の設定から決める: 向きが「反転」の肩・肘）
 #           QUEST=0 で Quest の接続を扉せず Mac のブラウザだけ（ゴーグル無しの確認）  QUEST_WAIT=許可を待つ秒数（既定 900）
 set -e
@@ -38,6 +39,9 @@ FF_CAP="${FF_CAP:-500}"                      # 握り返しの電流上限 mA（
 SWAP="${SWAP:-1}"                            # 1=役割入替（10/25: 操作者はフォロワー機を持ち、リーダー機が追従）0=従来
 FF_SIGN="${FF_SIGN:-1}"                      # 握り返しの向き。入替で逆向き（握ると引き込まれる）なら -1
 GRIP_MA="${GRIP_MA:-500}"                    # 追従する腕の gripper 電流上限 mA（入替では M077: 同じ mA で力は約 1/2.4）
+FOLLOW_P="${FOLLOW_P:-1500}"                 # 入替で追従するリーダー機の腕 5 軸の Position_P_Gain（サーボ既定では重力と摩擦に負ける。負=書かない）
+FOLLOW_I="${FOLLOW_I:-0}"                    # 同 Position_I_Gain
+FOLLOW_D="${FOLLOW_D:-600}"                  # 同 Position_D_Gain（1500/0/600 は lerobot がフォロワー機の肘に使う値）
 PAIR="${PAIR:-B}"
 QUEST="${QUEST:-1}"
 QUEST_WAIT="${QUEST_WAIT:-900}"
@@ -177,7 +181,7 @@ run_hand() {  # run_hand <名前> <機種> <腕の役> <ブリッジ HTTP> <テ�
   kill "$bridge" $quest 2>/dev/null || true
 }
 
-usage() { sed -n '2,26p' "$here/koch.sh" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,27p' "$here/koch.sh" | sed 's/^# \{0,1\}//'; }
 
 mode="${1:-help}"
 [ $# -gt 0 ] && shift
@@ -186,10 +190,13 @@ case "$mode" in
     prepare
     has_arg --dry-run "$@" || ports_free "握手" 8765 8766 -- 8780
     swap=()
+    swap_extra=""
     if [ "$SWAP" = "1" ]; then
       swap=(--swap-roles)
+      swap_extra=" --follower-pgain $FOLLOW_P --follower-igain $FOLLOW_I --follower-dgain $FOLLOW_D"
       echo "握手（ペア A・差分反射式・役割入替）: 操作者が持つ腕=フォロワー機 A（XL430/M288: 同じ mA で約 2.4 倍の握り返し）、来場者側=リーダー機 A（M077）が追従。パネル http://127.0.0.1:8780"
       echo "  起動時にリーダー機 A がフォロワー機 A の姿勢へ 1.5 秒で動きます。従来の向きに戻す: SWAP=0 ./scripts/koch.sh handshake（コードごと戻すなら git switch main）"
+      echo "  追従側（リーダー機 A）の腕ゲイン P/I/D=${FOLLOW_P}/${FOLLOW_I}/${FOLLOW_D}（FOLLOW_P／FOLLOW_I／FOLLOW_D で変更。腕の温度は 2 秒ごとに 1 軸ずつ監視）"
       if ! has_arg --dry-run "$@"; then
         if [ "${KOCH_YES:-0}" = "1" ]; then
           echo "⚠ 接続直後と終了時にフォロワー機 A の腕の力が抜けます（KOCH_YES=1: 確認なしで起動）"
@@ -203,7 +210,7 @@ case "$mode" in
     fi
     echo "握り返し: 差分ゲイン ${FF_KE}・電流上限 ${FF_CAP} mA・向き ${FF_SIGN}・追従する腕の握力上限 ${GRIP_MA} mA（FF_KE／FF_CAP／FF_SIGN／GRIP_MA で変更。ゲインと上限はパネルのスライダでも動かせる）"
     exec "$PY" -m koch.launch --pair A --ff gripper --grip-ma "$GRIP_MA" ${swap[@]+"${swap[@]}"} \
-      --extra "--ff-style error --max-rel $MAX_REL --ff-ke $FF_KE --ff-cap $FF_CAP --ff-sign $FF_SIGN" "$@"
+      --extra "--ff-style error --max-rel $MAX_REL --ff-ke $FF_KE --ff-cap $FF_CAP --ff-sign $FF_SIGN$swap_extra" "$@"
     ;;
   vr-leader)
     prepare vr

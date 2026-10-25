@@ -177,18 +177,30 @@ machines of a wired pair:
   wraps lerobot's `KochLeader` in `DrivenLeader` (`src/koch/driven_leader.py`), which enables torque on
   the arm joints after lerobot's configure and writes `Goal_Position` like `KochFollower` does, with the
   same `--max-rel` limiter; `--grip-ma` caps its M077 gripper (the same 500 mA is about 1/2.4 of the
-  grip force the M288 gave the visitor).
+  grip force the M288 gave the visitor);
+- the driven arm's **position gains**: with the servo defaults the M077 arm lost to gravity and
+  friction on the bench (10/25 18:50: elbow 9 and wrist 12 normalized units behind, stepwise
+  motion, slow return), so `DrivenLeader` writes P 1500 / I 0 / D 600 (lerobot's values for the
+  follower's elbow) on the five arm joints after lerobot's configure (writing `Operating_Mode`
+  resets them) and before torque goes on, and reads them back (`--follower-pgain` /
+  `--follower-igain` / `--follower-dgain`, `FOLLOW_P` / `FOLLOW_I` / `FOLLOW_D` in `koch.sh`;
+  a negative value leaves the servo default). The teleop then reads one of its arm joints'
+  temperature every 2 s: a panel alert at 60 °C, ⛔ at 65 °C (stop and let it cool; the servo
+  shuts itself off at 70 °C and the arm drops).
 
 Wired only (`udp://` followers and VR pairs are refused), the config file is unchanged (ports and
 calibration ids keep their names; the launcher exchanges them), and the panel is unchanged: the pair's
 name on it becomes `A（役割入替: 操作側=フォロワー機／相手側=リーダー機）` through the existing
 `--labels` option, and the teleop's alerts name the machine (`リーダー役(フォロワー機)`). The panel's
 current graph still multiplies the two shoulder traces by 10 (XL430 load %), which over-reads the M077
-shoulders of a swapped pair; the gripper trace is unaffected. **Not yet run on the arms**: the
-direction of the grip feedback on the M288 (`FF_SIGN=-1` if the gripper is pulled closed instead of
-pushed open), the heaviness of the hand-moved follower machine, and the M077 arm following under the
-20-unit limiter are CHECKLIST TEST 2c. `./scripts/start.sh rehearse swap` covers the software path.
-`git switch main` removes all of it.
+shoulders of a swapped pair; the gripper trace is unaffected. **On the arms** (10/25 18:50, first
+run): both machines connected and the M077 arm followed, but with the servo's default gains it
+lagged as described above; the gains are the fix under test. Still to confirm on the arms
+(CHECKLIST TEST 2c): the tracking error and any oscillation or heating with the gains, the direction
+of the grip feedback on the M288 (`FF_SIGN=-1` if the gripper is pulled closed instead of pushed
+open), and the heaviness of the hand-moved follower machine. A wrist roll that reads −100 on the
+panel sits past its one-turn calibration (the shoulder-pan phenomenon in HANDOFF): turn it back one
+turn. `./scripts/start.sh rehearse swap` covers the software path. `git switch main` removes all of it.
 
 The laws are pure functions in `src/koch/feedback.py`, a verbatim mirror of
 [`twinarm/src/twinarm/domain/gripper_feedback.py`](../../twinarm/src/twinarm/domain/gripper_feedback.py)

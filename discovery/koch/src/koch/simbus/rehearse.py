@@ -374,7 +374,8 @@ def swap(r):
         "--swap-roles",
         "--no-browser",
         "--extra",
-        "--ff-style error --max-rel 20 --ff-ke 15 --ff-cap 500 --ff-sign 1",
+        "--ff-style error --max-rel 20 --ff-ke 15 --ff-cap 500 --ff-sign 1"
+        " --follower-pgain 1500 --follower-igain 0 --follower-dgain 600",
     )
     r.check("パネルが応答", wait_http(8780, "/"))
     time.sleep(9.0)
@@ -406,7 +407,8 @@ def swap(r):
         "clamped to be safe" not in log,
     )
     r.check("teleop が役割入替を告げた", "[swap]" in log)
-    recs, _ = r.bus_checks(["LA", "FA"])
+    r.check("腕ゲインの読み戻しが一致した", "読み戻し一致" in log)
+    recs, last = r.bus_checks(["LA", "FA"])
 
     def writes(port, motor, reg):
         return [
@@ -430,6 +432,35 @@ def swap(r):
     r.check(
         "フォロワー機の gripper は電流モード（差分反射）",
         0 in writes("FA", "gripper", "Operating_Mode"),
+    )
+    lift = [
+        (x["reg"], x["value"])
+        for x in recs
+        if x["port"] == "LA" and x.get("motor") == "shoulder_lift" and "reg" in x
+    ]
+    modes = [i for i, x in enumerate(lift) if x[0] == "Operating_Mode"]
+    after = modes[-1] if modes else -1
+    gain = next(
+        (i for i, x in enumerate(lift) if i > after and x == ("Position_P_Gain", 1500)),
+        None,
+    )
+    on = next(
+        (i for i, x in enumerate(lift) if i > after and x == ("Torque_Enable", 1)), None
+    )
+    r.check(
+        "リーダー機の腕ゲイン P 1500 をモード設定の後・トルク ON の前に書いた",
+        gain is not None and on is not None and gain < on,
+        lift[after + 1 : after + 6],
+    )
+    r.check(
+        "リーダー機の腕ゲイン D 600 も書いた",
+        ("Position_D_Gain", 600) in lift[after + 1 :],
+    )
+    shoulder = (last.get("LA") or {}).get("shoulder_lift", {})
+    r.check(
+        "終了時もリーダー機の肩の P ゲインは 1500",
+        shoulder.get("p_gain") == 1500,
+        shoulder,
     )
     goals = {x["port"]: x["goal_position_writes"] for x in recs if "dump" in x}
     r.check(

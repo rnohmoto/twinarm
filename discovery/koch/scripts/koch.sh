@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Koch 4 本: 握手（ペア A）と VR（どちらのペアでも、2 本を別々の人が手で動かす）を Mac で起動する。これが起動の正本。
 #   ./scripts/koch.sh              使い方を表示
-#   ./scripts/koch.sh handshake    握手: ペア A・差分反射式（フリーなら戻らない）・握力上限 500 mA・追従リミッタ 20・握り返し 差分ゲイン 15／上限 500 mA（10/19 の設定）
-#                                  10/25 に試して戻したもの: 上限 900（判定あり／なし・即時立ち上がりのどれでも「かちかち」＝27 fps の電流指令で手に押し返す方式の限界）、役割入替（M077 の肘が持ち上がらない）
+#   ./scripts/koch.sh handshake    握手: ペア A・握り返しは「なめらか壁」（10/25 実機で採用: 自由空間は力 0・フォロワーより 8 unit 握り込むと壁・力は 1 unit 100 mA ずつ上限 500・硬さ P 1200）
+#                                  握力上限 500 mA・追従リミッタ 20。従来の差分反射式に戻す: FF_STYLE=error ./scripts/koch.sh handshake（ke 15・上限 500・10/19 の応答）
+#                                  10/25 に試して戻したもの: 差分反射式の上限 900 と応答の調整（どれも「かちかち」）、役割入替（M077 の肘が持ち上がらない）
 #   ./scripts/koch.sh tune k=v ... 走行中の握手の握り返しを変える（例: tune ff_slew=300 ff_ke=30 / tune ff_pgain=2000。ペア B も: tune --ctl-port 8766,8768 ff_cap=600）
 #   ./scripts/koch.sh vr-leader    VR 1 人目: リーダーを手で。ペア B=http://localhost:8444/  ペア A=http://localhost:8445/
 #   ./scripts/koch.sh vr-follower  VR 2 人目: フォロワーを手で（別の空間）。ペア B=http://localhost:8443/  ペア A=http://localhost:8446/
@@ -23,7 +24,7 @@
 #           FF_KE=握手の握り返しの差分ゲイン mA/unit（既定 15。硬さ。上げても発熱は増えない）
 #           FF_CAP=握り返しの電流上限 mA（既定 500・最大 900。握っている間の最大電流＝発熱: 60 ℃でゲイン半減・65 ℃で停止。900 は 10/25 に「かちかち」で戻した）
 #           FF_SLEW／FF_ALPHA／FF_STALL／FF_MOVE_EPS=差分反射式の応答（既定 90／0.3／3／0.4＝10/19 の値。450／1.0／0 の即時型も 10/25 に試してかちかちは消えず。走行中は tune で）
-#           FF_STYLE=握り返しの方式（既定 error＝差分反射式 / follow＝なめらか壁: 壁はサーボ内部ループ。10/25 実機「ゆっくりだとかなり良い」 / spring）  FF_PGAIN=follow の壁の硬さ（既定 1200）
+#           FF_STYLE=握り返しの方式（既定 follow＝なめらか壁: 壁はサーボ内部ループ。10/25 実機「グッド」 / error＝差分反射式 / spring）  FF_PGAIN=follow の壁の硬さ（既定 1200）
 #           FF_FREE=follow の自由空間の許容幅 unit（既定 8。フォロワーの遅れがこの幅以内なら力 0＝完全フリー。大きいほど軽いが壁が遠い）  FF_RAMP=壁の力の立ち上がり mA/unit（既定 100。握り込み 5 unit で上限 500）
 #           SWAP=1 で握手の役割入替（既定 0。10/25: リーダー機 M077 の肘が前腕を持ち上げられず不採用・実験用に残す）  FF_SIGN=握り返しの向き（逆なら -1）  GRIP_MA=追従する腕の握力上限 mA（既定 500）
 #           FOLLOW_P／FOLLOW_I／FOLLOW_D=入替で追従するリーダー機の腕 5 軸の位置ゲイン（既定 1500/0/600＝lerobot がフォロワー機の肘に使う値。負で書かない）
@@ -44,7 +45,7 @@ FF_SLEW="${FF_SLEW:-90}"                     # 握り返しの立ち上がり: 1
 FF_ALPHA="${FF_ALPHA:-0.3}"                  # 握り返しの平滑化係数（10/19 の値。1 で平滑化なし）
 FF_STALL="${FF_STALL:-3}"                    # フォロワーが止まったと見るまでのフレーム数（10/19 の値。0 で待たない）
 FF_MOVE_EPS="${FF_MOVE_EPS:-0.4}"            # これ以上動くフォロワーは追従中と見て反力を出さない unit/フレーム（10/19 の値）
-FF_STYLE="${FF_STYLE:-error}"                # error=差分反射式 / follow=追従壁式（目標=フォロワー実位置。壁はサーボ内部ループ。10/25 実機未検証）/ spring
+FF_STYLE="${FF_STYLE:-follow}"               # follow=なめらか壁（10/25 実機で採用。壁はサーボ内部ループ）/ error=差分反射式（10/19 までの方式）/ spring
 FF_PGAIN="${FF_PGAIN:-1200}"                 # follow の壁の硬さ Position_P_Gain（vwall の物体は 250 スポンジ／900 ボール／2000 鉄）
 FF_FREE="${FF_FREE:-8}"                      # follow の自由空間の許容幅 unit（遅れがこの幅以内なら力 0＝完全フリー。10/25: 何も握っていないのに重い → 追加）
 FF_RAMP="${FF_RAMP:-100}"                    # follow の壁の力の立ち上がり mA/unit（許容幅を超えた握り込み 1 unit ごと。100 なら 5 unit で上限 500）

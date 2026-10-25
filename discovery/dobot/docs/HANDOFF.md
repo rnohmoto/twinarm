@@ -26,7 +26,7 @@ cd dobot && ./scripts/start.sh launcher   # Finder なら scripts/start.command 
 | PC | MacBook Pro（フェス Mac D）。作業ディレクトリは `twinarm-main/dobot` |
 | ロボット | Dobot Magician、吸盤。ポート `/dev/cu.usbserial-5A9E0126111`（CH9102）、backend `magician`（非常停止レーン付き） |
 | カメラ | Logicool C922 俯瞰、OpenCV index 0、1280×720。Logi Options+ で AF OFF・手動フォーカス（机）・自動露出 OFF、WB は自動（手動だと青被り） |
-| 物 | 木のブロック 4 色（赤・緑・青・黄）、厚み 16 mm |
+| 物 | 木のブロック 4 色（赤・緑・青・黄）、厚み 16 mm。ゴルフボール（白）は `detector: sphere`＝白い机でも「丸い縁の影」で見つける（10/26・実機未確認。手引き `manual/fest_quickstart.html` §3） |
 | 高さ | ブロック上面 z=-56.1 → `z_pick`=-57.1（4 色）。机面 z=-72.2 → `z_place`=-54.1（面＋厚み＋2）。`z_safe`=20、`z_min`=-80 |
 | 速さ | `speed_pct`=100、`travel_mode`=movj、`ee_settle_s`=0.4（§6） |
 | 置き場 | `tray_right`=(211,-125)。`tray_left`(230,110)・`box_front`(170,0)・`box_back`(280,0)・`start`(235,0) は既定 |

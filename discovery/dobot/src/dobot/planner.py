@@ -127,7 +127,9 @@ class TaskExecutor:
 
     def detect(self, frame: np.ndarray) -> list[Detection]:
         """画像 1 枚から検出し、ロボット座標・大きさ・届くかを埋める。状態もログも触らないので表示スレッドからも呼べる。"""
-        dets = detect_objects(frame, self.cfg.objects, self.cfg.min_area_px, self.cfg.max_area_px)
+        h, w = frame.shape[:2]
+        scale = self.p2r.mm_per_px(w / 2, h / 2) if self.p2r is not None else None
+        dets = detect_objects(frame, self.cfg.objects, self.cfg.min_area_px, self.cfg.max_area_px, mm_per_px=scale)
         if self.p2r is not None:
             for d in dets:
                 d.x_mm, d.y_mm = self.p2r.to_robot(d.cx, d.cy)

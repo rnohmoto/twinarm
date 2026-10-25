@@ -12,7 +12,7 @@ and purchasing rationale live in the planning repo: `robotics/TacitCapture/91_Ma
 (architecture, tests M0–M7, safety) and `93_Magicianカメラ…` (camera compatibility, buy list,
 object sizes).
 
-**Manuals (Japanese, with photo slots):** [`manual/index.html`](manual/index.html) first-time setup ·
+**Manuals (Japanese, with photo slots):** [`manual/fest_quickstart.html`](manual/fest_quickstart.html) the one-page fest guide (getting this branch onto the Mac and remaking the Desktop alias, the carry calibration's 9-point order, the white ball on a white table, heights, troubleshooting) · [`manual/index.html`](manual/index.html) first-time setup ·
 [`manual/connection.html`](manual/connection.html) wiring and ports (pump → SW1/GP1, Temp pin, what the
 Magician can and cannot report) · [`manual/purchase.html`](manual/purchase.html) purchase list with prices.
 

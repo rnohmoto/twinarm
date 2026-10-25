@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>卓上ロボット 当日の手引き（Magician・2026-10-26）</title>
+<style>
+  :root { --ink:#1f2937; --sub:#4b5563; --line:#d1d5db; --bg:#ffffff; --box:#f3f4f6; --blue:#2563eb; --green:#059669; --amber:#d97706; --red:#dc2626; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif; font-size:15px; line-height:1.7; }
+  main { max-width:960px; margin:0 auto; padding:24px 20px 60px; }
+  h1 { font-size:24px; margin:0 0 6px; }
+  h2 { font-size:19px; margin:34px 0 10px; padding-left:10px; border-left:6px solid var(--blue); }
+  h3 { font-size:16px; margin:18px 0 6px; }
+  p { margin:6px 0; }
+  .lead { color:var(--sub); font-size:14px; }
+  .steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:14px 0; }
+  .step { background:var(--box); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .step b { display:block; font-size:16px; margin-bottom:4px; }
+  .num { display:inline-block; width:26px; height:26px; line-height:26px; text-align:center; border-radius:50%; background:var(--blue); color:#fff; font-weight:bold; margin-right:6px; }
+  table { border-collapse:collapse; width:100%; margin:10px 0; font-size:14px; }
+  th, td { border:1px solid var(--line); padding:7px 9px; vertical-align:top; text-align:left; }
+  th { background:var(--box); }
+  code { background:#eef2ff; padding:1px 5px; border-radius:4px; font-size:13.5px; font-family:Menlo,Consolas,monospace; }
+  pre { background:#111827; color:#f9fafb; padding:12px 14px; border-radius:8px; overflow:auto; font-size:13.5px; line-height:1.55; }
+  .fig { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px; margin:12px 0; }
+  .fig figcaption { font-size:13px; color:var(--sub); margin-top:4px; }
+  .warn { border-left:6px solid var(--amber); background:#fff7ed; padding:8px 12px; margin:10px 0; }
+  .stop { border-left:6px solid var(--red); background:#fef2f2; padding:8px 12px; margin:10px 0; }
+  .ok { border-left:6px solid var(--green); background:#ecfdf5; padding:8px 12px; margin:10px 0; }
+  svg text { font-family:inherit; }
+  @media print { body { font-size:12.5pt; } main { padding:0; } h2 { break-after:avoid; } .fig, .step, table { break-inside:avoid; } pre { white-space:pre-wrap; } }
+</style>
+</head>
+<body>
+<main>
+<h1>卓上ロボット 当日の手引き</h1>
+<p class="lead">Dobot Magician（吸盤）・俯瞰カメラ C922・Mac D。2026-10-26 版。会場で触るのは「確認 → 必要なら較正 → 置き場 → 1 回動かす」の 4 つ。細かいことは <code>docs/fest-checklist-261026.md</code> と <code>docs/HANDOFF.md</code>。</p>
+
+<div class="steps">
+  <div class="step"><b><span class="num">1</span>電源とホーミング</b>電源 ON → 本体キー 2 秒長押し → LED が緑。電源を入れるたびに必ず</div>
+  <div class="step"><b><span class="num">2</span>起動</b><code>scripts/start.command</code> をダブルクリック → ランチャー（ブラウザ）</div>
+  <div class="step"><b><span class="num">3</span>較正を確認（30 秒）</b>青ブロックを見える所に 1 個置いて「較正を確認」。「使えます」ならそのまま</div>
+  <div class="step"><b><span class="num">4</span>置き場と 1 回</b>トレイを置いたら「置き場を調整」→「実演を起動」→ 往復 → 文字で 1 回 → 声で 1 回</div>
+</div>
+
+<h2>1. 新しい版を Mac に入れる（最初に 1 回）</h2>
+<p>10/21 に置き場所が変わりました。<b>旧: <code>twinarm-main/dobot/</code>（設定 <code>config.json</code>・起動 <code>start.command</code>）→ 新: <code>discovery/dobot/</code>（設定 <code>src/config.json</code>・起動 <code>scripts/start.command</code>）</b>。デスクトップのエイリアスは旧の <code>start.command</code> を指しているので、作り直します。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 900 230" width="100%" role="img" aria-label="フォルダ構成の変更">
+  <rect x="20" y="20" width="380" height="190" rx="10" fill="#f3f4f6" stroke="#d1d5db"/>
+  <text x="40" y="48" font-size="15" font-weight="bold">旧（10/19 まで・zip の twinarm-main）</text>
+  <text x="40" y="80" font-size="14">twinarm-main/</text>
+  <text x="60" y="104" font-size="14">dobot/</text>
+  <text x="84" y="128" font-size="14">config.json</text>
+  <text x="84" y="152" font-size="14" fill="#dc2626">start.command  ← エイリアスの先</text>
+  <text x="84" y="176" font-size="14">assets/homography.json</text>
+  <path d="M410 115 L480 115" stroke="#2563eb" stroke-width="3" marker-end="url(#a)"/>
+  <defs><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker></defs>
+  <rect x="500" y="20" width="380" height="190" rx="10" fill="#eef2ff" stroke="#2563eb"/>
+  <text x="520" y="48" font-size="15" font-weight="bold" fill="#1e3a8a">新（この版・枝 ms/feat/dobot-calibrate-carry-261026）</text>
+  <text x="520" y="80" font-size="14">twinarm/</text>
+  <text x="540" y="104" font-size="14">discovery/dobot/</text>
+  <text x="564" y="128" font-size="14">src/config.json</text>
+  <text x="564" y="152" font-size="14" fill="#059669">scripts/start.command  ← ここへ新しいエイリアス</text>
+  <text x="564" y="176" font-size="14">assets/homography.json（git 管理）</text>
+</svg>
+<figcaption>設定ファイルの場所と起動スクリプトの場所が変わった。エイリアスは右の start.command を右クリック →「エイリアスを作成」→ デスクトップへ。</figcaption>
+</figure>
+
+<h3>A. フォルダが git のクローンのとき（Terminal で <code>git status</code> が通る）</h3>
+<pre>cd ~/twinarm            # 実際のフォルダへ
+git fetch origin
+git checkout ms/feat/dobot-calibrate-carry-261026
+cd discovery/dobot
+uv sync --extra voice --extra llm   # 1 回。声と Claude の分（約 150 MB・ネットが要る）
+./scripts/start.sh check            # 「passed」が出れば入っている。腕は動かない</pre>
+<p>旧の <code>dobot/config.json</code> を手で直していた（ポート・置き場・高さ）なら、その値を <code>src/config.json</code> に写す。ポートは <code>ls /dev/cu.usbserial-*</code>。</p>
+
+<h3>B. zip で持ってきたとき（git が無い）</h3>
+<p>GitHub の twinarm → Branches → <code>ms/feat/dobot-calibrate-carry-261026</code> → Code → Download ZIP。展開して <code>discovery/dobot/scripts/setup.command</code> をダブルクリック（uv・依存・音声モデル・テストまで自動）。終わったら <code>scripts/start.command</code> のエイリアスをデスクトップへ。</p>
+<div class="warn">どちらの場合も、以前の <code>assets/homography.json</code>（較正）は新しい版にも入っています（10/19・9 点・RMS 3.10 mm）。カメラとロボットを動かしていなければそのまま使えます。</div>
+
+<h2>2. 較正: ブロックを 1 回置くだけ</h2>
+<p>較正が要るのは<b>カメラかロボットを動かしたときだけ</b>。迷ったら「較正を確認」（30 秒）。やり直すときは「較正をやり直す」（約 1 分）。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 900 360" width="100%" role="img" aria-label="較正で腕が回る 9 点の順">
+  <rect x="20" y="20" width="520" height="320" rx="10" fill="#fafafa" stroke="#d1d5db"/>
+  <text x="40" y="48" font-size="15" font-weight="bold">机（上から）・ロボットの基部は下</text>
+  <rect x="140" y="300" width="80" height="30" rx="6" fill="#9ca3af"/>
+  <text x="152" y="321" font-size="13" fill="#fff">基部</text>
+  <!-- grid: x from base up, y left/right. points drawn as circles -->
+  <g font-size="13" text-anchor="middle">
+    <circle cx="90" cy="250" r="16" fill="#2563eb"/><text x="90" y="255" fill="#fff" font-weight="bold">1</text>
+    <circle cx="90" cy="150" r="16" fill="#2563eb"/><text x="90" y="155" fill="#fff" font-weight="bold">2</text>
+    <circle cx="470" cy="150" r="16" fill="#2563eb"/><text x="470" y="155" fill="#fff" font-weight="bold">3</text>
+    <circle cx="470" cy="250" r="16" fill="#2563eb"/><text x="470" y="255" fill="#fff" font-weight="bold">4</text>
+    <circle cx="280" cy="200" r="16" fill="#059669"/><text x="280" y="205" fill="#fff" font-weight="bold">5</text>
+    <circle cx="280" cy="250" r="16" fill="#d97706"/><text x="280" y="255" fill="#fff" font-weight="bold">6</text>
+    <circle cx="470" cy="200" r="16" fill="#d97706"/><text x="470" y="205" fill="#fff" font-weight="bold">7</text>
+    <circle cx="280" cy="150" r="16" fill="#d97706"/><text x="280" y="155" fill="#fff" font-weight="bold">8</text>
+    <circle cx="90" cy="200" r="16" fill="#d97706"/><text x="90" y="205" fill="#fff" font-weight="bold">9</text>
+  </g>
+  <text x="40" y="80" font-size="13" fill="#4b5563">四隅（1〜4）→ 中心（5）→ 辺の中点（6〜9）。1 の上でだけ「吸盤の真下に置いて Enter」</text>
+  <!-- park positions -->
+  <rect x="40" y="265" width="40" height="22" rx="4" fill="#fee2e2" stroke="#dc2626"/><text x="60" y="281" font-size="11" text-anchor="middle" fill="#dc2626">退避</text>
+  <rect x="40" y="118" width="40" height="22" rx="4" fill="#fee2e2" stroke="#dc2626"/><text x="60" y="134" font-size="11" text-anchor="middle" fill="#dc2626">退避</text>
+  <text x="40" y="100" font-size="12" fill="#dc2626">撮る前に、目標と反対側の基部寄りへ退避（腕が物を隠さないため）</text>
+  <!-- right: cycle -->
+  <rect x="570" y="20" width="310" height="320" rx="10" fill="#eef2ff" stroke="#2563eb"/>
+  <text x="590" y="48" font-size="15" font-weight="bold" fill="#1e3a8a">各点で腕がすること</text>
+  <g font-size="14">
+    <text x="590" y="85">① 置く（吸盤を z_place まで下げて離す）</text>
+    <text x="590" y="115">② 脇へ退避する</text>
+    <text x="590" y="145">③ カメラで読む（画素を記録）</text>
+    <text x="590" y="175">④ 拾う（z_pick まで下げて吸う）</text>
+    <text x="590" y="205">⑤ 次の点へ運ぶ</text>
+    <text x="590" y="250" fill="#4b5563" font-size="13">拾えていなかったら前の点から拾い直す</text>
+    <text x="590" y="275" fill="#4b5563" font-size="13">見えない・落としたら「置いて Enter」と聞く</text>
+    <text x="590" y="300" fill="#4b5563" font-size="13">終わると RMS（3 mm 以下で合格）</text>
+    <text x="590" y="325" fill="#4b5563" font-size="13">最後の点にブロックを置いたまま home へ</text>
+  </g>
+</svg>
+<figcaption>なぜ 9 点か: 画素→座標の変換は 4 点で決まり、5 点で足りる。9 点にすると余りの点で当てはまりの悪さ（RMS）が分かる。端まで広く取るのは精度のためで、可動域の確認ではない。</figcaption>
+</figure>
+
+<table>
+<tr><th>ボタン</th><th>前に用意するもの</th><th>腕の動き</th><th>結果の見方</th></tr>
+<tr><td>較正を確認</td><td>青ブロック 1 個をカメラに見える所（トレイの外）に置く</td><td>拾って中心へ置き、置いた位置を読む（30 秒）</td><td>「使えます: ずれ x mm」→ 何もしない。「拾えませんでした」「ずれ &gt; 3 mm」→ やり直す</td></tr>
+<tr><td>較正をやり直す</td><td>トレイをどける。青ブロック 1 個</td><td>最初の点の上 8 mm で止まる → 真下に置いて Enter → 9 点を回る（約 1 分）</td><td>RMS 3 mm 以下で合格。超えたらカメラの固定（AF・露出）と置き方を見てもう 1 回</td></tr>
+</table>
+
+<h2>3. 白い机の白いゴルフボール</h2>
+<p>色では見つかりません（机も白）。この版は<b>「丸い縁の影」</b>で見つけます。上から見た球は、中心が明るく、縁に向かって暗くなり、片側に影が落ちます。平らな白い物（紙・ブロックの上面）は中心と縁が同じ明るさなので、球と区別できます。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 900 300" width="100%" role="img" aria-label="白い机の白い球の見え方">
+  <defs>
+    <radialGradient id="ball" cx="40%" cy="38%" r="62%"><stop offset="0%" stop-color="#ffffff"/><stop offset="55%" stop-color="#ececec"/><stop offset="100%" stop-color="#a6a6a6"/></radialGradient>
+  </defs>
+  <rect x="20" y="20" width="400" height="260" rx="10" fill="#e6e6e6" stroke="#d1d5db"/>
+  <text x="40" y="48" font-size="14" fill="#4b5563">白い机（カメラから見た絵）</text>
+  <ellipse cx="250" cy="195" rx="92" ry="52" fill="#bdbdbd"/>
+  <circle cx="220" cy="160" r="80" fill="url(#ball)"/>
+  <circle cx="220" cy="160" r="80" fill="none" stroke="#2563eb" stroke-width="3" stroke-dasharray="8 6"/>
+  <circle cx="220" cy="160" r="44" fill="none" stroke="#059669" stroke-width="2"/>
+  <circle cx="220" cy="160" r="112" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="4 4"/>
+  <text x="40" y="270" font-size="13" fill="#4b5563">点線の円＝見つけた円（HoughCircles）</text>
+  <!-- legend -->
+  <g font-size="14">
+    <rect x="450" y="20" width="430" height="260" rx="10" fill="#fff" stroke="#d1d5db"/>
+    <text x="470" y="50" font-weight="bold">球と認める 3 つの条件</text>
+    <circle cx="482" cy="82" r="8" fill="none" stroke="#059669" stroke-width="2"/><text x="500" y="87">中心（緑の円の内側）が、縁より明るい＝球の陰影</text>
+    <circle cx="482" cy="122" r="8" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="3 2"/><text x="500" y="127">縁（青の円のすぐ内側）が、机（橙の輪）と明るさが違う</text>
+    <rect x="474" y="154" width="16" height="16" fill="#f3f4f6" stroke="#9ca3af"/><text x="500" y="167">内側が白っぽい（色が付いていない）</text>
+    <text x="470" y="205" fill="#4b5563" font-size="13">落ちた影は平らで中心と縁が同じ → 球と言わない</text>
+    <text x="470" y="228" fill="#4b5563" font-size="13">半径の目安は較正の縮尺とボールの直径 42.67 mm から</text>
+    <text x="470" y="251" fill="#4b5563" font-size="13">円の中心を使うので、影に引っ張られない</text>
+  </g>
+</svg>
+<figcaption>球の縁は暗く、中心は明るい。この「陰影」が白い机でも見つける手がかり。黒いマットのときは従来どおり色（白）でも探す。</figcaption>
+</figure>
+
+<table>
+<tr><th>見る所</th><th>やること</th></tr>
+<tr><td>見つかるか</td><td>ボールを 1 個置いて、実演画面に <code>golf_ball</code> の枠が付くか。付かなければ <code>src/config.json</code> の <code>golf_ball</code> を順に: <code>rim_contrast</code> 10 → 6、<code>min_limb_drop</code> 6 → 3、<code>hough_param2</code> 28 → 20。誤検出（無い所に枠）なら逆に上げる</td></tr>
+<tr><td>照明</td><td>真上からの一灯より、少し斜めからの光の方が縁の影が出て見つけやすい。机の上に白い丸い物（カップ・コースター）を置かない</td></tr>
+<tr><td>高さ</td><td><code>z_pick</code> −30.5／<code>z_place</code> −27.5 は机 −72.2 からの計算値。1 回だけ吸盤をボールの上面に当てて <code>uv run dobot-check-robot --config src/config.json</code> の z を読み、−1 を <code>z_pick</code>、+3 を <code>z_place</code> に（<code>dobot-setup --from 6</code> なら自動）</td></tr>
+<tr><td>吸えるか</td><td>ディンプルで密着が不確実（公開事例なし）。10 回試して 9 回吸えなければ「展示のみ」にして卓球ボールへ。次の手は柔らかい大径の吸盤</td></tr>
+<tr><td>端のずれ</td><td>較正はブロックの上面（16 mm）で取り、ボールの赤道は 21 mm。カメラの真下から 30 cm 離れると 3 mm ほど外側に見える。ボールはカメラの真下 20 cm 以内に置く</td></tr>
+</table>
+
+<h2>4. 高さの約束</h2>
+<figure class="fig">
+<svg viewBox="0 0 900 260" width="100%" role="img" aria-label="高さの関係">
+  <rect x="20" y="200" width="860" height="14" fill="#9ca3af"/><text x="30" y="236" font-size="13" fill="#4b5563">机の面 z = −72.2（ロボットの基部からの相対。会場が変わっても同じ）</text>
+  <line x1="60" y1="40" x2="840" y2="40" stroke="#2563eb" stroke-dasharray="6 5"/><text x="70" y="34" font-size="13" fill="#2563eb">z_safe = 20（運ぶ高さ。箱の縁より上に）</text>
+  <!-- block -->
+  <rect x="140" y="168" width="140" height="32" fill="#fbbf24" stroke="#b45309"/><text x="150" y="190" font-size="13">ブロック 16 mm</text>
+  <line x1="120" y1="166" x2="300" y2="166" stroke="#059669"/><text x="305" y="160" font-size="12" fill="#059669">上面 −56.1 → z_pick −57.1（1 mm 押す）</text>
+  <line x1="120" y1="150" x2="300" y2="150" stroke="#d97706"/><text x="305" y="146" font-size="12" fill="#d97706">z_place −54.1（底が面の 2 mm 上で離す）</text>
+  <!-- ball -->
+  <circle cx="620" cy="157" r="43" fill="#f9fafb" stroke="#6b7280"/><text x="590" y="162" font-size="12">ゴルフ 43 mm</text>
+  <line x1="560" y1="114" x2="700" y2="114" stroke="#059669"/><text x="705" y="110" font-size="12" fill="#059669">上面 −29.5 → z_pick −30.5</text>
+  <line x1="560" y1="98" x2="700" y2="98" stroke="#d97706"/><text x="705" y="94" font-size="12" fill="#d97706">z_place −27.5</text>
+  <text x="560" y="250" font-size="12" fill="#dc2626">ブロック用の −54.1 でボールを置くと 27 mm 押し付ける → 物ごとの z_place で防ぐ（10/26）</text>
+</svg>
+<figcaption>拾う高さも置く高さも物ごと。置き場に z_place があるときだけ置き場が優先（トレイの底が机と違う高さのとき）。</figcaption>
+</figure>
+
+<h2>5. 困ったとき</h2>
+<table>
+<tr><th>症状</th><th>対処</th></tr>
+<tr><td>腕が止まり「脱調」のアラーム</td><td class="stop">腕の周りを空けて<b>本体キー 2 秒長押し</b>（ホーミング・J1 が左右に振れる・LED が緑まで）→ 停止解除 → ホーム。画面の「ホーム」だけでは直らない（座標へ動くだけで基準を取り直さない）。繰り返すなら速さを 70 に</td></tr>
+<tr><td>「届きません」「限界」</td><td>物や置き場をロボットから 15〜30 cm の中へ → 停止解除 → ホーム（自動で解除される）</td></tr>
+<tr><td>「拾えませんでした」が続く</td><td>吸着の待ちを 0.6 に。ブロックの上面の汚れ。<code>z_pick</code> が上面 −1 か（<code>dobot-setup --from 6</code>）</td></tr>
+<tr><td>較正の RMS が 3 mm 超</td><td>Logi Options+ の AF・露出が自動に戻っていないか。三脚の揺れ。ブロックが真下からずれて置かれた → もう 1 回</td></tr>
+<tr><td>色が拾えない</td><td>照明が変わった。ブロックを影の無い所へ。<code>dobot-setup --from 7</code> で枠を見ながら <code>objects[].ranges</code></td></tr>
+<tr><td>画面が固まる・ポート使用中</td><td>ランチャー「再起動」。駄目なら Terminal で Ctrl+C → start.command。残っていれば <code>pkill -f dobot.demo</code></td></tr>
+</table>
+<div class="ok">終わるとき: ランチャー「停止」（腕がホームへ）→ Terminal で Ctrl+C → 電源 OFF。</div>
+<p class="lead">初めて実機で動くもの（結果を HANDOFF に書く）: ①較正を確認 ②較正をやり直す（1 回置くだけで回り切るか・RMS・秒数）③ゴルフボールの枠と吸着 10 回 ④20 サイクル連続。</p>
+</main>
+</body>
+</html>

@@ -91,6 +91,13 @@ class ObjectSpec:
     min_circularity: float = 0.0     # 4πA/P² の下限（正方形 ≈0.79・円 ≈1.0）。球は 0.82 以上
     aspect_min: float = 1.0          # 外接矩形の 長辺/短辺 の範囲（細長い物の識別）
     aspect_max: float = 99.0
+    detector: str = "hsv"            # hsv=色＋形（ranges）／sphere=白い机の白い球: 円のあたり（HoughCircles）＋縁の影（球の縁は机より暗い）。
+    #                                  sphere は ranges を使わない。白い机では色では見つからないので球はこちら（2026-10-26）
+    diameter_mm: float | None = None # 球の直径。較正があるとき sphere の半径の目安に使う（ゴルフ 42.67・卓球 40）
+    rim_contrast: float = 10.0       # sphere: |外側（机）− 縁| の明るさの差の下限（0〜255）。見つからなければ 6、誤検出なら 15
+    min_limb_drop: float = 6.0       # sphere: 中心 − 縁 の明るさの差の下限（球の陰影。平らな紙・影・ブロックの上面はこれで落ちる）
+    max_saturation: int = 70         # sphere: 円の内側の平均彩度の上限（色つきの物を球と言わない）
+    hough_param2: float = 28.0       # sphere: 円のあたりの票の下限。下げる＝拾いやすい（誤検出も増える）
     z_pick: float | None = None      # None → RobotConfig.z_pick（物の高さが違うので原則は物ごとに教える）
     z_place: float | None = None     # 置くときの吸盤高さ（物をつかんだまま）。None → Zone.z_place → RobotConfig.z_place。
     #                                  同じ面に置くなら z_pick + 3（物の底が面の 2 mm 上）。ブロック用の値をボールに使うと
@@ -219,7 +226,8 @@ class AppConfig:
                        [[[95, 120, 60], [130, 255, 255]]], aspect_min=2.2, aspect_max=8.0, ee="gripper"),
             # 白いボール（ゴルフ）: S 低・V 高＋円形度。ArUco の白地（正方形 ≈0.79）を円形度で弾く
             ObjectSpec("golf_ball", "ゴルフボール", ["ゴルフ", "ごるふ", "白いボール", "白い球"],
-                       [[[0, 0, 170], [179, 70, 255]]], min_circularity=0.85, aspect_min=1.0, aspect_max=1.3),
+                       [[[0, 0, 170], [179, 70, 255]]], min_circularity=0.85, aspect_min=1.0, aspect_max=1.3,
+                       detector="sphere", diameter_mm=42.67),
             # 球の円形度は凸包で測る（detect.shape_features）: 縁の影やディンプルで欠けても 0.9 前後。ぼかしと開閉で角が丸まった
             # 白い正方形（ArUco の白地）は 0.80 を超えることがあるので、下限は 0.85 のまま（2026-10-26 合成画像で確認）
         ]
